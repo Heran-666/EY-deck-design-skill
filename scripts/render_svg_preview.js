@@ -12,7 +12,7 @@ const path = require("path");
 const { pathToFileURL } = require("url");
 
 const RENDERER = "ey-deck-playwright-chromium";
-const SCHEMA_VERSION = "ey-deck-preview-renderer.v3";
+const SCHEMA_VERSION = "ey-deck-preview-renderer.v4";
 
 function fail(message, code = 2) {
   process.stderr.write(String(message).trim() + "\n");
@@ -168,6 +168,29 @@ async function render(requestPath) {
               .replace(/\s+/gu, " ")
               .trim()
               .replace(/(?<=[\u2E80-\u9FFF\uF900-\uFAFF\uFF01-\uFF60]) (?=[\u2E80-\u9FFF\uF900-\uFAFF\uFF01-\uFF60])/gu, "");
+            const xmlNamespace = "http://www.w3.org/XML/1998/namespace";
+            const isFormattingWhitespace = (value, xmlSpace) => (
+              xmlSpace !== "preserve"
+              && /^[\s]*$/u.test(value)
+              && /[\r\n]/u.test(value)
+            );
+            const logicalText = (element, inheritedXmlSpace = "default") => {
+              const declared = element.getAttributeNS(xmlNamespace, "space")
+                || element.getAttribute("xml:space");
+              const xmlSpace = ["default", "preserve"].includes(declared)
+                ? declared
+                : inheritedXmlSpace;
+              let value = "";
+              for (const child of element.childNodes) {
+                if (child.nodeType === Node.TEXT_NODE) {
+                  const text = child.nodeValue || "";
+                  if (!isFormattingWhitespace(text, xmlSpace)) value += text;
+                } else if (child.nodeType === Node.ELEMENT_NODE) {
+                  value += logicalText(child, xmlSpace);
+                }
+              }
+              return value;
+            };
             const stageElement = document.querySelector("#stage");
             const stageRect = stageElement.getBoundingClientRect();
             const errors = [];
@@ -186,7 +209,7 @@ async function render(requestPath) {
               const element = matches[0];
               const style = getComputedStyle(element);
               const rect = element.getBoundingClientRect();
-              const observed = normalize(element.textContent);
+              const observed = normalize(logicalText(element));
               const approved = normalize(expected.text);
               const intersects = rect.right > stageRect.left && rect.left < stageRect.right
                 && rect.bottom > stageRect.top && rect.top < stageRect.bottom;

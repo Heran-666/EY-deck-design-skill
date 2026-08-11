@@ -163,6 +163,53 @@ class VisibleCopyContractTests(unittest.TestCase):
             self.assertTrue(any("S01-title changed" in error for error in errors))
             self.assertTrue(any("missing required visible-copy id S01-subtitle" in error for error in errors))
 
+    def test_pretty_printed_tspans_do_not_inject_visible_copy_spaces(self) -> None:
+        section = """## S01｜转向“持续 / hello world
+
+### On-slide content
+- Title: 转向“持续 / hello world
+"""
+        contract = visible_copy_contract(section, "S01")
+        compact = (
+            '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720">'
+            '<text data-copy-id="S01-title" x="10" y="30">'
+            '<tspan>转向</tspan><tspan>“持续 / hello</tspan> <tspan>world</tspan>'
+            '</text></svg>'
+        )
+        formatted = (
+            '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720">\n'
+            '  <text data-copy-id="S01-title" x="10" y="30">\n'
+            '    <tspan>转向</tspan>\n'
+            '    <tspan>“持续 / hello</tspan> <tspan>world</tspan>\n'
+            '  </text>\n'
+            '</svg>'
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            for name, svg in (("compact.svg", compact), ("formatted.svg", formatted)):
+                path = root / name
+                path.write_text(svg, encoding="utf-8")
+                self.assertEqual([], visible_copy_errors(path, contract), name)
+
+    def test_xml_space_preserve_keeps_line_break_whitespace_significant(self) -> None:
+        section = """## S01｜转向“持续
+
+### On-slide content
+- Title: 转向“持续
+"""
+        contract = visible_copy_contract(section, "S01")
+        svg = (
+            '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720">'
+            '<text data-copy-id="S01-title" x="10" y="30" xml:space="preserve">'
+            '<tspan>转向</tspan>\n  <tspan>“持续</tspan>'
+            '</text></svg>'
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "preserved.svg"
+            path.write_text(svg, encoding="utf-8")
+            errors = visible_copy_errors(path, contract)
+            self.assertTrue(any("S01-title changed" in error for error in errors))
+
 
 class PagePreflightReuseTests(unittest.TestCase):
     def test_current_receipt_reuses_pass_until_artifact_hash_changes(self) -> None:

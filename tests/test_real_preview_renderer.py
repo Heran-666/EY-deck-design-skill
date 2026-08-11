@@ -14,6 +14,7 @@ import sys
 sys.path.insert(0, str(SCRIPTS))
 
 from preview_renderer import ensure_preview_pair, png_dimensions  # noqa: E402
+from workflow_copy_contract import visible_copy_contract  # noqa: E402
 
 
 @unittest.skipUnless(
@@ -21,6 +22,39 @@ from preview_renderer import ensure_preview_pair, png_dimensions  # noqa: E402
     "set EY_RUN_BROWSER_PREVIEW_TESTS=1 for the local Chromium smoke test",
 )
 class RealPreviewRendererTests(unittest.TestCase):
+    def test_copy_gate_ignores_pretty_print_tspan_indentation(self) -> None:
+        section = """## S01｜转向“持续 / hello world
+
+### On-slide content
+- Title: 转向“持续 / hello world
+"""
+        contract = visible_copy_contract(section, "S01")
+        compact = '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" width="1280" height="720">
+<rect width="1280" height="720" fill="#000000"/>
+<text data-copy-id="S01-title" x="80" y="100" fill="#FFFFFF" font-size="36"><tspan>转向</tspan><tspan>“持续 / hello</tspan> <tspan>world</tspan></text>
+</svg>'''
+        formatted = '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" width="1280" height="720">
+<rect width="1280" height="720" fill="#000000"/>
+<text data-copy-id="S01-title" x="80" y="100" fill="#FFFFFF" font-size="36">
+  <tspan>转向</tspan>
+  <tspan>“持续 / hello</tspan> <tspan>world</tspan>
+</text>
+</svg>'''
+        with tempfile.TemporaryDirectory() as tmp:
+            project = Path(tmp)
+            working = project / "svg_working" / "S01"
+            working.mkdir(parents=True)
+            (working / "A.svg").write_text(compact, encoding="utf-8")
+            (working / "B.svg").write_text(formatted, encoding="utf-8")
+            records = ensure_preview_pair(
+                project,
+                "S01",
+                ("A", "B"),
+                copy_contract=contract,
+            )
+            for version in ("A", "B"):
+                self.assertEqual(records[version]["visible_copy_status"], "PASS")
+
     def test_playwright_chromium_renders_text_and_embedded_image(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             project = Path(tmp)
