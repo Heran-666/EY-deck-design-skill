@@ -1,0 +1,62 @@
+# Deliverable type and Storyline selection
+
+## Contents
+
+1. Classify from the supplied background
+2. Confirm the type
+3. Build the type-appropriate Storyline
+4. Present the Storyline for approval
+
+## 1. Classify from the supplied background
+
+Review the user's objective, audience, source material, delivery setting, requested output, desired audience change, and constraints before asking about format. Infer the primary deliverable type:
+
+- `Proposal`: seeks selection, approval, sponsorship, funding, or authorization for a proposed response, scope, approach, or commercial offer.
+- `Sharing deck`: communicates experience, insights, progress, practices, or a point of view primarily to create understanding, alignment, or discussion.
+- `Training`: builds knowledge or capability and requires explicit learning objectives, explanation, examples, practice, checks, or application support.
+- `Interpretation`: explains and makes sense of supplied material, findings, policy, research, data, or an existing document, with emphasis on meaning, implications, uncertainty, and response.
+- `Other: <specific form>`: names the actual form when none of the four types fits, such as decision briefing, workshop, readout, update, report-out, or keynote.
+
+Classify by the audience outcome, not by the user's casual use of words such as “deck,” “presentation,” or “sharing.” Treat hybrids by their dominant purpose. Mention a secondary type only when it materially changes the Storyline.
+
+## 2. Confirm the type
+
+Give one concise preliminary judgment after reviewing the background:
+
+`根据现有背景，我初步判断这是 <type>，因为 <purpose/audience basis>。请确认；如果不准确，请告诉我更希望它作为哪种形式。`
+
+If two types remain genuinely plausible, recommend one and name only the closest alternative with the consequence for structure. Ask no more than the minimum additional question needed to distinguish them. Do not present a page sequence before confirmation unless the user explicitly asks to proceed without the gate.
+
+Treat a direct correction as confirmation of the corrected type. Record the confirmed type in the temporary intake summary and later in `framework.md`; do not repeatedly reconfirm it unless the user's objective changes.
+
+## 3. Build the type-appropriate Storyline
+
+### Proposal
+
+Use [client-and-rfp-contexts.md](client-and-rfp-contexts.md) and [storyline-and-content.md](storyline-and-content.md). Anchor the sequence in the decision, requirements, thesis, scope, approach, deliverables, value, and evidence.
+
+### Sharing deck
+
+Use: why it matters → context/experience → key ideas and evidence → audience implications → discussion or action. Do not manufacture a sales thesis or exercises.
+
+### Training
+
+Define observable learning outcomes, then sequence prerequisite context → concepts/model → demonstration → practice/reflection → application checks → recap and next use. A topic list is not a learning journey.
+
+### Interpretation
+
+Use: source/context → key findings or provisions → interpretation → audience implications → uncertainties/boundaries → response or questions. Separate fact, interpretation, inference, and recommendation.
+
+### Other
+
+Name the form and success condition. Select the clearest justified logic—decision, chronology, problem–solution, evidence–implication, comparison, process, or workshop flow—rather than defaulting to proposal logic.
+
+### Hybrids
+
+Choose one primary type and only the necessary secondary behavior. Surface conflicting audience outcomes before drafting.
+
+## 4. Present the Storyline for approval
+
+For every confirmed type, show the complete page sequence with provisional Slide ID, title or purpose, narrative role, adjacency logic, review mode, and protected status. Briefly explain the overall narrative arc and how it serves the confirmed audience outcome.
+
+Obtain explicit approval before creating `framework.md` or `content.md`, unless the user expressly waives the Storyline gate. After approval, all types use the same controller-governed workflow.
