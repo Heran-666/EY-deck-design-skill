@@ -508,15 +508,18 @@ def _emit_mergeable_paragraph(
 def flatten_text_with_tspans(
     tree: ET.ElementTree,
     merge_paragraphs: bool = False,
+    split_unmergeable: bool = True,
 ) -> bool:
     """Flatten multi-line tspan text into independent text nodes when needed.
 
     When ``merge_paragraphs`` is True, mergeable paragraph blocks (same x,
     dy clustered around one base line-height) are kept as a single <text>
     so downstream conversion emits one editable PowerPoint text frame
-    with multiple <a:p>. Default False preserves the original behavior:
-    every line-break tspan becomes its own <text>, matching the SVG's
-    pixel-fidelity contract.
+    with multiple <a:p>. When ``split_unmergeable`` is False, rejected
+    paragraph blocks remain unchanged instead of being promoted into sibling
+    ``<text>`` elements. Stage 2 uses that mode for deterministic isolated-copy
+    normalization so its post-normalization topology gate can still identify
+    every unresolved block. Defaults preserve the historical converter path.
     """
     root = tree.getroot()
     parent_map = {c: p for p in root.iter() for c in p}
@@ -587,6 +590,8 @@ def flatten_text_with_tspans(
                     synthetic_first=synthetic_first,
                 )
                 changed = True
+                continue
+            if not split_unmergeable:
                 continue
 
         base_x = parse_first_number(get_attr(text_el, "x")) or 0.0

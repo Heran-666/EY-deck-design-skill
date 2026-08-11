@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import subprocess
@@ -32,6 +33,19 @@ CSS_SVG = '''<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" v
 <text class="body" x="80" y="220">Body three</text></g>
 <text id="foot" x="80" y="680">Foot</text>
 </svg>'''
+
+
+TOPOLOGY_SVG = '''<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720">
+<rect width="1280" height="720" fill="#000000"/>
+<text data-copy-id="S01-detail" x="100" fill="#FFFFFF" font-family="Arial" font-size="16">
+  <tspan x="100" y="120"><tspan>Exact </tspan><tspan font-weight="700">first line</tspan></tspan>
+  <tspan x="100" y="144">Exact second line</tspan>
+</text>
+</svg>'''
+
+
+def file_sha256(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
 class BundledExportRuntimeTests(unittest.TestCase):
@@ -107,6 +121,117 @@ class BundledExportRuntimeTests(unittest.TestCase):
             )
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("unsupported CSS selector", result.stdout)
+
+    def test_stage_two_repairs_topology_on_isolated_copy_and_rechecks_copy(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source = root / "S01.svg"
+            source.write_text(TOPOLOGY_SVG, encoding="utf-8")
+            source_bytes = source.read_bytes()
+            project = root / "export"
+            prepared = subprocess.run(
+                [
+                    sys.executable,
+                    str(RUNTIME / "prepare_confirmed_svg_export.py"),
+                    "--project-dir",
+                    str(project),
+                    str(source),
+                ],
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            self.assertEqual(prepared.returncode, 0, prepared.stdout + prepared.stderr)
+            normalized = project / "svg_output" / "P01.svg"
+            before_topology_hash = file_sha256(normalized)
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(RUNTIME / "normalize_text_frame_topology.py"),
+                    "--project-dir",
+                    str(project),
+                ],
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertEqual(source.read_bytes(), source_bytes)
+            self.assertEqual(
+                (project / "source_original" / "P01.svg").read_bytes(),
+                source_bytes,
+            )
+            receipt = json.loads(
+                (project / "validation" / "text_frame_topology.json").read_text(
+                    encoding="utf-8"
+                )
+            )
+            page = receipt["pages"][0]
+            self.assertEqual(receipt["status"], "PASS")
+            self.assertEqual(page["detected_before"][0]["copy_id"], "S01-detail")
+            self.assertEqual(page["detected_before"][0]["predicted_text_boxes"], 2)
+            self.assertEqual(page["parent_baseline_repairs"][0]["parent_y"], "120")
+            self.assertEqual(page["paragraph_blocks_normalized"], 1)
+            self.assertEqual(page["exact_copy"]["status"], "PASS")
+            self.assertEqual(page["detected_after"], [])
+            self.assertNotEqual(before_topology_hash, file_sha256(normalized))
+            manifest = json.loads(
+                (project / "confirmed-svg-export.json").read_text(encoding="utf-8")
+            )
+            self.assertEqual(
+                manifest["page_order"][0]["normalized_sha256"],
+                file_sha256(normalized),
+            )
+
+    def test_stage_two_leaves_unrepairable_topology_visible_to_recheck(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source = root / "S01.svg"
+            source.write_text(
+                TOPOLOGY_SVG.replace(
+                    '<tspan x="100" y="144">Exact second line</tspan>',
+                    '<tspan x="160" y="144">Exact second line</tspan>',
+                ),
+                encoding="utf-8",
+            )
+            source_bytes = source.read_bytes()
+            project = root / "export"
+            prepared = subprocess.run(
+                [
+                    sys.executable,
+                    str(RUNTIME / "prepare_confirmed_svg_export.py"),
+                    "--project-dir",
+                    str(project),
+                    str(source),
+                ],
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            self.assertEqual(prepared.returncode, 0, prepared.stdout + prepared.stderr)
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(RUNTIME / "normalize_text_frame_topology.py"),
+                    "--project-dir",
+                    str(project),
+                ],
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+            self.assertEqual(source.read_bytes(), source_bytes)
+            receipt = json.loads(
+                (project / "validation" / "text_frame_topology.json").read_text(
+                    encoding="utf-8"
+                )
+            )
+            page = receipt["pages"][0]
+            self.assertEqual(receipt["blocked_slide_ids"], ["S01"])
+            self.assertEqual(page["exact_copy"]["status"], "PASS")
+            self.assertEqual(page["detected_after"][0]["copy_id"], "S01-detail")
+            self.assertEqual(page["detected_after"][0]["predicted_text_boxes"], 2)
 
     @unittest.skipUnless(
         os.environ.get("EY_BUNDLED_PYTHON"),

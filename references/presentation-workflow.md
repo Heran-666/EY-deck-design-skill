@@ -45,11 +45,14 @@ Design reopen retains the content receipt. Content reopen invalidates it. Both a
 
 ## Stage 2 recovery
 
-Run the emitted `prepare-export` command. The controller stages confirmed SVG copies in an external export workspace and writes one hash-bound manifest with their order, hashes, output filename, required output path, bundled exporter fingerprint, validated Python runtime, and terminal-result validator. Run the printed deterministic exporter command directly. It normalizes only isolated technical copies, treats observed confirmed paints and typography already verified against the fixed scale as inherited input, runs the SVG/PPTX gates, and validates its exact terminal JSON before returning it. A valid contextual color missing from the synthesized stable-role palette is inherited evidence, never a Stage 2 block by itself; an out-of-scale visible text size is a `source-svg` block.
+Run the emitted `prepare-export` command. The controller stages confirmed SVG copies in an external export workspace and writes one hash-bound manifest with their order, hashes, output filename, required output path, bundled exporter fingerprint, validated Python runtime, and terminal-result validator. Run the printed deterministic exporter command directly. It binds and preserves an untouched source copy, detects text-frame topology, deterministically normalizes only the isolated working copy, proves exact text identity, and reruns topology before PPTX generation. A successful technical normalization continues without another image display or A/B selection. The runtime then treats observed confirmed paints and typography already verified against the fixed scale as inherited input, runs the remaining SVG/PPTX gates, and validates its exact terminal JSON before returning it. A valid contextual color missing from the synthesized stable-role palette is inherited evidence, never a Stage 2 block by itself; an out-of-scale visible text size is a `source-svg` block.
 
 Stage 2 never trusts the reusable page-preflight receipt in place of its own
-checks. It independently verifies the staged SVG hashes, normalization,
-typography, native-conversion compatibility, PPTX package, and terminal result.
+checks. It independently verifies the staged SVG hashes, pre-normalization
+topology, isolated-copy normalization, exact-copy identity, post-normalization
+topology, typography, native-conversion compatibility, PPTX package, and
+terminal result. Store the topology loop evidence in
+`validation/text_frame_topology.json`; never rewrite the untouched source copy.
 
 Only a reported blocking error may produce `BLOCKED`. Warnings, advisories,
 inherited observations, portability notes, and optional authoring hints stay in
