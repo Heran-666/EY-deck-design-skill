@@ -11,7 +11,9 @@ from framework_lib import duplicate_line_fields, h2_section, line_fields, page_e
 from workflow_export import validate_output_filename
 from workflow_spec import (
     FRAMEWORK_VERSION,
+    PAGE_AUTHORING_MODES,
     PAGE_STATES,
+    REQUESTED_AUTHORING_MODES,
     WORKFLOW_VERSION,
 )
 
@@ -26,6 +28,7 @@ GENERAL_CONTEXT_FIELDS = (
     "Deliverable name",
     "Audience",
     "Deliverable type",
+    "Requested authoring mode",
     "Audience outcome",
     "Core need",
     "Storyline thesis",
@@ -39,10 +42,11 @@ PAGE_FIELDS = (
     "Content scope",
     "Next connection",
     "Review mode",
+    "Authoring mode",
     "Status",
     "Confirmed decisions",
     "Open items",
-    "Selected version",
+    "Confirmed version",
 )
 LENGTH_LIMITS = {
     "Narrative role": 500,
@@ -56,6 +60,7 @@ GENERAL_CONTEXT_LIMITS = {
     "Deliverable name": 200,
     "Audience": 200,
     "Deliverable type": 100,
+    "Requested authoring mode": 20,
     "Audience outcome": 700,
     "Core need": 700,
     "Storyline thesis": 700,
@@ -127,6 +132,9 @@ def validate(framework: Path, project_dir: Path | None) -> list[str]:
             "Deliverable type must be Proposal, Sharing deck, Training, Interpretation, "
             "or Other: <specific form>"
         )
+    requested_authoring_mode = context_values.get("Requested authoring mode", "").strip()
+    if requested_authoring_mode not in REQUESTED_AUTHORING_MODES:
+        errors.append("Requested authoring mode must be Simplified or Standard")
     errors.extend(required_fields(rules, DESIGN_RULE_FIELDS, "Design hard rules"))
     for field, limit in GENERAL_CONTEXT_LIMITS.items():
         if len(context_values.get(field, "")) > limit:
@@ -185,14 +193,25 @@ def validate(framework: Path, project_dir: Path | None) -> list[str]:
         for field, limit in LENGTH_LIMITS.items():
             if len(page.fields.get(field, "")) > limit:
                 errors.append(f"{page.slide_id} {field} exceeds {limit} characters")
-        selected = page.fields.get("Selected version", "")
-        if state == "SVG confirmed" and not re.fullmatch(r"(?:A|B|R[1-9]\d*)", selected):
-            errors.append(f"{page.slide_id} {state} requires Selected version A, B, or Rn")
-        if state not in {"SVG confirmed", "Protected placeholder"} and selected != "Pending":
-            errors.append(f"{page.slide_id} {state} must keep Selected version Pending")
-        if state == "Protected placeholder" and selected != "Not applicable":
-            errors.append(f"{page.slide_id} Protected placeholder requires Selected version: Not applicable")
-        if state in {"Content locked", "Awaiting SVG selection", "SVG confirmed"} and page.fields.get(
+        authoring_mode = page.fields.get("Authoring mode", "")
+        if authoring_mode not in PAGE_AUTHORING_MODES:
+            errors.append(
+                f"{page.slide_id} Authoring mode must be Simplified, Standard, or Not applicable"
+            )
+        confirmed = page.fields.get("Confirmed version", "")
+        confirmed_pattern = (
+            r"(?:A|R[1-9]\d*)" if authoring_mode == "Simplified" else r"(?:A|B|R[1-9]\d*)"
+        )
+        if state == "SVG confirmed" and not re.fullmatch(confirmed_pattern, confirmed):
+            allowed = "A or Rn" if authoring_mode == "Simplified" else "A, B, or Rn"
+            errors.append(f"{page.slide_id} {state} requires Confirmed version {allowed}")
+        if state not in {"SVG confirmed", "Protected placeholder"} and confirmed != "Pending":
+            errors.append(f"{page.slide_id} {state} must keep Confirmed version Pending")
+        if state == "Protected placeholder" and confirmed != "Not applicable":
+            errors.append(
+                f"{page.slide_id} Protected placeholder requires Confirmed version: Not applicable"
+            )
+        if state in {"Content locked", "Awaiting SVG decision", "SVG confirmed"} and page.fields.get(
             "Open items", ""
         ).strip().lower() != "none":
             errors.append(f"{page.slide_id} {state} requires Open items: None")
@@ -203,6 +222,14 @@ def validate(framework: Path, project_dir: Path | None) -> list[str]:
         if normalized_type == "protected placeholder" and state != "Protected placeholder":
             errors.append(
                 f"{page.slide_id} Page type Protected placeholder requires Protected placeholder state"
+            )
+        if state == "Protected placeholder" and authoring_mode != "Not applicable":
+            errors.append(
+                f"{page.slide_id} Protected placeholder requires Authoring mode: Not applicable"
+            )
+        if state != "Protected placeholder" and authoring_mode == "Not applicable":
+            errors.append(
+                f"{page.slide_id} normal page requires Authoring mode Simplified or Standard"
             )
         if state == "SVG confirmed":
             canonical_ids.add(page.slide_id)

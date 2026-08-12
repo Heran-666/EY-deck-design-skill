@@ -27,7 +27,7 @@ Begin both provisional and canonical files with only the deck language. Project-
 - Language: <Chinese | English>
 ```
 
-The fixed canvas and project exceptions remain in `framework.md`; basic EY palette, hierarchy, editability, and ImageGen principles remain in the design reference; display/selection evidence remains in controller receipts. Do not copy them into `content.md`. Do not add a Storyline table, intake-analysis register, coverage matrix, review log, open questions, or assumptions register.
+The fixed canvas and project exceptions remain in `framework.md`; basic EY palette, hierarchy, editability, and ImageGen principles remain in the design reference; display/decision evidence remains in controller receipts. Do not copy them into `content.md`. Do not add a Storyline table, intake-analysis register, coverage matrix, review log, open questions, or assumptions register.
 
 ## 3. Page schema
 
@@ -105,7 +105,7 @@ Keep titles on one line and within 36 Chinese-width characters. Shorten crowded 
 
 Use only the five Visual Direction decisions plus `Page type`. State what dominates, the semantic reading order/relationship, confirmed constraints, and comprehension failures to avoid.
 
-Do not name or sketch a composition, layout family, geometry, position, shape, card/grid/panel structure, timeline, funnel, matrix, or other concrete design solution. Do not include coordinates, dimensions, font sizes, asset links, or construction instructions. The bounded page-authoring action owns composition and typography-role assignment within the fixed scale and must be able to produce two independent A/B options from the same Visual Direction.
+Do not name or sketch a composition, layout family, geometry, position, shape, card/grid/panel structure, timeline, funnel, matrix, or other concrete design solution. Do not include coordinates, dimensions, font sizes, asset links, or construction instructions. The bounded page-authoring action owns composition and typography-role assignment within the fixed scale. Keep the Visual Direction open enough for one complete `Simplified` solution or two independent `Standard` A/B solutions under [authoring-modes.md](authoring-modes.md).
 
 Judge prescriptions by context. An isolated analytical term such as “matrix,” “timeline,” “row,” or “column” may describe approved subject matter and is not by itself a layout instruction. Block it only when the field tells the page author to construct or arrange that visual solution.
 

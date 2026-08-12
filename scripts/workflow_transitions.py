@@ -97,6 +97,7 @@ def record_page_author_result(text: str, project_dir: Path, raw: str) -> None:
         "route": "page-svg-authoring",
         "terminal_result": result,
         "slide_id": page.slide_id,
+        "authoring_mode": page.fields.get("Authoring mode"),
         "version": version,
         "packet_path": packet["packet_path"],
         "packet_sha256": packet["packet_sha256"],
@@ -197,7 +198,7 @@ def resume_page_author(
         *page_receipts,
     ])
     target_state = "Content locked" if scope == "design" else "Content reviewing"
-    updates = {"Status": target_state, "Selected version": "Pending"}
+    updates = {"Status": target_state, "Confirmed version": "Pending"}
     if scope == "content":
         updates["Open items"] = note
     text = update_page(text, slide_id, updates)
@@ -210,7 +211,7 @@ def resume_page_author(
     return text
 
 
-def repair_ab_candidate(
+def repair_candidate(
     text: str,
     project_dir: Path,
     slide_id: str,
@@ -220,17 +221,19 @@ def repair_ab_candidate(
     page = next((item for item in page_entries(text) if item.slide_id == slide_id), None)
     if page is None:
         raise ValueError(f"page not found: {slide_id}")
-    if page.fields.get("Status") not in {"Content locked", "Awaiting SVG selection"}:
+    if page.fields.get("Status") not in {"Content locked", "Awaiting SVG decision"}:
         raise ValueError(
-            f"{slide_id} A/B candidate repair requires Content locked or Awaiting SVG selection"
+            f"{slide_id} candidate repair requires Content locked or Awaiting SVG decision"
         )
     group = current_group(text)
     if slide_id not in {item.slide_id for item in group}:
         raise ValueError(f"{slide_id} is not in the active page group")
-    if version not in {"A", "B"}:
-        raise ValueError("A/B candidate repair version must be A or B")
+    allowed_versions = {"A"} if page.fields.get("Authoring mode") == "Simplified" else {"A", "B"}
+    if version not in allowed_versions:
+        allowed = "A" if allowed_versions == {"A"} else "A or B"
+        raise ValueError(f"candidate repair version must be {allowed} for this page mode")
     if not note.strip():
-        raise ValueError("A/B candidate repair requires a non-empty defect note")
+        raise ValueError("candidate repair requires a non-empty defect note")
     if active_revision(project_dir, slide_id):
         raise ValueError(f"{slide_id} already has an active user revision")
     if not page_author_completion_valid(project_dir, slide_id, version):
@@ -242,18 +245,19 @@ def repair_ab_candidate(
         page_author_result_path(project_dir, slide_id, version),
         preview_png,
         preview_receipt,
-        *[
-            receipt_path(project_dir, item.slide_id, "ab-presentation")
-            for item in group
-        ],
+        receipt_path(
+            project_dir,
+            slide_id,
+            "single-presentation"
+            if page.fields.get("Authoring mode") == "Simplified"
+            else "ab-presentation",
+        ),
     ])
-    for item in group:
-        if item.slide_id == slide_id or item.fields.get("Status") == "Awaiting SVG selection":
-            text = update_page(
-                text,
-                item.slide_id,
-                {"Status": "Content locked", "Selected version": "Pending"},
-            )
+    text = update_page(
+        text,
+        slide_id,
+        {"Status": "Content locked", "Confirmed version": "Pending"},
+    )
     write_json(receipt_path(project_dir, slide_id, f"{version}-candidate-repair"), {
         "slide_id": slide_id,
         "version": version,
@@ -308,7 +312,7 @@ def resume_handoff(text: str, project_dir: Path, pages: list[str], note: str | N
             target_state = "Content reviewing" if scope == "user-decision" else "Content locked"
             updates = {
                 "Status": target_state,
-                "Selected version": "Pending",
+                "Confirmed version": "Pending",
                 "Open items": note if target_state == "Content reviewing" else "None",
             }
             text = update_page(text, slide_id, updates)
@@ -385,7 +389,7 @@ def reopen_pages(
         text = update_page(
             text,
             slide_id,
-            {"Status": target_state, "Selected version": "Pending"},
+            {"Status": target_state, "Confirmed version": "Pending"},
         )
     return text
 

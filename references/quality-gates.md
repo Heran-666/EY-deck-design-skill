@@ -6,12 +6,12 @@ Use this policy whenever the controller or export runner reports a failure.
 
 | Gate | Retain here | Exclude from this gate |
 |---|---|---|
-| Page preflight (`page-author-result`) | path and artifact identity; XML/root/canvas; self-containment and CSS-free boundary; exact visible-copy bindings; fixed typography scale | A/B distinction; rendered bounds; user choice; deep native-PPTX compatibility; package checks |
+| Page preflight (`page-author-result`) | path and artifact identity; XML/root/canvas; self-containment and CSS-free boundary; exact visible-copy bindings; fixed typography scale | candidate count; A/B distinction; rendered bounds; user decision; deep native-PPTX compatibility; package checks |
 | Browser preview | network isolation; font-ready rendering; exact DOM copy; computed visibility; non-empty and on-canvas bounds; equal-size PNGs; renderer/PNG/hash evidence | repeated XML/CSS/typography parsing when a current preflight receipt matches; subjective design judgment; native-PPTX compatibility |
-| A/B or revision comparison | equal canonical canvas; targeted revision integrity; displayed-preview and user-selection evidence; A/B hash and material-difference observations recorded as evidence | repeated page-preflight checks; content reapproval; Stage 2 compatibility |
-| Canonical handoff | exactly one selected SVG per page; page order; terminal states; selected/canonical/presentation hashes and receipts | design review; preview regeneration; A/B re-evaluation; deep SVG compatibility |
-| Confirmed SVG export | staged hashes and runtime; pre-normalization topology detection; isolated deterministic normalization; exact-copy and topology rechecks; typography; converter-critical geometry, paint, reference, image, text-frame, and metadata compatibility | semantic design or copy re-review; another A/B selection after a proven identity-preserving repair; valid contextual colors/fonts; canonical-spelling and portability advice; optional grouping/animation hints as blockers |
-| PPTX postflight and handoff | readable package; slide count; relationships; transition/animation OOXML; exported typography; required output; terminal-result integrity | upstream authoring, preview, A/B, or semantic-design checks |
+| Initial or revision presentation | mode-required single or A/B preview evidence; equal canonical canvas when comparing; targeted revision integrity; user-decision evidence; A/B hash and material-difference observations only for Standard pages | repeated page-preflight checks; content reapproval; Stage 2 compatibility |
+| Canonical handoff | exactly one confirmed SVG per page; page order; terminal states; confirmed/canonical/presentation hashes and receipts | design review; preview regeneration; candidate re-evaluation; deep SVG compatibility |
+| Confirmed SVG export | staged hashes and runtime; pre-normalization topology detection; isolated deterministic normalization; exact-copy and topology rechecks; typography; converter-critical geometry, paint, reference, image, text-frame, and metadata compatibility | semantic design or copy re-review; another user decision after a proven identity-preserving repair; valid contextual colors/fonts; canonical-spelling and portability advice; optional grouping/animation hints as blockers |
+| PPTX postflight and handoff | readable package; slide count; relationships; transition/animation OOXML; exported typography; required output; terminal-result integrity | upstream authoring, preview, candidate-decision, or semantic-design checks |
 
 Treat one current page-preflight receipt as sufficient evidence only when its
 schema, artifact hash, packet hash, and visible-copy-contract hash match. If any
@@ -25,7 +25,7 @@ Block only when continuing would invalidate approved meaning, evidence, determin
 - schema/state corruption, stale hashes, wrong paths, missing receipts, or wrong page order;
 - changed, missing, duplicated, hidden, or materially off-canvas approved visible copy;
 - any visible text outside the fixed 24/18/14/12/10/8/6 pt typography scale;
-- missing user presentation/selection evidence;
+- missing mode-required user presentation or decision evidence;
 - an authored SVG `<text>` that would become multiple native PowerPoint text
   boxes in merge mode;
 - malformed SVG/XML, non-self-contained assets, unsupported rendering features, invalid geometry/paint/reference syntax, or metadata that changes conversion behavior;
@@ -53,6 +53,8 @@ equal-scale browser comparison and explicit user selection; they do not trigger
 base must likewise proceed to the equal-scale Base/Rn comparison and explicit user
 confirmation, with the identity recorded as an advisory.
 
+Apply A/B distinction and difference rules only to `Standard` pages. A `Simplified` page must still pass the same A preflight, browser visibility, explicit confirmation, canonical, export, and PPTX gates; skip only B and comparison-specific evidence.
+
 ## Interpretation safeguards
 
 - Compare canvases by canonical viewBox geometry, not raw `width`, `height`, comma, whitespace, or numeric spelling.
@@ -66,6 +68,6 @@ confirmation, with the identity recorded as an advisory.
   copy only when the unchanged first absolute-y line supplies an unambiguous
   baseline. Normalize mergeable paragraph blocks without splitting rejected
   blocks; then require exact-copy PASS and an empty post-normalization topology
-  violation set. Do not reopen user selection after that proven technical
+  violation set. Do not reopen the user decision after that proven technical
   repair.
 - If every SVG-gate error says a validator/import is unavailable, classify the block as `environment`, not `source-svg`.

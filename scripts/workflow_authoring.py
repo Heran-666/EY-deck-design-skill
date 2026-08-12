@@ -119,9 +119,10 @@ def page_author_completion_valid(project_dir: Path, slide_id: str, version: str)
         and result.get("route") == "page-svg-authoring"
         and result.get("slide_id") == slide_id
         and result.get("version") == version
+        and packet is not None
+        and result.get("authoring_mode") == packet.get("authoring_mode")
         and result.get("artifact_path") == str(artifact.resolve())
         and result.get("artifact_sha256") == artifact_sha256
-        and packet is not None
         and result.get("visible_copy_contract_sha256")
         == packet.get("visible_copy_contract_sha256")
         and packet_matches
@@ -222,6 +223,26 @@ def validate_ab(project_dir: Path, slide_id: str) -> tuple[list[str], dict | Non
             f"{slide_id} B result has missing or insufficient material_differences evidence"
         )
     return errors, summary
+
+
+def validate_single(project_dir: Path, slide_id: str) -> tuple[list[str], dict | None]:
+    errors: list[str] = []
+    a_path, _b_path = working_paths(project_dir, slide_id)
+    try:
+        contract = page_visible_copy_contract(project_dir, slide_id)
+    except (OSError, ValueError) as exc:
+        contract = None
+        errors.append(str(exc))
+    if not page_author_completion_valid(project_dir, slide_id, "A"):
+        before = len(errors)
+        errors.extend(candidate_errors(a_path))
+        if contract is not None and a_path.is_file():
+            errors.extend(visible_copy_errors(a_path, contract))
+        if len(errors) == before:
+            errors.append(f"{slide_id} A has no valid hash-bound preflight receipt")
+    if errors:
+        return errors, None
+    return errors, {"slide_id": slide_id, "a_sha256": sha256(a_path)}
 
 
 def validate_revision(project_dir: Path, slide_id: str, request: dict) -> list[str]:
@@ -352,7 +373,13 @@ def print_build_context(text: str, project_dir: Path, selected: list[PageEntry])
     for page in selected:
         index = indexes[page.slide_id]
         print(f"### {page.slide_id}｜{page.title}")
-        for field in ("Chapter", "Page type", "Narrative role", "Next connection"):
+        for field in (
+            "Chapter",
+            "Page type",
+            "Authoring mode",
+            "Narrative role",
+            "Next connection",
+        ):
             print(f"- {field}: {page.fields.get(field, 'Missing')}")
         adjacent = pages[max(0, index - 1): min(len(pages), index + 2)]
         print("- Adjacent titles: " + " | ".join(f"{item.slide_id} {item.title}" for item in adjacent))
@@ -361,7 +388,7 @@ def print_build_context(text: str, project_dir: Path, selected: list[PageEntry])
 
 
 def ensure_authoring_packet(text: str, project_dir: Path, page: PageEntry) -> dict:
-    """Materialize one stable A/B-shared page packet outside the conversation context."""
+    """Materialize one stable mode-independent page packet outside conversation context."""
     buffer = io.StringIO()
     with contextlib.redirect_stdout(buffer):
         print_build_context(text, project_dir, [page])
@@ -369,7 +396,7 @@ def ensure_authoring_packet(text: str, project_dir: Path, page: PageEntry) -> di
     contract_json = json.dumps(contract, ensure_ascii=False, indent=2)
     packet_text = (
         f"# Locked Page SVG Authoring Packet｜{page.slide_id}\n\n"
-        "Use this exact packet for A and B. Version-specific output paths and revision notes are "
+        "Use this exact packet for every requested candidate. Version-specific output paths and revision notes are "
         "controller directives, not page-content memory. Every visible SVG text run must be bound "
         "to exactly one approved item below with `data-copy-id`; Build-only text must never be "
         "visible. Text may be split into nested tspans inside one bound element or group.\n\n"
@@ -382,6 +409,7 @@ def ensure_authoring_packet(text: str, project_dir: Path, page: PageEntry) -> di
     atomic_write(packet_path, packet_text)
     payload = {
         "slide_id": page.slide_id,
+        "authoring_mode": page.fields.get("Authoring mode"),
         "packet_path": str(packet_path.resolve()),
         "packet_sha256": sha256(packet_path),
         "framework_page_sha256": text_sha256(page.text),

@@ -15,12 +15,13 @@ from workflow_authoring import (
     page_author_completion_valid,
     revision_request_hash,
     validate_ab,
+    validate_single,
 )
 from workflow_content import content_identity_errors, content_section
 from workflow_directives import directive
 from workflow_io import read_json, sha256, text_sha256
 from workflow_paths import receipt_path, revision_active_path, selected_working_path
-from workflow_preview_evidence import ab_presentation_valid
+from workflow_preview_evidence import ab_presentation_valid, single_presentation_valid
 from workflow_protected import protected_canonical_evidence_valid
 from workflow_spec import (
     ACTION_EVENT,
@@ -53,7 +54,7 @@ def artifact_errors(text: str, project_dir: Path) -> list[str]:
         state = page.fields.get("Status")
         if state not in PAGE_STATES:
             continue
-        if state in {"Content locked", "Awaiting SVG selection", "SVG confirmed"}:
+        if state in {"Content locked", "Awaiting SVG decision", "SVG confirmed"}:
             section = content_section(content, page.slide_id)
             receipt_file = receipt_path(project_dir, page.slide_id, "content")
             if not section:
@@ -73,22 +74,29 @@ def artifact_errors(text: str, project_dir: Path) -> list[str]:
                         errors.append(f"{page.slide_id} locked content changed after approval")
                 except ValueError as exc:
                     errors.append(str(exc))
-        if state == "Awaiting SVG selection":
+        if state == "Awaiting SVG decision":
             request = active_revision(project_dir, page.slide_id)
             if request is None:
-                for version in ("A", "B"):
+                versions = ("A",) if page.fields.get("Authoring mode") == "Simplified" else ("A", "B")
+                for version in versions:
                     if not page_author_completion_valid(project_dir, page.slide_id, version):
                         errors.append(f"{page.slide_id} {version} has no valid COMPLETE authoring result")
-                ab_errors, _ = validate_ab(project_dir, page.slide_id)
-                errors.extend(ab_errors)
-                if not ab_presentation_valid(project_dir, page.slide_id):
-                    errors.append(f"{page.slide_id} has no valid A/B presentation evidence")
+                if page.fields.get("Authoring mode") == "Simplified":
+                    single_errors, _ = validate_single(project_dir, page.slide_id)
+                    errors.extend(single_errors)
+                    if not single_presentation_valid(project_dir, page.slide_id):
+                        errors.append(f"{page.slide_id} has no valid single-option presentation evidence")
+                else:
+                    ab_errors, _ = validate_ab(project_dir, page.slide_id)
+                    errors.extend(ab_errors)
+                    if not ab_presentation_valid(project_dir, page.slide_id):
+                        errors.append(f"{page.slide_id} has no valid A/B presentation evidence")
         active_path = revision_active_path(project_dir, page.slide_id)
         if active_path.is_file():
             try:
                 request = read_json(active_path)
                 if request.get("active") is True:
-                    if state != "Awaiting SVG selection":
+                    if state != "Awaiting SVG decision":
                         errors.append(f"{page.slide_id} active revision conflicts with page state {state}")
                     if request.get("slide_id") != page.slide_id:
                         errors.append(f"{page.slide_id} active revision identifies the wrong page")
@@ -108,43 +116,54 @@ def artifact_errors(text: str, project_dir: Path) -> list[str]:
                 errors.append(str(exc))
         selected_path: Path | None = None
         if state == "SVG confirmed":
-            selected = page.fields.get("Selected version")
-            if selected and not page_author_completion_valid(project_dir, page.slide_id, selected):
-                errors.append(f"{page.slide_id} selected SVG has no valid COMPLETE authoring result")
+            confirmed = page.fields.get("Confirmed version")
+            decision_path = receipt_path(project_dir, page.slide_id, "svg-decision")
             try:
-                selected_path = selected_working_path(project_dir, page.slide_id, selected or "")
+                existing_decision = read_json(decision_path) if decision_path.is_file() else {}
+            except ValueError:
+                existing_decision = {}
+            migrated_decision = existing_decision.get("migration") is True
+            if (
+                confirmed
+                and not migrated_decision
+                and not page_author_completion_valid(project_dir, page.slide_id, confirmed)
+            ):
+                errors.append(f"{page.slide_id} confirmed SVG has no valid COMPLETE authoring result")
+            try:
+                selected_path = selected_working_path(project_dir, page.slide_id, confirmed or "")
             except ValueError as exc:
                 errors.append(str(exc))
-            selection_path = receipt_path(project_dir, page.slide_id, "svg-selection")
             final_path = project_dir / "svg_output" / f"{page.slide_id}.svg"
             if not final_path.is_file():
                 errors.append(f"{page.slide_id} canonical SVG is missing")
-            elif not selection_path.is_file():
-                errors.append(f"{page.slide_id} has no SVG selection receipt")
+            elif not decision_path.is_file():
+                errors.append(f"{page.slide_id} has no SVG decision receipt")
             else:
                 try:
-                    selection_receipt = read_json(selection_path)
-                    if selection_receipt.get("slide_id") != page.slide_id:
-                        errors.append(f"{page.slide_id} selection receipt identifies the wrong page")
-                    if selection_receipt.get("selected_version") != selected:
-                        errors.append(f"{page.slide_id} selection receipt has the wrong version")
-                    if selection_receipt.get("canonical_sha256") != sha256(final_path):
+                    decision_receipt = read_json(decision_path)
+                    if decision_receipt.get("slide_id") != page.slide_id:
+                        errors.append(f"{page.slide_id} decision receipt identifies the wrong page")
+                    if decision_receipt.get("authoring_mode") != page.fields.get("Authoring mode"):
+                        errors.append(f"{page.slide_id} decision receipt has the wrong authoring mode")
+                    if decision_receipt.get("confirmed_version") != confirmed:
+                        errors.append(f"{page.slide_id} decision receipt has the wrong version")
+                    if decision_receipt.get("canonical_sha256") != sha256(final_path):
                         errors.append(f"{page.slide_id} canonical SVG changed after selection")
-                    presentation_value = selection_receipt.get("presentation_receipt")
+                    presentation_value = decision_receipt.get("presentation_receipt")
                     if presentation_value:
                         presentation_path = Path(str(presentation_value))
                         if not presentation_path.is_absolute():
                             presentation_path = project_dir / presentation_path
                         if not presentation_path.is_file():
                             errors.append(f"{page.slide_id} selection presentation receipt is missing")
-                        elif selection_receipt.get("presentation_receipt_sha256") != sha256(
+                        elif decision_receipt.get("presentation_receipt_sha256") != sha256(
                             presentation_path
                         ):
                             errors.append(f"{page.slide_id} selection presentation evidence changed")
                     if selected_path is not None and selected_path.is_file():
-                        if selection_receipt.get("selected_sha256") != sha256(selected_path):
-                            errors.append(f"{page.slide_id} selected working SVG changed after selection")
-                    if selection_receipt.get("source_preflight_gate") != PAGE_PREFLIGHT_GATE_SCHEMA:
+                        if decision_receipt.get("confirmed_sha256") != sha256(selected_path):
+                            errors.append(f"{page.slide_id} confirmed working SVG changed after decision")
+                    if decision_receipt.get("source_preflight_gate") != PAGE_PREFLIGHT_GATE_SCHEMA:
                         # Legacy canonical evidence predates reusable preflight
                         # receipts and therefore retains the former deep audit.
                         errors.extend(candidate_errors(final_path))

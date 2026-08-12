@@ -1,8 +1,9 @@
 # Page SVG authoring
 
 Use this internal contract only when the controller emits `GENERATE_SVG_A`,
-`GENERATE_SVG_B`, or `GENERATE_SVG_REVISION` with one packet path/hash and one
-exact artifact path.
+`GENERATE_SVG_B`, or `GENERATE_SVG_REVISION` with one effective page authoring
+mode, one packet path/hash, and one exact artifact path. Generate only the
+requested version; do not infer that B is required for a `Simplified` page.
 
 Read the complete packet once. Preserve every approved word, number, source,
 emphasis, semantic relationship, and fixed constraint. Choose the composition,
@@ -33,7 +34,7 @@ external URLs, `@import`, `xml-stylesheet`, `foreignObject`, or runtime asset
 placeholders. An inert `class` used only as metadata is not a CSS dependency,
 but prefer stable `id` and `data-*` attributes for authoring semantics.
 
-For B, start independently from the same packet. Do not repair or polish A.
+For B on a `Standard` page, start independently from the same packet. Do not repair or polish A.
 Compare only after drafting to confirm the same approved meaning and at least
 one material design difference. For a revision, change only the recorded
 targets from the supplied base. If the resulting revision is byte-identical to
@@ -48,9 +49,10 @@ return exactly one terminal JSON object:
 {"status":"COMPLETE","route":"page-svg-authoring","artifact_path":"/absolute/path/to/S01/A.svg"}
 ```
 
-B should also include a non-empty `material_differences` string array. Missing or
-empty A/B difference evidence is recorded as a non-blocking advisory, not an
-authoring failure. On a terminal block, return `stage`, `slide_ids`, `reason`,
+B should also include a non-empty `material_differences` string array. This field
+does not apply to the only A candidate of a `Simplified` page. Missing or empty
+A/B difference evidence is recorded as a non-blocking advisory, not an authoring
+failure. On a terminal block, return `stage`, `slide_ids`, `reason`,
 `repair_scope`, and `resume_from`; do not ask the user a question inside this
 bounded action.
 

@@ -87,9 +87,10 @@ class ControllerArchitectureTests(unittest.TestCase):
             "prepare-authoring",
             "prepare-export",
             "present-ab",
+            "present-single",
             "present-review",
             "present-revision",
-            "repair-ab-candidate",
+            "repair-candidate",
             "request-revision",
             "resume-handoff",
             "resume-page-author",
@@ -224,6 +225,7 @@ class PagePreflightReuseTests(unittest.TestCase):
             receipt.write_text("{}", encoding="utf-8")
             artifact_sha256 = controller.sha256(artifact)
             packet = {
+                "authoring_mode": "Standard",
                 "packet_path": "/bound/packet.md",
                 "packet_sha256": "packet-hash",
                 "visible_copy_contract_sha256": "copy-hash",
@@ -233,6 +235,7 @@ class PagePreflightReuseTests(unittest.TestCase):
                 "status": "COMPLETE",
                 "route": "page-svg-authoring",
                 "slide_id": "S01",
+                "authoring_mode": "Standard",
                 "version": "A",
                 "artifact_path": str(artifact.resolve()),
                 "artifact_sha256": artifact_sha256,
@@ -324,7 +327,7 @@ class RecoveryRegressionTests(unittest.TestCase):
 - Next connection: End
 - Review mode: Page-by-page
 - Status: SVG confirmed
-- Selected version: A
+- Confirmed version: A
 - Confirmed decisions: Approved
 - Open items: None
 """
@@ -337,7 +340,7 @@ class RecoveryRegressionTests(unittest.TestCase):
                 "Apply the visible-copy contract",
             )
         self.assertIn("- Status: Content locked", updated)
-        self.assertIn("- Selected version: Pending", updated)
+        self.assertIn("- Confirmed version: Pending", updated)
 
 
 class DocumentationRegressionTests(unittest.TestCase):

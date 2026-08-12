@@ -29,25 +29,28 @@ from workflow_controller import (  # noqa: E402
     artifact_errors,
     candidate_errors,
     directive,
+    directive_payload,
     ensure_authoring_packet,
     migrate_workflow,
     receipt_path,
     sha256,
+    single_presentation_valid,
     text_sha256,
 )
 from framework_lib import page_entries  # noqa: E402
 from validate_framework import validate as validate_framework  # noqa: E402
 from validate_deck_blueprint import validate as validate_blueprint  # noqa: E402
 from validate_terminal_result import validate_terminal_result  # noqa: E402
+from workflow_spec import initial_authoring_mode  # noqa: E402
 
 
-def framework(status: str = "Content locked", version: str = "3.7", slide_id: str = "S01") -> str:
-    selected = "A" if status == "SVG confirmed" else "Pending"
+def framework(status: str = "Content locked", version: str = "3.8", slide_id: str = "S01") -> str:
+    confirmed = "A" if status == "SVG confirmed" else "Pending"
     return f"""# Presentation Framework
 
 ## Current position
 
-- Framework version: 2.5
+- Framework version: 2.6
 - Workflow version: {version}
 - Storyline version: 1.0
 - Output filename: Test deck.pptx
@@ -57,6 +60,7 @@ def framework(status: str = "Content locked", version: str = "3.7", slide_id: st
 - Deliverable name: Test deck
 - Audience: Leadership
 - Deliverable type: Sharing deck
+- Requested authoring mode: Standard
 - Audience outcome: Understand the recommendation
 - Core need: Explain the decision
 - Storyline thesis: Evidence supports action
@@ -78,10 +82,11 @@ def framework(status: str = "Content locked", version: str = "3.7", slide_id: st
 - Content scope: Evidence and action
 - Next connection: None
 - Review mode: Page-by-page
+- Authoring mode: Standard
 - Status: {status}
 - Confirmed decisions: None
 - Open items: None
-- Selected version: {selected}
+- Confirmed version: {confirmed}
 """
 
 
@@ -183,6 +188,7 @@ def setup_ab(project: Path) -> None:
             "status": "COMPLETE",
             "route": "page-svg-authoring",
             "slide_id": "S01",
+            "authoring_mode": "Standard",
             "version": version,
             "artifact_path": str(artifact.resolve()),
             "artifact_sha256": sha256(artifact),
@@ -192,6 +198,56 @@ def setup_ab(project: Path) -> None:
             "active": False,
             "terminal_result": terminal_result,
         })
+
+
+def setup_presented_revision(
+    project: Path,
+    *,
+    base_version: str = "A",
+    revision_color: str = "#FFFACC",
+) -> str:
+    setup_locked(project)
+    setup_ab(project)
+    presented_ab = run(project, "present-ab")
+    assert presented_ab.returncode == 0, presented_ab.stdout + presented_ab.stderr
+    requested = run(
+        project,
+        "request-revision",
+        "--page",
+        "S01",
+        "--base",
+        base_version,
+        "--note",
+        "Make the evidence relationship clearer",
+    )
+    assert requested.returncode == 0, requested.stdout + requested.stderr
+    active = json.loads(
+        receipt_path(project, "S01", "revision-active").read_text(encoding="utf-8")
+    )
+    revision_id = str(active["revision_id"])
+    prepared = run(project, "prepare-authoring", "--page", "S01")
+    assert prepared.returncode == 0, prepared.stdout + prepared.stderr
+    revision = project / "svg_working" / "S01" / f"{revision_id}.svg"
+    revision.write_text(
+        svg(revision_color, '<circle cx="700" cy="300" r="80" fill="#FFE600"/>'),
+        encoding="utf-8",
+    )
+    completed = run(
+        project,
+        "page-author-result",
+        "--result-json",
+        json.dumps({
+            "status": "COMPLETE",
+            "route": "page-svg-authoring",
+            "artifact_path": str(revision.resolve()),
+        }),
+    )
+    assert completed.returncode == 0, completed.stdout + completed.stderr
+    presented_revision = run(project, "present-revision")
+    assert (
+        presented_revision.returncode == 0
+    ), presented_revision.stdout + presented_revision.stderr
+    return revision_id
 
 
 def setup_batch_ab(project: Path) -> None:
@@ -241,6 +297,7 @@ def setup_batch_ab(project: Path) -> None:
                 "status": "COMPLETE",
                 "route": "page-svg-authoring",
                 "slide_id": slide_id,
+                "authoring_mode": "Standard",
                 "version": version,
                 "artifact_path": str(artifact.resolve()),
                 "artifact_sha256": sha256(artifact),
@@ -307,12 +364,166 @@ def protected_framework() -> str:
     return (
         framework("Protected placeholder")
         .replace("- Page type: Standard content", "- Page type: Protected placeholder")
+        .replace("- Authoring mode: Standard", "- Authoring mode: Not applicable")
         .replace("- Content scope: Evidence and action", "- Content scope: [占位：插入用户批准的受保护页面；AI不得生成、改写或补充]")
-        .replace("- Selected version: Pending", "- Selected version: Not applicable")
+        .replace("- Confirmed version: Pending", "- Confirmed version: Not applicable")
     )
 
 
 class LightweightWorkflowTests(unittest.TestCase):
+    def test_initial_authoring_mode_mapping(self) -> None:
+        self.assertEqual(initial_authoring_mode("Simplified", "Standard content"), "Simplified")
+        self.assertEqual(initial_authoring_mode("Standard", "Cover"), "Simplified")
+        self.assertEqual(initial_authoring_mode("Standard", "Agenda"), "Simplified")
+        self.assertEqual(initial_authoring_mode("Standard", "Section divider"), "Simplified")
+        self.assertEqual(initial_authoring_mode("Standard", "Chart-led"), "Standard")
+        self.assertEqual(
+            initial_authoring_mode("Simplified", "Protected placeholder"),
+            "Not applicable",
+        )
+
+    def test_mixed_batch_decision_directive_is_explicit_per_page(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project = Path(tmp)
+            first = (
+                framework("Awaiting SVG decision")
+                .replace("- Review mode: Page-by-page", "- Review mode: Batch")
+                .replace("- Authoring mode: Standard", "- Authoring mode: Simplified")
+            )
+            second = framework(
+                "Awaiting SVG decision", slide_id="S02"
+            ).replace("- Review mode: Page-by-page", "- Review mode: Batch")
+            second = second[second.index("### S02｜") :]
+            text = first.rstrip() + "\n\n" + second
+
+            payload = directive_payload(text, project, CONTROLLER)
+
+            self.assertEqual(payload["action"], "COLLECT_SVG_DECISION")
+            self.assertEqual(payload["pages"], ["S01", "S02"])
+            self.assertIn("single A preview", payload["command_when"])
+            self.assertIn("A/B comparison", payload["command_when"])
+            self.assertEqual(
+                payload["decision_requirements"],
+                [
+                    {
+                        "slide_id": "S01",
+                        "authoring_mode": "Simplified",
+                        "required_display": "single-A-preview",
+                        "allowed_selections": ["A"],
+                        "allowed_repair_versions": ["A"],
+                    },
+                    {
+                        "slide_id": "S02",
+                        "authoring_mode": "Standard",
+                        "required_display": "A/B-comparison",
+                        "allowed_selections": ["A", "B"],
+                        "allowed_repair_versions": ["A", "B"],
+                    },
+                ],
+            )
+            simplified_repair = payload["commands"]["repair_before_user_display_S01"]
+            standard_repair = payload["commands"]["repair_before_user_display_S02"]
+            self.assertIn("--page S01 --version A", simplified_repair)
+            self.assertNotIn("<A_OR_B>", simplified_repair)
+            self.assertIn("--page S02 --version '<A_OR_B>'", standard_repair)
+            self.assertNotIn("repair_before_user_display", payload["commands"])
+            self.assertIn(
+                "--selections 'S01=A,S02=<A_OR_B>'",
+                payload["commands"]["after_confirmation_or_selection"],
+            )
+
+    def test_multi_page_simplified_repair_command_never_allows_b(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project = Path(tmp)
+            first = (
+                framework("Awaiting SVG decision")
+                .replace("- Review mode: Page-by-page", "- Review mode: Batch")
+                .replace("- Authoring mode: Standard", "- Authoring mode: Simplified")
+            )
+            second = (
+                framework("Awaiting SVG decision", slide_id="S02")
+                .replace("- Review mode: Page-by-page", "- Review mode: Batch")
+                .replace("- Authoring mode: Standard", "- Authoring mode: Simplified")
+            )
+            second = second[second.index("### S02｜") :]
+            text = first.rstrip() + "\n\n" + second
+
+            payload = directive_payload(text, project, CONTROLLER)
+
+            repair = payload["commands"]["repair_before_user_display"]
+            self.assertIn("--page '<ACTIVE_PAGE>' --version A", repair)
+            self.assertNotIn("<A_OR_B>", repair)
+            self.assertEqual(
+                [item["allowed_selections"] for item in payload["decision_requirements"]],
+                [["A"], ["A"]],
+            )
+
+    def test_simplified_page_skips_b_and_confirms_single_option(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project = Path(tmp)
+            setup_locked(project)
+            framework_path = project / "framework.md"
+            simplified = framework_path.read_text(encoding="utf-8").replace(
+                "- Requested authoring mode: Standard",
+                "- Requested authoring mode: Simplified",
+            ).replace("- Authoring mode: Standard", "- Authoring mode: Simplified")
+            framework_path.write_text(simplified, encoding="utf-8")
+
+            self.assertEqual(prepare_authoring(project).returncode, 0)
+            a_path = project / "svg_working" / "S01" / "A.svg"
+            a_path.parent.mkdir(parents=True, exist_ok=True)
+            a_path.write_text(svg(), encoding="utf-8")
+            completed = run(
+                project,
+                "page-author-result",
+                "--result-json",
+                json.dumps({
+                    "status": "COMPLETE",
+                    "route": "page-svg-authoring",
+                    "artifact_path": str(a_path.resolve()),
+                }),
+            )
+            self.assertEqual(completed.returncode, 0, completed.stdout + completed.stderr)
+            payload = json.loads(run(project, "next", "--format", "json").stdout)
+            self.assertEqual(payload["action"], "PRESENT_SINGLE_OPTION")
+            self.assertFalse((a_path.parent / "B.svg").exists())
+
+            presented = run(project, "present-single")
+            self.assertEqual(presented.returncode, 0, presented.stdout + presented.stderr)
+            self.assertTrue(single_presentation_valid(project, "S01"))
+            payload = json.loads(run(project, "next", "--format", "json").stdout)
+            self.assertEqual(payload["action"], "COLLECT_SVG_DECISION")
+            self.assertIn("S01=A", payload["commands"]["after_confirmation_or_selection"])
+
+            rejected = run(
+                project,
+                "advance",
+                "--event",
+                "svg-confirmed",
+                "--page",
+                "S01",
+                "--selections",
+                "S01=B",
+            )
+            self.assertNotEqual(rejected.returncode, 0)
+            self.assertIn("Simplified confirmation must use A", rejected.stdout)
+
+            confirmed = run(
+                project,
+                "advance",
+                "--event",
+                "svg-confirmed",
+                "--page",
+                "S01",
+                "--selections",
+                "S01=A",
+            )
+            self.assertEqual(confirmed.returncode, 0, confirmed.stdout + confirmed.stderr)
+            final_framework = framework_path.read_text(encoding="utf-8")
+            self.assertIn("- Status: SVG confirmed", final_framework)
+            self.assertIn("- Confirmed version: A", final_framework)
+            self.assertTrue(receipt_path(project, "S01", "svg-decision").is_file())
+
     def test_framework_rejects_duplicate_fields_and_unmanaged_sections(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "framework.md"
@@ -459,6 +670,26 @@ class LightweightWorkflowTests(unittest.TestCase):
                 (project / "framework.md").read_text(encoding="utf-8"),
             )
 
+    def test_page_authoring_mode_can_change_before_svg_evidence(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project = Path(tmp)
+            (project / "framework.md").write_text(
+                framework("Not started"), encoding="utf-8"
+            )
+            updated = run(
+                project,
+                "update-page",
+                "--page",
+                "S01",
+                "--authoring-mode",
+                "Simplified",
+            )
+            self.assertEqual(updated.returncode, 0, updated.stdout + updated.stderr)
+            self.assertIn(
+                "- Authoring mode: Simplified",
+                (project / "framework.md").read_text(encoding="utf-8"),
+            )
+
     def test_locked_page_requires_explicit_authoring_preparation(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             project = Path(tmp)
@@ -533,7 +764,7 @@ class LightweightWorkflowTests(unittest.TestCase):
                 project,
                 "advance",
                 "--event",
-                "svg-selected",
+                "svg-confirmed",
                 "--page",
                 "S01",
                 "--selections",
@@ -683,7 +914,7 @@ class LightweightWorkflowTests(unittest.TestCase):
                 project,
                 "advance",
                 "--event",
-                "svg-selected",
+                "svg-confirmed",
                 "--page",
                 "S01",
                 "--selections",
@@ -696,7 +927,7 @@ class LightweightWorkflowTests(unittest.TestCase):
                 (project / "svg_output" / "S01.svg").read_bytes(),
                 (project / "svg_working" / "S01" / "B.svg").read_bytes(),
             )
-            self.assertTrue(receipt_path(project, "S01", "svg-selection").is_file())
+            self.assertTrue(receipt_path(project, "S01", "svg-decision").is_file())
 
     def test_selection_json_has_no_ambiguous_primary_command(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -706,18 +937,18 @@ class LightweightWorkflowTests(unittest.TestCase):
             self.assertEqual(run(project, "present-ab").returncode, 0)
             result = run(project, "next", "--format", "json")
             payload = json.loads(result.stdout)
-            self.assertEqual(payload["action"], "COLLECT_SVG_SELECTION")
+            self.assertEqual(payload["action"], "COLLECT_SVG_DECISION")
             self.assertNotIn("command", payload)
             self.assertEqual(
                 set(payload["commands"]),
                 {
                     "repair_before_user_display",
-                    "after_plain_selection",
+                    "after_confirmation_or_selection",
                     "for_targeted_changes",
                 },
             )
             self.assertEqual(
-                payload["commands"]["after_plain_selection"].count("--page S01"),
+                payload["commands"]["after_confirmation_or_selection"].count("--page S01"),
                 1,
             )
             self.assertFalse(receipt_path(project, "S01", "svg-qa").exists())
@@ -733,7 +964,7 @@ class LightweightWorkflowTests(unittest.TestCase):
 
             repaired = run(
                 project,
-                "repair-ab-candidate",
+                "repair-candidate",
                 "--page",
                 "S01",
                 "--version",
@@ -776,7 +1007,7 @@ class LightweightWorkflowTests(unittest.TestCase):
             self.assertFalse(list((project / "svg_working" / "S01").glob("R*.svg")))
             self.assertFalse(list((project / "working" / "receipts").glob("S01-R*.json")))
 
-    def test_batch_candidate_repair_targets_any_page_and_rebuilds_full_comparison(self) -> None:
+    def test_batch_candidate_repair_preserves_other_page_decisions(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             project = Path(tmp)
             setup_batch_ab(project)
@@ -792,7 +1023,7 @@ class LightweightWorkflowTests(unittest.TestCase):
 
             repaired = run(
                 project,
-                "repair-ab-candidate",
+                "repair-candidate",
                 "--page",
                 "S02",
                 "--version",
@@ -802,8 +1033,9 @@ class LightweightWorkflowTests(unittest.TestCase):
             )
             self.assertEqual(repaired.returncode, 0, repaired.stdout + repaired.stderr)
             framework_text = (project / "framework.md").read_text(encoding="utf-8")
-            self.assertEqual(framework_text.count("- Status: Content locked"), 2)
-            self.assertFalse(receipt_path(project, "S01", "ab-presentation").exists())
+            self.assertEqual(framework_text.count("- Status: Content locked"), 1)
+            self.assertEqual(framework_text.count("- Status: Awaiting SVG decision"), 1)
+            self.assertTrue(receipt_path(project, "S01", "ab-presentation").exists())
             self.assertFalse(receipt_path(project, "S02", "ab-presentation").exists())
 
             next_result = run(project, "next", "--format", "json")
@@ -830,7 +1062,7 @@ class LightweightWorkflowTests(unittest.TestCase):
             self.assertEqual(ready.returncode, 0, ready.stdout + ready.stderr)
             ready_payload = json.loads(ready.stdout)
             self.assertEqual(ready_payload["action"], "PRESENT_AB_OPTIONS")
-            self.assertEqual(ready_payload["pages"], ["S01", "S02"])
+            self.assertEqual(ready_payload["pages"], ["S02"])
 
     def test_deleted_preview_blocks_selection(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -848,7 +1080,7 @@ class LightweightWorkflowTests(unittest.TestCase):
                 project,
                 "advance",
                 "--event",
-                "svg-selected",
+                "svg-confirmed",
                 "--page",
                 "S01",
                 "--selections",
@@ -895,14 +1127,234 @@ class LightweightWorkflowTests(unittest.TestCase):
                 project,
                 "advance",
                 "--event",
-                "svg-selected",
+                "svg-confirmed",
                 "--page",
                 "S01",
                 "--selections",
                 "S01=R1",
             )
             self.assertEqual(confirmed.returncode, 0, confirmed.stdout + confirmed.stderr)
-            self.assertIn("- Selected version: R1", (project / "framework.md").read_text())
+            self.assertIn("- Confirmed version: R1", (project / "framework.md").read_text())
+            request = json.loads(
+                receipt_path(project, "S01", "R1-request").read_text()
+            )
+            self.assertEqual(request["resolution"], "revision-confirmed")
+            self.assertEqual(request["selected_version"], "R1")
+
+    def test_targeted_revision_base_can_be_retained_from_displayed_pair(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project = Path(tmp)
+            revision_id = setup_presented_revision(project)
+
+            payload = json.loads(run(project, "next", "--format", "json").stdout)
+            self.assertEqual(payload["action"], "COLLECT_REVISION_CONFIRMATION")
+            self.assertEqual(payload["user_display"]["allowed_selections"], ["A", revision_id])
+            self.assertIn("S01=A", payload["commands"]["after_keep_base"])
+            self.assertIn(
+                f"S01={revision_id}", payload["commands"]["after_confirmation"]
+            )
+
+            retained = run(
+                project,
+                "advance",
+                "--event",
+                "svg-confirmed",
+                "--page",
+                "S01",
+                "--selections",
+                "S01=A",
+            )
+            self.assertEqual(retained.returncode, 0, retained.stdout + retained.stderr)
+            self.assertIn("- Confirmed version: A", (project / "framework.md").read_text())
+            self.assertEqual(
+                (project / "svg_output" / "S01.svg").read_bytes(),
+                (project / "svg_working" / "S01" / "A.svg").read_bytes(),
+            )
+            request = json.loads(
+                receipt_path(project, "S01", f"{revision_id}-request").read_text()
+            )
+            self.assertFalse(request["active"])
+            self.assertEqual(request["resolution"], "base-retained")
+            self.assertEqual(request["selected_version"], "A")
+            decision = json.loads(
+                receipt_path(project, "S01", "svg-decision").read_text()
+            )
+            self.assertEqual(
+                decision["presentation_receipt"],
+                f"working/receipts/S01-{revision_id}-presentation.json",
+            )
+
+    def test_revision_confirmation_rejects_version_outside_displayed_pair(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project = Path(tmp)
+            setup_presented_revision(project)
+            rejected = run(
+                project,
+                "advance",
+                "--event",
+                "svg-confirmed",
+                "--page",
+                "S01",
+                "--selections",
+                "S01=B",
+            )
+            self.assertNotEqual(rejected.returncode, 0)
+            self.assertIn("displayed Base A or active Revision R1", rejected.stdout)
+            self.assertFalse((project / "svg_output" / "S01.svg").exists())
+            active = json.loads(
+                receipt_path(project, "S01", "revision-active").read_text()
+            )
+            self.assertTrue(active["active"])
+
+    def test_revision_base_retention_rejects_stale_presentation_evidence(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project = Path(tmp)
+            setup_presented_revision(project)
+            base = project / "svg_working" / "S01" / "A.svg"
+            base.write_text(svg("#A6A6A6"), encoding="utf-8")
+            rejected = run(
+                project,
+                "advance",
+                "--event",
+                "svg-confirmed",
+                "--page",
+                "S01",
+                "--selections",
+                "S01=A",
+            )
+            self.assertNotEqual(rejected.returncode, 0)
+            self.assertFalse((project / "svg_output" / "S01.svg").exists())
+
+    def test_chained_revision_can_retain_current_base_but_not_older_version(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project = Path(tmp)
+            first_revision = setup_presented_revision(project)
+            requested = run(
+                project,
+                "request-revision",
+                "--page",
+                "S01",
+                "--base",
+                first_revision,
+                "--note",
+                "Reduce the visual emphasis",
+            )
+            self.assertEqual(requested.returncode, 0, requested.stdout + requested.stderr)
+            active = json.loads(
+                receipt_path(project, "S01", "revision-active").read_text()
+            )
+            second_revision = str(active["revision_id"])
+            revision = project / "svg_working" / "S01" / f"{second_revision}.svg"
+            revision.write_text(svg("#D9D9D9"), encoding="utf-8")
+            completed = run(
+                project,
+                "page-author-result",
+                "--result-json",
+                json.dumps({
+                    "status": "COMPLETE",
+                    "route": "page-svg-authoring",
+                    "artifact_path": str(revision.resolve()),
+                }),
+            )
+            self.assertEqual(completed.returncode, 0, completed.stdout + completed.stderr)
+            presented = run(project, "present-revision")
+            self.assertEqual(presented.returncode, 0, presented.stdout + presented.stderr)
+
+            rejected = run(
+                project,
+                "advance",
+                "--event",
+                "svg-confirmed",
+                "--page",
+                "S01",
+                "--selections",
+                "S01=A",
+            )
+            self.assertNotEqual(rejected.returncode, 0)
+            retained = run(
+                project,
+                "advance",
+                "--event",
+                "svg-confirmed",
+                "--page",
+                "S01",
+                "--selections",
+                f"S01={first_revision}",
+            )
+            self.assertEqual(retained.returncode, 0, retained.stdout + retained.stderr)
+            self.assertIn(
+                f"- Confirmed version: {first_revision}",
+                (project / "framework.md").read_text(),
+            )
+
+    def test_simplified_revision_can_retain_displayed_base(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project = Path(tmp)
+            framework_path = setup_locked(project)
+            simplified = framework_path.read_text(encoding="utf-8").replace(
+                "- Requested authoring mode: Standard",
+                "- Requested authoring mode: Simplified",
+            ).replace("- Authoring mode: Standard", "- Authoring mode: Simplified")
+            framework_path.write_text(simplified, encoding="utf-8")
+
+            self.assertEqual(prepare_authoring(project).returncode, 0)
+            a_path = project / "svg_working" / "S01" / "A.svg"
+            a_path.parent.mkdir(parents=True, exist_ok=True)
+            a_path.write_text(svg(), encoding="utf-8")
+            completed = run(
+                project,
+                "page-author-result",
+                "--result-json",
+                json.dumps({
+                    "status": "COMPLETE",
+                    "route": "page-svg-authoring",
+                    "artifact_path": str(a_path.resolve()),
+                }),
+            )
+            self.assertEqual(completed.returncode, 0, completed.stdout + completed.stderr)
+            self.assertEqual(run(project, "present-single").returncode, 0)
+            requested = run(
+                project,
+                "request-revision",
+                "--page",
+                "S01",
+                "--base",
+                "A",
+                "--note",
+                "Reduce the emphasis",
+            )
+            self.assertEqual(requested.returncode, 0, requested.stdout + requested.stderr)
+            self.assertEqual(prepare_authoring(project).returncode, 0)
+            revision = project / "svg_working" / "S01" / "R1.svg"
+            revision.write_text(svg("#D9D9D9"), encoding="utf-8")
+            completed = run(
+                project,
+                "page-author-result",
+                "--result-json",
+                json.dumps({
+                    "status": "COMPLETE",
+                    "route": "page-svg-authoring",
+                    "artifact_path": str(revision.resolve()),
+                }),
+            )
+            self.assertEqual(completed.returncode, 0, completed.stdout + completed.stderr)
+            self.assertEqual(run(project, "present-revision").returncode, 0)
+            retained = run(
+                project,
+                "advance",
+                "--event",
+                "svg-confirmed",
+                "--page",
+                "S01",
+                "--selections",
+                "S01=A",
+            )
+            self.assertEqual(retained.returncode, 0, retained.stdout + retained.stderr)
+            decision = json.loads(
+                receipt_path(project, "S01", "svg-decision").read_text()
+            )
+            self.assertEqual(decision["authoring_mode"], "Simplified")
+            self.assertEqual(decision["confirmed_version"], "A")
 
     def test_confirmed_page_is_bound_only_to_selection_and_canonical_hash(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -911,7 +1363,7 @@ class LightweightWorkflowTests(unittest.TestCase):
             setup_ab(project)
             self.assertEqual(run(project, "present-ab").returncode, 0)
             self.assertEqual(run(
-                project, "advance", "--event", "svg-selected", "--page", "S01",
+                project, "advance", "--event", "svg-confirmed", "--page", "S01",
                 "--selections", "S01=A",
             ).returncode, 0)
             text = (project / "framework.md").read_text(encoding="utf-8")
@@ -926,7 +1378,7 @@ class LightweightWorkflowTests(unittest.TestCase):
             setup_ab(project)
             self.assertEqual(run(project, "present-ab").returncode, 0)
             self.assertEqual(run(
-                project, "advance", "--event", "svg-selected", "--page", "S01",
+                project, "advance", "--event", "svg-confirmed", "--page", "S01",
                 "--selections", "S01=A",
             ).returncode, 0)
             result = run(project, "next")
@@ -1134,7 +1586,7 @@ class LightweightWorkflowTests(unittest.TestCase):
                 project,
                 "advance",
                 "--event",
-                "svg-selected",
+                "svg-confirmed",
                 "--page",
                 "S01",
                 "--selections",
@@ -1209,7 +1661,7 @@ class LightweightWorkflowTests(unittest.TestCase):
             project = Path(tmp)
             (project / "content.md").write_text(content(), encoding="utf-8")
             old = framework("Content locked", "2.7").replace(
-                "- Framework version: 2.5", "- Framework version: 2.2"
+                "- Framework version: 2.6", "- Framework version: 2.2"
             ).replace(
                 "- Storyline version: 1.0",
                 "- Storyline version: 1.0\n"
@@ -1221,16 +1673,59 @@ class LightweightWorkflowTests(unittest.TestCase):
                 "- Previous connection: None\n- Next connection: None",
             ).replace(
                 "- Status: Content locked", "- Status: SVG selected"
-            ).replace("- Selected version: Pending", "- Selected version: A")
+            ).replace("- Confirmed version: Pending", "- Confirmed version: A")
             migrated = migrate_workflow(old, project)
-            self.assertIn("- Framework version: 2.5", migrated)
-            self.assertIn("- Workflow version: 3.7", migrated)
+            self.assertIn("- Framework version: 2.6", migrated)
+            self.assertIn("- Workflow version: 3.8", migrated)
             self.assertNotIn("- Last checkpoint:", migrated)
             self.assertNotIn("- Final PPTX owner:", migrated)
             self.assertNotIn("- Final PPTX requirement:", migrated)
             self.assertNotIn("- Previous connection:", migrated)
             self.assertIn("- Status: Content locked", migrated)
-            self.assertIn("- Selected version: Pending", migrated)
+            self.assertIn("- Confirmed version: Pending", migrated)
+
+    def test_migration_initializes_project_and_page_authoring_modes(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project = Path(tmp)
+            old = (
+                framework("Not started")
+                .replace("- Framework version: 2.6", "- Framework version: 2.5")
+                .replace("- Workflow version: 3.8", "- Workflow version: 3.7")
+                .replace("- Requested authoring mode: Standard\n", "")
+                .replace("- Page type: Standard content", "- Page type: Cover")
+                .replace("- Authoring mode: Standard\n", "")
+                .replace("- Confirmed version:", "- Selected version:")
+            )
+            migrated = migrate_workflow(old, project)
+            self.assertIn("- Requested authoring mode: Standard", migrated)
+            self.assertIn("- Authoring mode: Simplified", migrated)
+            self.assertIn("- Confirmed version: Pending", migrated)
+            self.assertNotIn("- Selected version:", migrated)
+
+    def test_migration_preserves_valid_legacy_confirmed_page(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project = Path(tmp)
+            (project / "content.md").write_text(content(), encoding="utf-8")
+            a_path = project / "svg_working" / "S01" / "A.svg"
+            final_path = project / "svg_output" / "S01.svg"
+            a_path.parent.mkdir(parents=True, exist_ok=True)
+            final_path.parent.mkdir(parents=True, exist_ok=True)
+            a_path.write_text(svg(), encoding="utf-8")
+            final_path.write_text(svg(), encoding="utf-8")
+            old = (
+                framework("SVG confirmed")
+                .replace("- Framework version: 2.6", "- Framework version: 2.5")
+                .replace("- Workflow version: 3.8", "- Workflow version: 3.7")
+                .replace("- Requested authoring mode: Standard\n", "")
+                .replace("- Authoring mode: Standard\n", "")
+                .replace("- Confirmed version:", "- Selected version:")
+            )
+            migrated = migrate_workflow(old, project)
+            (project / "framework.md").write_text(migrated, encoding="utf-8")
+            self.assertIn("- Status: SVG confirmed", migrated)
+            self.assertIn("- Authoring mode: Standard", migrated)
+            self.assertEqual(validate_framework(project / "framework.md", project), [])
+            self.assertEqual(artifact_errors(migrated, project), [])
 
     def test_normal_validation_rejects_legacy_schema_and_migrate_converts_it(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -1352,6 +1847,7 @@ class LightweightWorkflowTests(unittest.TestCase):
                 "status": "COMPLETE",
                 "route": "page-svg-authoring",
                 "slide_id": "S03",
+                "authoring_mode": "Standard",
                 "version": "A",
                 "artifact_path": str(working_svg.resolve()),
                 "artifact_sha256": sha256(working_svg),
@@ -1367,10 +1863,11 @@ class LightweightWorkflowTests(unittest.TestCase):
             })
             presentation = receipt_path(project, "S03", "ab-presentation")
             write_json(presentation, {"slide_id": "S03", "historical": True})
-            write_json(receipt_path(project, "S03", "svg-selection"), {
+            write_json(receipt_path(project, "S03", "svg-decision"), {
                 "slide_id": "S03",
-                "selected_version": "A",
-                "selected_sha256": sha256(working_svg),
+                "authoring_mode": "Standard",
+                "confirmed_version": "A",
+                "confirmed_sha256": sha256(working_svg),
                 "presentation_receipt": str(presentation.relative_to(project)),
                 "presentation_receipt_sha256": sha256(presentation),
                 "canonical_sha256": sha256(canonical),

@@ -1,0 +1,56 @@
+# Page authoring modes
+
+Use this reference to choose, initialize, interpret, change, or migrate page-level authoring modes.
+
+## Selection and initialization
+
+After confirming the deliverable type and before drafting the Storyline, ask once:
+
+`这次希望采用简化版还是标准版制作流程？简化版每页生成一个方案供确认；标准版的封面、目录和分隔页生成一个方案，其余内容页生成 A/B 两个方案供选择。`
+
+Record the answer as project-level `Requested authoring mode`. Materialize the effective `Authoring mode` on every Storyline page when creating `framework.md`:
+
+| Requested mode | Page type | Effective `Authoring mode` |
+|---|---|---|
+| `Simplified` | every normal page | `Simplified` |
+| `Standard` | `Cover`, `Agenda`, `Section divider` | `Simplified` |
+| `Standard` | every other normal page | `Standard` |
+| either | `Protected placeholder` | `Not applicable` |
+
+Use exact `Page type` values. Do not infer structural pages from titles. Treat closing, Q&A, appendix, and other unlisted page types as normal content pages unless the user explicitly changes their page mode.
+
+Use project mode only to initialize new pages. Treat each page's effective `Authoring mode` as the runtime authority for generation, display, decision evidence, recovery, and mode-specific audit rules.
+
+## Mode-specific first decision
+
+For `Simplified`:
+
+1. Generate and preflight only internal version `A`.
+2. Render and inspect one preview.
+3. Show the preview without exposing an unnecessary option label.
+4. Require explicit user confirmation of A or a targeted revision request.
+
+For `Standard`:
+
+1. Generate and preflight A and B independently from the same packet.
+2. Render and inspect both previews at equal scale.
+3. Show A and B together.
+4. Require explicit selection of A or B, or a targeted revision request.
+
+Set the page to `Awaiting SVG decision` after its required initial presentation. On confirmation or selection, copy the confirmed version to the canonical SVG, record the page mode and presentation evidence in the SVG decision receipt, and set `Confirmed version`.
+
+For a batch containing both modes, follow the directive's per-page `decision_requirements`. Show each `Simplified` page as a single A preview and each `Standard` page as an A/B comparison before collecting the atomic batch decision. Use the page-specific repair command emitted for mixed batches; never apply a Standard page's B repair or selection range to a Simplified page.
+
+## Shared revision and QA rules
+
+For either active mode, generate every targeted revision from its controller-bound Base. Show Base and Rn together at equal scale. Allow the user to retain that displayed Base, confirm that displayed Rn, or request another targeted revision based on Rn. Accept no version outside the current request-bound pair, and reuse the unchanged hash-bound preflight, preview, and paired-presentation evidence when the Base is retained. Do not treat a revision comparison as a second creative option.
+
+Keep the common quality baseline identical across modes: exact visible copy, data-copy bindings, typography scale, canvas and visibility, clipping and overlap, self-containment, rendered preview integrity, canonical hashes, confirmed export compatibility, PPTX package validity, and terminal-result integrity. Skip only B generation, A/B difference evidence, and A/B comparison for `Simplified` pages.
+
+## Changes, insertion, and migration
+
+Allow a page mode change before SVG authoring begins. If candidate, preview, decision, revision, or canonical evidence already exists, require a design reopen and archive the affected evidence before changing the mode.
+
+Initialize an inserted page from `Requested authoring mode` plus its exact `Page type`. Preserve page modes during reorder. Recompute only when the page type changes or the user explicitly changes the page mode.
+
+For legacy projects, default `Requested authoring mode` to `Standard`. Preserve completed pages as `Standard` when needed to retain their existing A/B decision evidence; initialize unfinished structural pages as `Simplified`, other unfinished pages as `Standard`, and protected pages as `Not applicable`.

@@ -4,15 +4,19 @@
 from __future__ import annotations
 
 
-FRAMEWORK_VERSION = "2.5"
-WORKFLOW_VERSION = "3.7"
+FRAMEWORK_VERSION = "2.6"
+WORKFLOW_VERSION = "3.8"
 PAGE_PREFLIGHT_GATE_SCHEMA = "ey-deck.page-preflight.v1"
+
+REQUESTED_AUTHORING_MODES = {"Simplified", "Standard"}
+PAGE_AUTHORING_MODES = {"Simplified", "Standard", "Not applicable"}
+SIMPLIFIED_STANDARD_PAGE_TYPES = {"cover", "agenda", "section divider"}
 
 PAGE_STATES = {
     "Not started",
     "Content reviewing",
     "Content locked",
-    "Awaiting SVG selection",
+    "Awaiting SVG decision",
     "SVG confirmed",
     "Protected placeholder",
 }
@@ -21,8 +25,8 @@ TERMINAL_STATES = {"SVG confirmed", "Protected placeholder"}
 
 ACTION_EVENT = {
     "PRESENT_PAGE_REVIEW": "content-approved",
-    "COLLECT_SVG_SELECTION": "svg-selected",
-    "COLLECT_REVISION_CONFIRMATION": "svg-selected",
+    "COLLECT_SVG_DECISION": "svg-confirmed",
+    "COLLECT_REVISION_CONFIRMATION": "svg-confirmed",
 }
 
 MANAGED_START = "<!-- EY-DECK-DESIGN-WORKFLOW:START -->"
@@ -51,3 +55,13 @@ PREPARE_AUTHORING_ACTIONS = {
     "PREPARE_SVG_B": "GENERATE_SVG_B",
     "PREPARE_SVG_REVISION": "GENERATE_SVG_REVISION",
 }
+
+
+def initial_authoring_mode(requested_mode: str, page_type: str) -> str:
+    """Resolve the initial page mode from the project request and exact page type."""
+    normalized_type = page_type.strip().lower()
+    if normalized_type == "protected placeholder":
+        return "Not applicable"
+    if requested_mode == "Simplified" or normalized_type in SIMPLIFIED_STANDARD_PAGE_TYPES:
+        return "Simplified"
+    return "Standard"

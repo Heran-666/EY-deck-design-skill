@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from framework_lib import PageEntry, h2_section, page_entries, replace_field
-from preview_renderer import PreviewError, ensure_preview_pair
+from preview_renderer import PreviewError, ensure_preview_pair, ensure_preview_single
 from svg_boundary import svg_error
 from validate_deck_blueprint import validate as validate_blueprint
 from validate_framework import validate as validate_framework
@@ -28,6 +28,7 @@ from workflow_authoring import (
     revision_presentation_valid,
     revision_request_hash,
     validate_ab,
+    validate_single,
     validate_revision,
 )
 from workflow_content import (
@@ -53,6 +54,7 @@ from workflow_paths import (
 from workflow_preview_evidence import (
     ab_presentation_valid,
     preview_presentation_evidence,
+    single_presentation_valid,
 )
 from workflow_protected import materialize_protected_pages
 from workflow_spec import PAGE_PREFLIGHT_GATE_SCHEMA, PREPARE_AUTHORING_ACTIONS, WORKFLOW_VERSION
@@ -64,7 +66,7 @@ from workflow_transitions import (
     record_handoff_result,
     record_page_author_result,
     reopen_pages,
-    repair_ab_candidate,
+    repair_candidate,
     resume_handoff,
     resume_page_author,
     run_and_record_doctor,
@@ -82,7 +84,7 @@ class CommandContext:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser()
     sub = parser.add_subparsers(dest='command', required=True)
-    for name in ('bootstrap', 'doctor', 'init', 'next', 'audit', 'prepare-authoring', 'prepare-export', 'validate-review', 'present-review', 'present-ab', 'repair-ab-candidate', 'request-revision', 'present-revision', 'advance', 'update-page', 'set-output-filename', 'migrate', 'materialize-protected', 'page-author-result', 'resume-page-author', 'handoff-result', 'resume-handoff'):
+    for name in ('bootstrap', 'doctor', 'init', 'next', 'audit', 'prepare-authoring', 'prepare-export', 'validate-review', 'present-review', 'present-single', 'present-ab', 'repair-candidate', 'request-revision', 'present-revision', 'advance', 'update-page', 'set-output-filename', 'migrate', 'materialize-protected', 'page-author-result', 'resume-page-author', 'handoff-result', 'resume-handoff'):
         command = sub.add_parser(name)
         command.add_argument('legacy_framework', nargs='?', type=Path, help=argparse.SUPPRESS)
         command.add_argument('--framework', dest='framework_option', type=Path)
@@ -102,7 +104,7 @@ def build_parser() -> argparse.ArgumentParser:
             command.add_argument('--page', required=True)
             command.add_argument('--base')
             command.add_argument('--note', required=True)
-        if name == 'repair-ab-candidate':
+        if name == 'repair-candidate':
             command.add_argument('--page', required=True)
             command.add_argument('--version', choices=('A', 'B'), required=True)
             command.add_argument('--note', required=True)
@@ -111,6 +113,7 @@ def build_parser() -> argparse.ArgumentParser:
             command.add_argument('--confirmed-decisions')
             command.add_argument('--open-items')
             command.add_argument('--review-mode', choices=('Page-by-page', 'Batch'))
+            command.add_argument('--authoring-mode', choices=('Simplified', 'Standard'))
             command.add_argument('--title')
         if name == 'set-output-filename':
             command.add_argument('--filename', required=True)
@@ -170,13 +173,13 @@ def handle_reopen(context: CommandContext) -> int:
     return 0
 
 
-def handle_repair_ab_candidate(context: CommandContext) -> int:
+def handle_repair_candidate(context: CommandContext) -> int:
     args, project_dir, framework, text, controller = _unpack(context)
     try:
-        text = repair_ab_candidate(text, project_dir, args.page, args.version, args.note)
+        text = repair_candidate(text, project_dir, args.page, args.version, args.note)
         atomic_write(framework, text)
     except (OSError, ValueError) as exc:
-        print(f'A/B candidate repair blocked: {exc}')
+        print(f'Candidate repair blocked: {exc}')
         return 1
     print(f'Reopened {args.page} {args.version} for same-slot candidate repair.')
     print_directive(text, project_dir, controller)
@@ -379,6 +382,66 @@ def handle_present_review(context: CommandContext) -> int:
     return 0
 
 
+def handle_present_single(context: CommandContext) -> int:
+    args, project_dir, framework, text, controller = _unpack(context)
+    action, selected = directive(text, project_dir)
+    if action != 'PRESENT_SINGLE_OPTION':
+        print(f'Single-option presentation blocked: current action is {action}')
+        return 1
+    packets: list[tuple[PageEntry, Path, dict[str, dict]]] = []
+    for page in selected:
+        if page.fields.get('Authoring mode') != 'Simplified':
+            print(f'Single-option presentation blocked: {page.slide_id} is not Simplified')
+            return 1
+        problems, manifest = validate_single(project_dir, page.slide_id)
+        if problems:
+            print('Single-option presentation blocked: ' + '; '.join(problems))
+            return 1
+        a_path, _b_path = working_paths(project_dir, page.slide_id)
+        try:
+            previews = ensure_preview_single(
+                project_dir,
+                page.slide_id,
+                'A',
+                copy_contract=page_visible_copy_contract(project_dir, page.slide_id),
+                prevalidated_source_hash=str((manifest or {}).get('a_sha256', '')),
+            )
+        except (OSError, PreviewError, ValueError) as exc:
+            issue: dict[str, object] = preview_failure_issue(exc)
+            issue.update({
+                'slide_id': page.slide_id,
+                'retry_command': command_line(controller, 'present-single', project_dir),
+            })
+            if issue.get('code') == 'PREVIEW_BROWSER_SANDBOX_BLOCKED':
+                issue['approval_prefix'] = ['python3', str(controller)]
+            print('Single-option presentation blocked: ' + json.dumps(
+                issue, ensure_ascii=False, sort_keys=True
+            ))
+            return 1
+        packets.append((page, a_path, previews))
+    for page, a_path, previews in packets:
+        write_json(receipt_path(project_dir, page.slide_id, 'single-presentation'), {
+            'slide_id': page.slide_id,
+            'authoring_mode': 'Simplified',
+            'a_sha256': sha256(a_path),
+            'evidence_scope': 'rendered-single-option',
+            **preview_presentation_evidence(project_dir, page.slide_id, ('A',), previews),
+            'created_at': now(),
+        })
+        text = update_page(text, page.slide_id, {'Status': 'Awaiting SVG decision'})
+    atomic_write(framework, text)
+    for page, a_path, previews in packets:
+        a_png = project_dir / str(previews['A']['preview_png'])
+        print(f'## {page.slide_id}｜Single design confirmation\n')
+        print(f'![{page.slide_id} PNG preview](<{a_png}>)\n')
+        print(f'Original SVG: [A.svg](<{a_path}>)\n')
+        print(
+            'Before sending this preview to the user, inspect it. If it has a defect, run '
+            'repair-candidate for A. Otherwise ask the user to confirm it or request a targeted revision.\n'
+        )
+    return 0
+
+
 def handle_present_ab(context: CommandContext) -> int:
     args, project_dir, framework, text, controller = _unpack(context)
     action, selected = directive(text, project_dir)
@@ -387,6 +450,9 @@ def handle_present_ab(context: CommandContext) -> int:
         return 1
     packets: list[tuple[PageEntry, dict, Path, Path, dict[str, dict]]] = []
     for page in selected:
+        if page.fields.get('Authoring mode') != 'Standard':
+            print(f'A/B presentation blocked: {page.slide_id} is not Standard')
+            return 1
         problems, manifest = validate_ab(project_dir, page.slide_id)
         if problems:
             print('A/B presentation blocked: ' + '; '.join(problems))
@@ -404,7 +470,7 @@ def handle_present_ab(context: CommandContext) -> int:
         packets.append((page, manifest or {}, a_path, b_path, previews))
     for page, manifest, a_path, b_path, previews in packets:
         write_json(receipt_path(project_dir, page.slide_id, 'ab-presentation'), {'slide_id': page.slide_id, 'a_sha256': sha256(a_path), 'b_sha256': sha256(b_path), 'advisories': manifest.get('advisories', []), 'evidence_scope': 'rendered-comparison', **preview_presentation_evidence(project_dir, page.slide_id, ('A', 'B'), previews), 'created_at': now()})
-        text = update_page(text, page.slide_id, {'Status': 'Awaiting SVG selection'})
+        text = update_page(text, page.slide_id, {'Status': 'Awaiting SVG decision'})
     atomic_write(framework, text)
     for page, manifest, a_path, b_path, previews in packets:
         a_target = f'<{a_path}>'
@@ -432,15 +498,15 @@ def handle_present_ab(context: CommandContext) -> int:
             print('\nAdvisories:')
             for advisory in advisories:
                 print(f'- {advisory}')
-        print('\nBefore sending this comparison to the user, inspect both candidates. If either has a defect, run repair-ab-candidate for that same A/B slot and do not create Rn. Otherwise show both, then ask the user to choose A or B or request a targeted revision.\n')
+        print('\nBefore sending this comparison to the user, inspect both candidates. If either has a defect, run repair-candidate for that same A/B slot and do not create Rn. Otherwise show both, then ask the user to choose A or B or request a targeted revision.\n')
     return 0
 
 
 def handle_request_revision(context: CommandContext) -> int:
     args, project_dir, framework, text, controller = _unpack(context)
     page = next((p for p in page_entries(text) if p.slide_id == args.page), None)
-    if not page or page.fields.get('Status') not in {'Awaiting SVG selection', 'SVG confirmed'}:
-        print(f'Revision request blocked: {args.page} is not in a selectable or confirmed SVG state')
+    if not page or page.fields.get('Status') not in {'Awaiting SVG decision', 'SVG confirmed'}:
+        print(f'Revision request blocked: {args.page} is not in a decidable or confirmed SVG state')
         return 1
     if not args.note.strip():
         print('Revision request blocked: --note must record the targeted changes')
@@ -449,8 +515,8 @@ def handle_request_revision(context: CommandContext) -> int:
     base_version = args.base
     if not base_version and previous:
         base_version = str(previous.get('revision_id', ''))
-    if not base_version and page.fields.get('Selected version') != 'Pending':
-        base_version = page.fields.get('Selected version')
+    if not base_version and page.fields.get('Confirmed version') != 'Pending':
+        base_version = page.fields.get('Confirmed version')
     if not base_version or not re.fullmatch('(?:A|B|R[1-9]\\d*)', base_version):
         print('Revision request blocked: provide a valid --base A, B, or Rn')
         return 1
@@ -477,8 +543,11 @@ def handle_request_revision(context: CommandContext) -> int:
     write_json(receipt_path(project_dir, args.page, f'{revision_id}-request'), request)
     write_json(revision_active_path(project_dir, args.page), request)
     if page.fields.get('Status') == 'SVG confirmed':
-        archive_items(project_dir, args.page, [project_dir / 'svg_output' / f'{args.page}.svg', receipt_path(project_dir, args.page, 'svg-selection')])
-    text = update_page(text, args.page, {'Status': 'Awaiting SVG selection', 'Selected version': 'Pending'})
+        archive_items(project_dir, args.page, [
+            project_dir / 'svg_output' / f'{args.page}.svg',
+            receipt_path(project_dir, args.page, 'svg-decision'),
+        ])
+    text = update_page(text, args.page, {'Status': 'Awaiting SVG decision', 'Confirmed version': 'Pending'})
     atomic_write(framework, text)
     print(f'Recorded targeted revision {revision_id} for {args.page} from base {base_version}.')
     print_directive(text, project_dir, controller)
@@ -535,7 +604,10 @@ def handle_present_revision(context: CommandContext) -> int:
             print(f'- {advisory}')
         print()
     print('Required user display: send both previews above together in the same message at equal scale; never show the revision alone.')
-    print(f'Please explicitly confirm {revision_id}, or request another targeted revision.')
+    print(
+        f'Please explicitly retain Base {base_version}, confirm Revision {revision_id}, '
+        'or request another targeted revision.'
+    )
     return 0
 
 
@@ -553,6 +625,17 @@ def handle_update_page(context: CommandContext) -> int:
     if args.review_mode is not None and state != 'Not started':
         print('Update blocked: Review mode may change only before page review starts')
         return 1
+    if args.authoring_mode is not None:
+        if state not in {'Not started', 'Content reviewing', 'Content locked'}:
+            print('Update blocked: reopen design before changing Authoring mode')
+            return 1
+        page_working = project_dir / 'svg_working' / args.page
+        authoring_receipts = list(
+            (project_dir / 'working' / 'receipts').glob(f'{args.page}-*-authoring.json')
+        )
+        if page_working.exists() or authoring_receipts:
+            print('Update blocked: archive existing design evidence through a design reopen first')
+            return 1
     updates = {}
     if args.confirmed_decisions is not None:
         updates['Confirmed decisions'] = args.confirmed_decisions
@@ -560,6 +643,8 @@ def handle_update_page(context: CommandContext) -> int:
         updates['Open items'] = args.open_items
     if args.review_mode is not None:
         updates['Review mode'] = args.review_mode
+    if args.authoring_mode is not None:
+        updates['Authoring mode'] = args.authoring_mode
     if not updates and (not args.title):
         print('Update blocked: no update supplied')
         return 1
@@ -648,38 +733,82 @@ def handle_advance(context: CommandContext) -> int:
                 if title_match:
                     text = update_page_title(text, slide_id, title_match.group(1).strip())
             review_to_clear = review
-        elif event == 'svg-selected':
+        elif event == 'svg-confirmed':
             selections = parse_selections(args.selections)
             if set(selections) != set(ids):
-                raise ValueError('explicit selections must cover exactly the active pages')
-            for slide_id in ids:
-                if current_action == 'COLLECT_SVG_SELECTION' and selections[slide_id] not in {'A', 'B'}:
-                    raise ValueError(f'{slide_id} direct A/B selection must be A or B')
-                presentation_file = receipt_path(project_dir, slide_id, 'ab-presentation')
-                if current_action == 'COLLECT_SVG_SELECTION' and (not ab_presentation_valid(project_dir, slide_id)):
-                    raise ValueError(f'{slide_id} A/B options were not presented or changed afterward')
+                raise ValueError('explicit confirmations must cover exactly the active pages')
+            for slide_id, page in zip(ids, selected):
+                mode = page.fields.get('Authoring mode')
+                presentation_file = receipt_path(
+                    project_dir,
+                    slide_id,
+                    'single-presentation' if mode == 'Simplified' else 'ab-presentation',
+                )
+                if current_action == 'COLLECT_SVG_DECISION':
+                    if mode == 'Simplified':
+                        if selections[slide_id] != 'A':
+                            raise ValueError(f'{slide_id} Simplified confirmation must use A')
+                        if not single_presentation_valid(project_dir, slide_id):
+                            raise ValueError(
+                                f'{slide_id} single option was not presented or changed afterward'
+                            )
+                    else:
+                        if selections[slide_id] not in {'A', 'B'}:
+                            raise ValueError(f'{slide_id} Standard selection must be A or B')
+                        if not ab_presentation_valid(project_dir, slide_id):
+                            raise ValueError(
+                                f'{slide_id} A/B options were not presented or changed afterward'
+                            )
                 if current_action == 'COLLECT_REVISION_CONFIRMATION':
                     request = active_revision(project_dir, slide_id)
-                    if request is None or selections[slide_id] != request.get('revision_id'):
-                        raise ValueError(f'{slide_id} must explicitly confirm the active revision')
+                    if request is None:
+                        raise ValueError(f'{slide_id} has no active revision to resolve')
+                    base_version = str(request.get('base_version', ''))
+                    revision_id = str(request.get('revision_id', ''))
+                    allowed_selections = {base_version, revision_id}
+                    if selections[slide_id] not in allowed_selections:
+                        raise ValueError(
+                            f'{slide_id} must select the displayed Base {base_version} or '
+                            f'active Revision {revision_id}'
+                        )
                     if not revision_presentation_valid(project_dir, slide_id, request):
                         raise ValueError(f'{slide_id} revision was not presented or changed afterward')
                     request['active'] = False
-                    request['confirmed_at'] = now()
-                    revision_id = str(request['revision_id'])
+                    request['resolved_at'] = now()
+                    request['resolution'] = (
+                        'base-retained'
+                        if selections[slide_id] == base_version
+                        else 'revision-confirmed'
+                    )
+                    request['selected_version'] = selections[slide_id]
+                    if selections[slide_id] == revision_id:
+                        request['confirmed_at'] = request['resolved_at']
                     write_json(receipt_path(project_dir, slide_id, f'{revision_id}-request'), request)
                     write_json(revision_active_path(project_dir, slide_id), request)
                     presentation_file = revision_presentation_path(project_dir, slide_id, revision_id)
-                selected_path = selected_working_path(project_dir, slide_id, selections[slide_id])
+                confirmed_path = selected_working_path(project_dir, slide_id, selections[slide_id])
                 if not page_author_completion_valid(project_dir, slide_id, selections[slide_id]):
-                    raise ValueError(f'{slide_id} selected SVG has no valid hash-bound preflight receipt')
+                    raise ValueError(f'{slide_id} confirmed SVG has no valid hash-bound preflight receipt')
                 if not presentation_file.is_file():
                     raise ValueError(f'{slide_id} has no presentation receipt')
                 final_path = project_dir / 'svg_output' / f'{slide_id}.svg'
                 final_path.parent.mkdir(parents=True, exist_ok=True)
-                shutil.copy2(selected_path, final_path)
-                write_json(receipt_path(project_dir, slide_id, 'svg-selection'), {'slide_id': slide_id, 'selected_version': selections[slide_id], 'selected_sha256': sha256(selected_path), 'presentation_receipt': str(presentation_file.relative_to(project_dir)), 'presentation_receipt_sha256': sha256(presentation_file), 'canonical_sha256': sha256(final_path), 'source_preflight_gate': PAGE_PREFLIGHT_GATE_SCHEMA, 'accepted_at': now()})
-                text = update_page(text, slide_id, {'Status': 'SVG confirmed', 'Selected version': selections[slide_id]})
+                shutil.copy2(confirmed_path, final_path)
+                write_json(receipt_path(project_dir, slide_id, 'svg-decision'), {
+                    'slide_id': slide_id,
+                    'authoring_mode': mode,
+                    'confirmed_version': selections[slide_id],
+                    'confirmed_sha256': sha256(confirmed_path),
+                    'presentation_receipt': str(presentation_file.relative_to(project_dir)),
+                    'presentation_receipt_sha256': sha256(presentation_file),
+                    'canonical_sha256': sha256(final_path),
+                    'source_preflight_gate': PAGE_PREFLIGHT_GATE_SCHEMA,
+                    'accepted_at': now(),
+                })
+                text = update_page(text, slide_id, {
+                    'Status': 'SVG confirmed',
+                    'Confirmed version': selections[slide_id],
+                })
         else:
             raise ValueError(f'unsupported event: {event}')
         atomic_write(framework, text)
@@ -699,7 +828,7 @@ def handle_advance(context: CommandContext) -> int:
 
 
 COMMAND_HANDLERS = {
-    "repair-ab-candidate": handle_repair_ab_candidate,
+    "repair-candidate": handle_repair_candidate,
     "bootstrap": handle_doctor,
     "doctor": handle_doctor,
     "init": handle_init,
@@ -714,6 +843,7 @@ COMMAND_HANDLERS = {
     "resume-handoff": handle_resume_handoff,
     "materialize-protected": handle_materialize_protected,
     "present-review": handle_present_review,
+    "present-single": handle_present_single,
     "present-ab": handle_present_ab,
     "request-revision": handle_request_revision,
     "present-revision": handle_present_revision,
