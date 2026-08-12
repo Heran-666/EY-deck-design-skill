@@ -17,6 +17,7 @@ from workflow_paths import (
 from workflow_spec import (
     FRAMEWORK_VERSION,
     WORKFLOW_VERSION,
+    initial_authoring_mode,
 )
 
 
@@ -121,6 +122,7 @@ def migrate_legacy_project_schema(text: str) -> str:
 - Deliverable name: {name}
 - Audience: {audience}
 - Deliverable type: Proposal
+- Requested authoring mode: Standard
 - Audience outcome: {outcome}
 - Core need: {core_need}
 - Storyline thesis: {thesis}
@@ -157,6 +159,10 @@ def migrate_workflow(
         and "Final PPTX owner" not in original_position
         and "Final PPTX requirement" not in original_position
         and "Last checkpoint" not in original_position
+        and line_fields(h2_section(text, "Project context")).get("Requested authoring mode")
+        in {"Simplified", "Standard"}
+        and all("Authoring mode" in page.fields for page in page_entries(text))
+        and all("Confirmed version" in page.fields for page in page_entries(text))
         and all("Previous connection" not in page.fields for page in page_entries(text))
         and text == original_text
     ):
@@ -182,6 +188,24 @@ def migrate_workflow(
             flags=re.MULTILINE,
         )
     text = text.replace(current, updated, 1)
+
+    context = h2_section(text, "Project context")
+    context_values = line_fields(context)
+    if context_values.get("Requested authoring mode") not in {"Simplified", "Standard"}:
+        if "Requested authoring mode" in context_values:
+            migrated_context = replace_field(context, "Requested authoring mode", "Standard")
+        else:
+            migrated_context = re.sub(
+                r"(^- Deliverable type:.*$)",
+                r"\1\n- Requested authoring mode: Standard",
+                context,
+                count=1,
+                flags=re.MULTILINE,
+            )
+        text = text.replace(context, migrated_context, 1)
+    requested_authoring_mode = line_fields(
+        h2_section(text, "Project context")
+    ).get("Requested authoring mode", "Standard")
 
     rules = h2_section(text, "Design hard rules")
     cleaned = rules
@@ -216,20 +240,57 @@ def migrate_workflow(
         "SVG A/B ready": "Content locked",
         "SVG choice pending": "Content locked",
         "Awaiting SVG selection": "Content locked",
+        "Awaiting SVG decision": "Content locked",
         "SVG selected": "Content locked",
         "SVG QA passed": "SVG confirmed",
+        "SVG confirmed": "SVG confirmed",
         "Protected placeholder": "Protected placeholder",
     }
     for page in page_entries(text):
         section = page.text
         for field in ("Content section", "SVG candidates", "Final SVG", "Previous connection"):
             section = re.sub(rf"^- {re.escape(field)}:.*\n", "", section, flags=re.MULTILINE)
+        if "Confirmed version" not in page.fields and "Selected version" in page.fields:
+            section = re.sub(
+                r"^- Selected version:",
+                "- Confirmed version:",
+                section,
+                count=1,
+                flags=re.MULTILINE,
+            )
+        mode = page.fields.get("Authoring mode")
+        if mode not in {"Simplified", "Standard", "Not applicable"}:
+            mode = (
+                "Standard"
+                if page.fields.get("Status") == "SVG confirmed"
+                and page.fields.get("Page type", "").strip().lower() != "protected placeholder"
+                else initial_authoring_mode(
+                    requested_authoring_mode,
+                    page.fields.get("Page type", ""),
+                )
+            )
+            if "Authoring mode" in page.fields:
+                section = replace_field(section, "Authoring mode", mode)
+            else:
+                section = re.sub(
+                    r"(^- Review mode:.*$)",
+                    rf"\1\n- Authoring mode: {mode}",
+                    section,
+                    count=1,
+                    flags=re.MULTILINE,
+                )
         section = replace_field(section, "Status", mapping.get(page.fields.get("Status"), "Not started"))
-        if page.fields.get("Status") in {"SVG choice pending", "Awaiting SVG selection", "SVG selected"}:
-            section = replace_field(section, "Selected version", "Pending")
+        if page.fields.get("Status") in {
+            "SVG choice pending",
+            "Awaiting SVG selection",
+            "Awaiting SVG decision",
+            "SVG selected",
+        }:
+            section = replace_field(section, "Confirmed version", "Pending")
         if mapping.get(page.fields.get("Status")) == "Protected placeholder":
             section = replace_field(section, "Page type", "Protected placeholder")
-            section = replace_field(section, "Selected version", "Not applicable")
+            section = replace_field(section, "Authoring mode", "Not applicable")
+            section = replace_field(section, "Confirmed version", "Not applicable")
         text = text.replace(page.text, section, 1)
 
     content_path = project_dir / "content.md"
@@ -269,6 +330,7 @@ def migrate_workflow(
                     "status": "COMPLETE",
                     "route": "page-svg-authoring",
                     "slide_id": page.slide_id,
+                    "authoring_mode": page.fields.get("Authoring mode"),
                     "version": version,
                     "artifact_path": str(artifact.resolve()),
                     "artifact_sha256": sha256(artifact),
@@ -278,16 +340,17 @@ def migrate_workflow(
                 })
         if state == "SVG confirmed":
             final_path = project_dir / "svg_output" / f"{page.slide_id}.svg"
-            version = page.fields.get("Selected version", "")
+            version = page.fields.get("Confirmed version", "")
             try:
                 selected = selected_working_path(project_dir, page.slide_id, version)
             except ValueError:
                 selected = None
             if not candidate_errors(final_path) and selected is not None:
-                write_json(receipt_path(project_dir, page.slide_id, "svg-selection"), {
+                write_json(receipt_path(project_dir, page.slide_id, "svg-decision"), {
                     "slide_id": page.slide_id,
-                    "selected_version": version,
-                    "selected_sha256": sha256(selected) if selected.is_file() else sha256(final_path),
+                    "authoring_mode": page.fields.get("Authoring mode"),
+                    "confirmed_version": version,
+                    "confirmed_sha256": sha256(selected) if selected.is_file() else sha256(final_path),
                     "canonical_sha256": sha256(final_path),
                     "accepted_at": now(),
                     "migration": True,
@@ -295,7 +358,7 @@ def migrate_workflow(
             else:
                 current_page = next(item for item in page_entries(text) if item.slide_id == page.slide_id)
                 reset = replace_field(current_page.text, "Status", "Content locked")
-                reset = replace_field(reset, "Selected version", "Pending")
+                reset = replace_field(reset, "Confirmed version", "Pending")
                 text = text.replace(current_page.text, reset, 1)
 
     archive_items(project_dir, "workflow-3.0-obsolete", [
@@ -315,6 +378,7 @@ def migrate_workflow(
             project_dir / "working" / "receipts" / "final-qa.json",
         ])
     receipts = project_dir / "working" / "receipts"
+    archive_items(project_dir, "workflow-3.8-renamed", list(receipts.glob("S*-svg-selection.json")))
     old_handoff = receipts / "ppt-master-handoff.json"
     new_handoff = receipts / "confirmed-export-handoff.json"
     if old_handoff.is_file() and not new_handoff.exists():

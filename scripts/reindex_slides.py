@@ -18,7 +18,7 @@ from workflow_io import atomic_write, read_json, sha256, text_sha256, write_json
 from workflow_copy_contract import visible_copy_contract
 
 
-BLOCKED_STATUSES = {"Content reviewing", "Content locked", "Awaiting SVG selection"}
+BLOCKED_STATUSES = {"Content reviewing", "Content locked", "Awaiting SVG decision"}
 
 
 def content_sections(text: str) -> tuple[str, dict[str, str]]:
@@ -106,7 +106,7 @@ def refresh_nested_receipt_hashes(
         page.slide_id: page for page in page_entries(framework_path.read_text(encoding="utf-8"))
     }
     packets = working_dir / "packets"
-    packet_evidence: dict[str, tuple[str, str, str]] = {}
+    packet_evidence: dict[str, tuple[str, str, str, str]] = {}
     if packets.is_dir():
         for packet in packets.glob("S*-authoring.md"):
             slide_id = packet.name.removesuffix("-authoring.md")
@@ -135,6 +135,7 @@ def refresh_nested_receipt_hashes(
                 payload["visible_copy_contract_sha256"] = contract["contract_sha256"]
             payload.update({
                 "slide_id": slide_id,
+                "authoring_mode": page.fields.get("Authoring mode"),
                 "packet_path": str(packet.resolve()),
                 "packet_sha256": sha256(packet),
                 "framework_page_sha256": text_sha256(page.text),
@@ -144,6 +145,7 @@ def refresh_nested_receipt_hashes(
                 str(packet.resolve()),
                 sha256(packet),
                 str(payload.get("visible_copy_contract_sha256", "")),
+                str(payload.get("authoring_mode", "")),
             )
 
     for path in receipts.glob("S*-*-authoring.json"):
@@ -154,6 +156,7 @@ def refresh_nested_receipt_hashes(
                 payload["packet_path"],
                 payload["packet_sha256"],
                 payload["visible_copy_contract_sha256"],
+                payload["authoring_mode"],
             ) = packet_evidence[slide_id]
         artifact_value = payload.get("artifact_path")
         if artifact_value:
@@ -214,14 +217,14 @@ def refresh_nested_receipt_hashes(
             payload["revision_sha256"] = sha256(revision)
         write_json(path, payload)
 
-    for path in receipts.glob("S*-svg-selection.json"):
+    for path in receipts.glob("S*-svg-decision.json"):
         payload = read_json(path)
         slide_id = str(payload.get("slide_id", ""))
-        selected_version = str(payload.get("selected_version", ""))
-        selected = project_dir / "svg_working" / slide_id / f"{selected_version}.svg"
+        confirmed_version = str(payload.get("confirmed_version", ""))
+        confirmed = project_dir / "svg_working" / slide_id / f"{confirmed_version}.svg"
         canonical = project_dir / "svg_output" / f"{slide_id}.svg"
-        if selected.is_file():
-            payload["selected_sha256"] = sha256(selected)
+        if confirmed.is_file():
+            payload["confirmed_sha256"] = sha256(confirmed)
         if canonical.is_file():
             payload["canonical_sha256"] = sha256(canonical)
         presentation_value = payload.get("presentation_receipt")

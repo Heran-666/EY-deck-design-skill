@@ -4,8 +4,9 @@
 
 1. Classify from the supplied background
 2. Confirm the type
-3. Build the type-appropriate Storyline
-4. Present the Storyline for approval
+3. Confirm the authoring mode
+4. Build the type-appropriate Storyline
+5. Present the Storyline for approval
 
 ## 1. Classify from the supplied background
 
@@ -29,7 +30,11 @@ If two types remain genuinely plausible, recommend one and name only the closest
 
 Treat a direct correction as confirmation of the corrected type. Record the confirmed type in the temporary intake summary and later in `framework.md`; do not repeatedly reconfirm it unless the user's objective changes.
 
-## 3. Build the type-appropriate Storyline
+## 3. Confirm the authoring mode
+
+After type confirmation and before Storyline drafting, ask the user to choose `Simplified` or `Standard` under [authoring-modes.md](authoring-modes.md). Record the choice in temporary intake context and later as project-level `Requested authoring mode`. Do not infer the choice from urgency, deck length, or deliverable type.
+
+## 4. Build the type-appropriate Storyline
 
 ### Proposal
 
@@ -55,8 +60,8 @@ Name the form and success condition. Select the clearest justified logic—decis
 
 Choose one primary type and only the necessary secondary behavior. Surface conflicting audience outcomes before drafting.
 
-## 4. Present the Storyline for approval
+## 5. Present the Storyline for approval
 
-For every confirmed type, show the complete page sequence with provisional Slide ID, title or purpose, narrative role, adjacency logic, review mode, and protected status. Briefly explain the overall narrative arc and how it serves the confirmed audience outcome.
+For every confirmed type, show the complete page sequence with provisional Slide ID, title or purpose, narrative role, adjacency logic, review mode, effective authoring mode, and protected status. Briefly explain the overall narrative arc and how it serves the confirmed audience outcome.
 
-Obtain explicit approval before creating `framework.md` or `content.md`, unless the user expressly waives the Storyline gate. After approval, all types use the same controller-governed workflow.
+Obtain explicit approval before creating `framework.md` or `content.md`, unless the user expressly waives the Storyline gate. After approval, all types use the same controller-governed workflow, with each page following its own effective authoring mode.

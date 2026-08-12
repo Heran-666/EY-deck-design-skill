@@ -43,11 +43,13 @@ Consume the approved semantic `Visual Direction（Build-only）` defined by [out
 - Keep tables and charts editable, simple, and evidence-backed. Do not invent missing labels, values, units, dates, caveats, or sources.
 - Preserve approved copy, data, sources, emphasis, semantic relationships, and brand constraints.
 
-## A/B design intent
+## Mode-aware design intent
 
-Produce two complete interpretations from the same locked packet:
+For a `Simplified` page, produce one confident complete A solution. Do not lower composition, copy, typography, preview, or export quality because the page has one candidate.
+
+For a `Standard` page, produce two complete interpretations from the same locked packet:
 
 - A: one confident complete solution.
 - B: a materially distinct complete solution, not an optimization, critique, or repair of A.
 
-Both preserve the same approved meaning and canvas. B should report its material differences in terminal JSON; identical A/B bytes or insufficient difference evidence are advisory and do not block comparison or user selection. The controller owns the manifest, comparison, selection, revisions, and handoff.
+Both preserve the same approved meaning and canvas. B should report its material differences in terminal JSON; identical A/B bytes or insufficient difference evidence are advisory and do not block comparison or user selection. In either mode, the controller owns the manifest, presentation, user decision, revisions, and handoff. See [authoring-modes.md](authoring-modes.md).

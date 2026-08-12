@@ -105,6 +105,20 @@ def quality_failure_is_environment(project: Path) -> bool:
     return all(any(marker in message for marker in environment_markers) for message in messages)
 
 
+def topology_blocked_slide_ids(project: Path, fallback: list[str]) -> list[str]:
+    """Return source Slide IDs from the isolated topology receipt."""
+    receipt = project / "validation" / "text_frame_topology.json"
+    try:
+        payload = json.loads(receipt.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return fallback
+    blocked = payload.get("blocked_slide_ids")
+    if not isinstance(blocked, list):
+        return fallback
+    selected = [str(item) for item in blocked if str(item) in fallback]
+    return selected or fallback
+
+
 def validate_terminal(
     python: str,
     manifest_path: Path,
@@ -219,6 +233,29 @@ def execute(manifest_path: Path, expected_manifest_sha256: str) -> dict[str, obj
             repair_scope="environment",
             slide_ids=slide_ids,
             resume_from="Repair the bound runtime and retry the deterministic export runner.",
+        )
+        return validate_terminal(python, manifest_path, manifest, result)
+
+    topology = run_step(
+        python,
+        "normalize_text_frame_topology.py",
+        "--project-dir",
+        str(project),
+    )
+    if topology.returncode != 0:
+        result = blocked(
+            stage="text-frame-topology",
+            reason=(
+                "Isolated-copy text-frame normalization, exact-copy verification, "
+                "or topology recheck failed: " + compact_detail(topology)
+            ),
+            repair_scope="source-svg",
+            slide_ids=topology_blocked_slide_ids(project, slide_ids),
+            resume_from=(
+                "Inspect validation/text_frame_topology.json and replace only an "
+                "unresolved confirmed SVG; safely normalized pages do not require "
+                "new user selection."
+            ),
         )
         return validate_terminal(python, manifest_path, manifest, result)
 

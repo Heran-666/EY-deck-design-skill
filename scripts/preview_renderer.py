@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Hash-bound, browser-rendered PNG previews for EY A/B and Rn messages."""
+"""Hash-bound browser PNG previews for EY single, A/B, and Rn messages."""
 
 from __future__ import annotations
 
@@ -510,24 +510,25 @@ def _render(
             path.unlink(missing_ok=True)
 
 
-def ensure_preview_pair(
+def ensure_previews(
     project_dir: Path,
     slide_id: str,
-    versions: tuple[str, str],
+    versions: tuple[str, ...],
     runtime: dict | None = None,
     copy_contract: dict | None = None,
     prevalidated_source_hashes: dict[str, str] | None = None,
 ) -> dict[str, dict]:
-    if len(versions) != 2 or versions[0] == versions[1]:
-        raise PreviewError("preview comparison requires two distinct versions")
+    if not versions or len(set(versions)) != len(versions):
+        raise PreviewError("preview rendering requires one or more distinct versions")
     dimensions = {
         version: svg_canvas_pixels(source_path(project_dir, slide_id, version))
         for version in versions
     }
-    if dimensions[versions[0]] != dimensions[versions[1]]:
+    if len(versions) > 1 and any(
+        dimensions[version] != dimensions[versions[0]] for version in versions[1:]
+    ):
         raise PreviewError(
-            f"{slide_id} {versions[0]}/{versions[1]} preview canvases differ: "
-            f"{dimensions[versions[0]]} vs {dimensions[versions[1]]}"
+            f"{slide_id} {'/'.join(versions)} preview canvases differ"
         )
     if copy_contract is not None:
         contract_problems = copy_contract_errors(copy_contract)
@@ -580,7 +581,49 @@ def ensure_preview_pair(
             records[version] = _read_json(receipt_file)
     if problems:
         raise PreviewError("; ".join(problems))
-    first, second = (records[version] for version in versions)
-    if (first["width"], first["height"]) != (second["width"], second["height"]):
-        raise PreviewError(f"{slide_id} preview pair is not equal-scale")
+    dimensions_seen = {
+        (records[version]["width"], records[version]["height"]) for version in versions
+    }
+    if len(dimensions_seen) != 1:
+        raise PreviewError(f"{slide_id} rendered previews are not equal-scale")
     return records
+
+
+def ensure_preview_single(
+    project_dir: Path,
+    slide_id: str,
+    version: str,
+    runtime: dict | None = None,
+    copy_contract: dict | None = None,
+    prevalidated_source_hash: str | None = None,
+) -> dict[str, dict]:
+    return ensure_previews(
+        project_dir,
+        slide_id,
+        (version,),
+        runtime=runtime,
+        copy_contract=copy_contract,
+        prevalidated_source_hashes=(
+            {version: prevalidated_source_hash} if prevalidated_source_hash else None
+        ),
+    )
+
+
+def ensure_preview_pair(
+    project_dir: Path,
+    slide_id: str,
+    versions: tuple[str, str],
+    runtime: dict | None = None,
+    copy_contract: dict | None = None,
+    prevalidated_source_hashes: dict[str, str] | None = None,
+) -> dict[str, dict]:
+    if len(versions) != 2 or versions[0] == versions[1]:
+        raise PreviewError("preview comparison requires two distinct versions")
+    return ensure_previews(
+        project_dir,
+        slide_id,
+        versions,
+        runtime=runtime,
+        copy_contract=copy_contract,
+        prevalidated_source_hashes=prevalidated_source_hashes,
+    )

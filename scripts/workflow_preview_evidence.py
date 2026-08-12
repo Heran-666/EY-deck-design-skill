@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Hash-bind displayed PNG previews to their source SVG comparisons."""
+"""Hash-bind displayed single, A/B, and revision PNG previews to source SVGs."""
 
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ from workflow_paths import receipt_path, working_paths
 def presentation_preview_errors(
     project_dir: Path,
     slide_id: str,
-    versions: tuple[str, str],
+    versions: tuple[str, ...],
     presentation: dict,
 ) -> list[str]:
     errors: list[str] = []
@@ -44,7 +44,7 @@ def presentation_preview_errors(
 def preview_presentation_evidence(
     project_dir: Path,
     slide_id: str,
-    versions: tuple[str, str],
+    versions: tuple[str, ...],
     records: dict[str, dict],
 ) -> dict[str, str]:
     evidence: dict[str, str] = {}
@@ -76,4 +76,19 @@ def ab_presentation_valid(project_dir: Path, slide_id: str) -> bool:
     )
     return hashes_match and not presentation_preview_errors(
         project_dir, slide_id, ("A", "B"), receipt
+    )
+
+
+def single_presentation_valid(project_dir: Path, slide_id: str) -> bool:
+    path = receipt_path(project_dir, slide_id, "single-presentation")
+    if not path.is_file():
+        return False
+    try:
+        receipt = read_json(path)
+    except ValueError:
+        return False
+    a_path, _b_path = working_paths(project_dir, slide_id)
+    hashes_match = a_path.is_file() and receipt.get("a_sha256") == sha256(a_path)
+    return hashes_match and not presentation_preview_errors(
+        project_dir, slide_id, ("A",), receipt
     )

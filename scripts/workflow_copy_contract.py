@@ -14,6 +14,7 @@ from workflow_io import text_sha256
 
 COPY_CONTRACT_SCHEMA = "ey-deck.visible-copy.v1"
 COPY_ID_ATTRIBUTE = "data-copy-id"
+XML_SPACE_ATTRIBUTE = "{http://www.w3.org/XML/1998/namespace}space"
 _BLOCK_HEADING = re.compile(r"^#{4,5}\s+(S\d{2}-B[0-9.]+)｜(.+?)\s*$")
 _SECTION_HEADING = re.compile(r"^###\s+(.+?)\s*$")
 _FIELD = re.compile(r"^- ([^:\n]+):\s*(.*?)\s*$")
@@ -29,6 +30,40 @@ def normalize_visible_text(value: str) -> str:
         "",
         normalized,
     )
+
+
+def _is_formatting_whitespace(value: str | None, xml_space: str) -> bool:
+    """Identify pretty-print whitespace that is not authored visible copy."""
+    return bool(
+        value
+        and xml_space != "preserve"
+        and not value.strip()
+        and ("\n" in value or "\r" in value)
+    )
+
+
+def logical_svg_text(
+    element: ElementTree.Element,
+    inherited_xml_space: str = "default",
+) -> str:
+    """Extract authored SVG text without injecting XML indentation.
+
+    A whitespace-only node containing a line break between adjacent elements is
+    treated as source formatting under the default XML whitespace mode. A
+    literal space-only node remains significant so English word boundaries are
+    preserved. ``xml:space="preserve"`` disables the formatting exception.
+    """
+    xml_space = element.get(XML_SPACE_ATTRIBUTE, inherited_xml_space)
+    if xml_space not in {"default", "preserve"}:
+        xml_space = inherited_xml_space
+    parts: list[str] = []
+    if element.text and not _is_formatting_whitespace(element.text, xml_space):
+        parts.append(element.text)
+    for child in element:
+        parts.append(logical_svg_text(child, xml_space))
+        if child.tail and not _is_formatting_whitespace(child.tail, xml_space):
+            parts.append(child.tail)
+    return "".join(parts)
 
 
 def _contract_hash(payload: dict) -> str:
@@ -197,7 +232,7 @@ def visible_copy_errors(path: Path, contract: dict) -> list[str]:
         active_id = own_id or inherited_id
         tag = element.tag.rsplit("}", 1)[-1].lower()
         if tag == "text" and not active_id:
-            text = normalize_visible_text("".join(element.itertext()))
+            text = normalize_visible_text(logical_svg_text(element))
             if text:
                 errors.append(f"unbound visible SVG text {text!r} in {path}")
         if own_id:
@@ -218,7 +253,7 @@ def visible_copy_errors(path: Path, contract: dict) -> list[str]:
                         f"visible-copy group {own_id} contains non-text elements: "
                         + ", ".join(non_text)
                     )
-            actual.setdefault(own_id, []).append("".join(element.itertext()))
+            actual.setdefault(own_id, []).append(logical_svg_text(element))
         for child in element:
             visit(child, active_id)
 
