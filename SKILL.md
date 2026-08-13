@@ -32,7 +32,7 @@ Treat visible copy marked `data-copy-scope="template-fixed"` as inherited Master
 ## Load only what the action needs
 
 - New intake: read [references/deliverable-types.md](references/deliverable-types.md) and [references/authoring-modes.md](references/authoring-modes.md).
-- Storyline or content reasoning: read [references/storyline-and-content.md](references/storyline-and-content.md); for a confirmed Proposal also read [references/client-and-rfp-contexts.md](references/client-and-rfp-contexts.md).
+- Storyline or content reasoning: read [references/storyline-and-content.md](references/storyline-and-content.md) plus exactly the confirmed primary type policy: [Proposal](references/storyline-type-proposal.md), [Sharing deck](references/storyline-type-sharing-deck.md), [Training](references/storyline-type-training.md), [Interpretation](references/storyline-type-interpretation.md), or [Other](references/storyline-type-other.md). Read one additional type policy only when a confirmed secondary behavior materially changes the Storyline.
 - Create, migrate, or reindex `framework.md`: read [references/framework-contract.md](references/framework-contract.md).
 - First provisional content write or schema failure: read [references/output-contract.md](references/output-contract.md).
 - External facts or citations: read [references/research-and-sources.md](references/research-and-sources.md).

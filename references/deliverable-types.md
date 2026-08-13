@@ -1,11 +1,11 @@
-# Deliverable type and Storyline selection
+# Deliverable type routing
 
 ## Contents
 
 1. Classify from the supplied background
 2. Confirm the type
 3. Confirm the authoring mode
-4. Build the type-appropriate Storyline
+4. Route to the type policy
 5. Present the Storyline for approval
 
 ## 1. Classify from the supplied background
@@ -34,9 +34,9 @@ Treat a direct correction as confirmation of the corrected type. Record the conf
 
 After type confirmation and before Storyline drafting, ask the user to choose `Simplified` or `Standard` under [authoring-modes.md](authoring-modes.md). Record the choice in temporary intake context and later as project-level `Requested authoring mode`. Do not infer the choice from urgency, deck length, or deliverable type.
 
-## 4. Build the type-appropriate Storyline
+## 4. Route to the type policy
 
-Apply one universal structural shell before the type-specific argument below:
+Apply this universal structural shell before the selected type policy:
 
 - place exactly one `Cover` at S01 for every deliverable type;
 - when there are at least six substantive pages, place one `Agenda` at S02 and
@@ -49,29 +49,27 @@ Apply one universal structural shell before the type-specific argument below:
 Agenda uses its dedicated two-column numbered-card Layout while owning its directory
 composition as editable page content.
 
-### Proposal
+After confirmation, read [storyline-and-content.md](storyline-and-content.md) and exactly one primary type policy:
 
-Use [client-and-rfp-contexts.md](client-and-rfp-contexts.md) and [storyline-and-content.md](storyline-and-content.md). Anchor the sequence in the decision, requirements, thesis, scope, approach, deliverables, value, and evidence.
+| Confirmed primary type | Type policy |
+|---|---|
+| `Proposal` | [storyline-type-proposal.md](storyline-type-proposal.md) |
+| `Sharing deck` | [storyline-type-sharing-deck.md](storyline-type-sharing-deck.md) |
+| `Training` | [storyline-type-training.md](storyline-type-training.md) |
+| `Interpretation` | [storyline-type-interpretation.md](storyline-type-interpretation.md) |
+| `Other: <specific form>` | [storyline-type-other.md](storyline-type-other.md) |
 
-### Sharing deck
+Each type policy must define these sections:
 
-Use: why it matters → context/experience → key ideas and evidence → audience implications → discussion or action. Do not manufacture a sales thesis or exercises.
+1. `Audience outcome`: activation condition and required intake context;
+2. `Storyline logic`: the type-specific audience journey and sequencing rules;
+3. optional type-only context or variants;
+4. `Safeguards`: failure modes and unsupported behaviors to prevent;
+5. `Completion checks`: conditions the proposed Storyline must satisfy.
 
-### Training
+Treat each type policy as the sole owner of that type's Storyline sequence, required inputs, safeguards, and completion checks. To add a new primary type, create one policy with this contract, add one route above, expose its direct conditional link in `SKILL.md`, and extend the `Deliverable type` schema and validator. Do not copy type-specific rules back into this router or into `storyline-and-content.md`.
 
-Define observable learning outcomes, then sequence prerequisite context → concepts/model → demonstration → practice/reflection → application checks → recap and next use. A topic list is not a learning journey.
-
-### Interpretation
-
-Use: source/context → key findings or provisions → interpretation → audience implications → uncertainties/boundaries → response or questions. Separate fact, interpretation, inference, and recommendation.
-
-### Other
-
-Name the form and success condition. Select the clearest justified logic—decision, chronology, problem–solution, evidence–implication, comparison, process, or workshop flow—rather than defaulting to proposal logic.
-
-### Hybrids
-
-Choose one primary type and only the necessary secondary behavior. Surface conflicting audience outcomes before drafting.
+For a hybrid, choose one primary type and only the necessary secondary behavior. Read one additional type policy only when that secondary behavior materially changes the Storyline. Surface conflicting audience outcomes before drafting, and keep `Deliverable type` set to the confirmed primary type.
 
 ## 5. Present the Storyline for approval
 

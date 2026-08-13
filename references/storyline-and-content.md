@@ -15,7 +15,7 @@
 
 Define what the audience should understand, believe, decide, prioritize, or do. Distinguish source facts and the audience's desired outcome from the presentation team's interpretation or recommendation.
 
-Build a concise audience journey from the confirmed starting point to the desired outcome. Use the logic selected in [deliverable-types.md](deliverable-types.md); make each page earn its place and make adjacent pages connect.
+Build a concise audience journey from the confirmed starting point to the desired outcome. Use the selected `storyline-type-*.md` policy routed by [deliverable-types.md](deliverable-types.md); make each page earn its place and make adjacent pages connect.
 
 Use the same navigation skeleton for every deliverable type: S01 is always the
 Cover. A Storyline with at least six substantive pages also includes an Agenda
@@ -24,9 +24,7 @@ structure is independent of proposal logic; Sharing deck, Training,
 Interpretation, and Other decks follow it too. Keep structural pages minimal
 and reserve substantive argument for content pages.
 
-For proposals, establish the client purpose or tension; isolate the few challenges or principles that matter; state a differentiated thesis; show how the methodology answers the purpose; show how the approach converts it into work and deliverables; then establish value, credibility, and fit with supported evidence or protected placeholders. Make differentiation visible early and reinforce it through client value, methodology, approach, deliverables, and working style. Do not rely on a generic late-stage “why us” page unless the RFP or Storyline warrants one.
-
-For non-proposals, do not manufacture a commercial decision journey. Use the confirmed sharing, learning, interpretation, briefing, workshop, or other audience outcome. Do not claim that presented content or proposed work alone will solve issues driven by policy, incentives, operating ownership, technology, data quality, or adoption unless scope and evidence support the claim.
+Keep all type-specific sequence, input, safeguard, and completion rules in the selected type policy. This file owns only reasoning shared by every deliverable type.
 
 ## 2. Page argument
 
