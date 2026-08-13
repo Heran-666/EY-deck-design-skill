@@ -19,6 +19,11 @@ Record the answer as project-level `Requested authoring mode`. Materialize the e
 
 Use exact `Page type` values. Do not infer structural pages from titles. Treat closing, Q&A, appendix, and other unlisted page types as normal content pages unless the user explicitly changes their page mode.
 
+Apply this mapping to every deliverable type. Cover, Agenda, and Section divider
+pages always generate only A, regardless of the requested project mode. Agenda
+binds the dedicated Agenda Layout; each numbered card contains exactly one
+agenda-item label and no secondary supporting detail.
+
 Use project mode only to initialize new pages. Treat each page's effective `Authoring mode` as the runtime authority for generation, display, decision evidence, recovery, and mode-specific audit rules.
 
 ## Mode-specific first decision
@@ -39,7 +44,9 @@ For `Standard`:
 
 Set the page to `Awaiting SVG decision` after its required initial presentation. On confirmation or selection, copy the confirmed version to the canonical SVG, record the page mode and presentation evidence in the SVG decision receipt, and set `Confirmed version`.
 
-For a batch containing both modes, follow the directive's per-page `decision_requirements`. Show each `Simplified` page as a single A preview and each `Standard` page as an A/B comparison before collecting the atomic batch decision. Use the page-specific repair command emitted for mixed batches; never apply a Standard page's B repair or selection range to a Simplified page.
+Process pages strictly by Slide ID. The controller never groups later pages with
+the first unfinished page, even when `Review mode` is `Batch`. Show and confirm
+the current page in its effective mode before advancing.
 
 ## Shared revision and QA rules
 

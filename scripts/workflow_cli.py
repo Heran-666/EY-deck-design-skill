@@ -19,6 +19,7 @@ from validate_framework import validate as validate_framework
 from workflow_audit import assert_current_action, audit, parse_selections
 from workflow_authoring import (
     active_revision,
+    author_version_for_action,
     ensure_authoring_packet,
     next_revision_id,
     page_author_completion_valid,
@@ -246,6 +247,12 @@ def handle_prepare_authoring(context: CommandContext) -> int:
         print(f'Authoring preparation blocked: current action is {action}')
         return 1
     try:
+        generate_action = action.replace('PREPARE_', 'GENERATE_', 1)
+        version = author_version_for_action(generate_action, project_dir, selected[0])
+        selected_working_path(project_dir, args.page, version).parent.mkdir(
+            parents=True,
+            exist_ok=True,
+        )
         ensure_authoring_packet(text, project_dir, selected[0])
     except (OSError, ValueError) as exc:
         print(f'Authoring preparation failed: {exc}')
@@ -253,6 +260,16 @@ def handle_prepare_authoring(context: CommandContext) -> int:
     print(f'Authoring packet prepared for {args.page}.')
     print_directive(text, project_dir, controller)
     return 0
+
+
+def print_preview_blocks(
+    slide_id: str,
+    previews: tuple[tuple[str, str, Path], tuple[str, str, Path]],
+) -> None:
+    """Print local previews as standalone blocks for Codex message compatibility."""
+    for version, label, png in previews:
+        print(f'### {version}｜{label}\n')
+        print(f'![{slide_id} {version} PNG preview](<{png}>)\n')
 
 
 def handle_prepare_export(context: CommandContext) -> int:
@@ -477,12 +494,11 @@ def handle_present_ab(context: CommandContext) -> int:
         b_target = f'<{b_path}>'
         a_png = project_dir / str(previews['A']['preview_png'])
         b_png = project_dir / str(previews['B']['preview_png'])
-        a_png_target = f'<{a_png}>'
-        b_png_target = f'<{b_png}>'
         print(f'## {page.slide_id}｜A/B design choice\n')
-        print('| A｜EY option A | B｜EY option B |')
-        print('|---|---|')
-        print(f'| ![{page.slide_id} A PNG preview]({a_png_target}) | ![{page.slide_id} B PNG preview]({b_png_target}) |\n')
+        print_preview_blocks(page.slide_id, (
+            ('A', 'EY option A', a_png),
+            ('B', 'EY option B', b_png),
+        ))
         print('Original SVG files:')
         print(f'- [A.svg]({a_target})')
         print(f'- [B.svg]({b_target})\n')
@@ -498,7 +514,13 @@ def handle_present_ab(context: CommandContext) -> int:
             print('\nAdvisories:')
             for advisory in advisories:
                 print(f'- {advisory}')
-        print('\nBefore sending this comparison to the user, inspect both candidates. If either has a defect, run repair-candidate for that same A/B slot and do not create Rn. Otherwise show both, then ask the user to choose A or B or request a targeted revision.\n')
+        print(
+            '\nBefore sending this comparison to the user, inspect both candidates. If either '
+            'has a defect, run repair-candidate for that same A/B slot and do not create Rn. '
+            'Otherwise send both standalone preview blocks in the same message, never place local '
+            'preview images inside a Markdown table, then ask the user to choose A or B or request '
+            'a targeted revision.\n'
+        )
     return 0
 
 
@@ -588,13 +610,12 @@ def handle_present_revision(context: CommandContext) -> int:
     revision_target = f'<{revision_path}>'
     base_png = project_dir / str(previews[base_version]['preview_png'])
     revision_png = project_dir / str(previews[revision_id]['preview_png'])
-    base_png_target = f'<{base_png}>'
-    revision_png_target = f'<{revision_png}>'
     print(f'## {page.slide_id}｜Targeted revision review\n')
     print(f"Requested changes: {request.get('note')}\n")
-    print(f'| {base_version}｜Base | {revision_id}｜Revision |')
-    print('|---|---|')
-    print(f'| ![{page.slide_id} {base_version} PNG preview]({base_png_target}) | ![{page.slide_id} {revision_id} PNG preview]({revision_png_target}) |\n')
+    print_preview_blocks(page.slide_id, (
+        (base_version, 'Base', base_png),
+        (revision_id, 'Revision', revision_png),
+    ))
     print('Original SVG files:')
     print(f'- [{base_version}.svg]({base_target})')
     print(f'- [{revision_id}.svg]({revision_target})\n')
@@ -603,7 +624,11 @@ def handle_present_revision(context: CommandContext) -> int:
         for advisory in advisories:
             print(f'- {advisory}')
         print()
-    print('Required user display: send both previews above together in the same message at equal scale; never show the revision alone.')
+    print(
+        'Required user display: send both standalone preview blocks above together in the same '
+        'message. Their source PNGs have the same canvas and preserve equal scale; never place '
+        'local preview images inside a Markdown table or show the revision alone.'
+    )
     print(
         f'Please explicitly retain Base {base_version}, confirm Revision {revision_id}, '
         'or request another targeted revision.'

@@ -1,0 +1,61 @@
+---
+native_structure_mode: structured
+template_profile: ey-gradient-dark-v1
+canvas_viewbox: "0 0 1280 720"
+placeholders:
+  cover: [project-type, title, subtitle]
+  agenda: [title, agenda-content-region]
+  divider: [section-label, title]
+  content: [title, subtitle, content-region]
+  ending: []
+---
+
+# EY Gradient Dark template profile
+
+This reusable profile was reconstructed from the inspected cover, divider, and
+body templates supplied for EY Deck Design. It intentionally exposes two
+PowerPoint Masters and five reusable Layouts.
+
+## VI. Page Roster
+
+### 1. Cover (`cover.svg`)
+
+- Master: `ey-cover` / `EY Cover`
+- Layout: `cover` / `EY Cover`
+- Slots: optional project type or core insight, title, optional subtitle
+- Fixed Layout copy: `The better the question. The better the answer. The better the world works.` at `x=51`, baseline `y=679`
+
+### 2. Agenda (`agenda.svg`)
+
+- Master: `ey-dark` / `EY Dark`
+- Layout: `agenda` / `EY Agenda`
+- Slots: title and a composite editable directory region
+- Composition: two balanced columns of rounded `#141414` cards, each with a
+  yellow left rule, numbered emphasis, and exactly one agenda-item label;
+  the seven-item reference uses four cards left and three right
+
+### 3. Section divider (`divider.svg`)
+
+- Master: `ey-dark` / `EY Dark`
+- Layout: `divider` / `EY Section Divider`
+- Slots: optional section label, title
+
+### 4. Content (`content.svg`)
+
+- Master: `ey-dark` / `EY Dark`
+- Layout: `content` / `EY Content`
+- Slots: title, optional subtitle, composite editable content region
+
+### 5. Ending (`ending.svg`)
+
+- Master: `ey-dark` / `EY Dark`
+- Layout: `ending` / `EY Ending`
+- Treatment: the complete user-supplied ending slide is embedded as one fixed full-slide image; do not reflow, restyle, translate, or revise it.
+- Slots: none
+- Fixed behavior: append this unchanged legal/brand page after every generated
+  deck; do not expose it to Storyline, content, or page-authoring updates
+
+The title/subtitle/content coordinates are contract data. Page authoring may
+change only placeholder content. It must retain the root Master/Layout identity,
+fixed-layer atom roster, placeholder ids/types/bounds, and inherited-shape
+visibility.

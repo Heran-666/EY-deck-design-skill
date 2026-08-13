@@ -5,12 +5,14 @@ from __future__ import annotations
 
 
 FRAMEWORK_VERSION = "2.6"
-WORKFLOW_VERSION = "3.8"
-PAGE_PREFLIGHT_GATE_SCHEMA = "ey-deck.page-preflight.v1"
+WORKFLOW_VERSION = "3.9"
+READABLE_WORKFLOW_VERSIONS = {"3.8", WORKFLOW_VERSION}
+PAGE_PREFLIGHT_GATE_SCHEMA = "ey-deck.page-preflight.v2"
 
 REQUESTED_AUTHORING_MODES = {"Simplified", "Standard"}
 PAGE_AUTHORING_MODES = {"Simplified", "Standard", "Not applicable"}
 SIMPLIFIED_STANDARD_PAGE_TYPES = {"cover", "agenda", "section divider"}
+LONG_DECK_CONTENT_THRESHOLD = 6
 
 PAGE_STATES = {
     "Not started",
@@ -36,9 +38,10 @@ LEGACY_MANAGED_END = "<!-- EY-PROPOSAL-WORKFLOW:END -->"
 
 EY_PAGE_AUTHORING_INSTRUCTION = (
     "Use EY Deck Design's bundled Page SVG Authoring contract. Create one complete candidate from "
-    "the exact hash-bound locked page packet at the supplied path. Own concept, composition, "
-    "construction, fit, and normal SVG quality; bind every visible text run to the packet's exact "
-    "data-copy-id, emit only inline SVG attributes/styles with no <style> or class dependency, and "
+    "the exact hash-bound locked page packet and its bound structured-template prototype at the supplied paths. "
+    "Preserve the prototype's root Master/Layout identity, fixed atoms, and placeholder contract. "
+    "Own placeholder content, concept, composition, construction, fit, and normal SVG quality; bind every page-authored visible text run to the packet's exact "
+    "data-copy-id while preserving inherited template-fixed text exactly, emit only inline SVG attributes/styles with no <style> or class dependency, and "
     "do not initialize a project or enter PPTX export."
 )
 

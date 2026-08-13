@@ -31,22 +31,36 @@ def _parse_size(raw: str | None) -> int | None:
         return None
 
 
-def audit_pptx(path: Path) -> dict[str, object]:
+def _slide_number(name: str) -> int:
+    return int(name.rsplit("slide", 1)[1].split(".xml", 1)[0])
+
+
+def audit_pptx(
+    path: Path,
+    *,
+    exempt_slide_numbers: set[int] | None = None,
+) -> dict[str, object]:
+    exemptions = exempt_slide_numbers or set()
     observed: Counter[int] = Counter()
     violations: list[str] = []
     try:
         with zipfile.ZipFile(path) as package:
-            slide_names = sorted(name for name in package.namelist() if SLIDE_RE.fullmatch(name))
+            slide_names = sorted(
+                (name for name in package.namelist() if SLIDE_RE.fullmatch(name)),
+                key=_slide_number,
+            )
             if not slide_names:
                 raise ValueError("PPTX package has no slide XML")
             for slide_name in slide_names:
+                if _slide_number(slide_name) in exemptions:
+                    continue
                 root = ET.fromstring(package.read(slide_name))
                 for run_tag in ("r", "fld"):
                     for run in root.iter(f"{{{DML_NS}}}{run_tag}"):
                         text = "".join(
                             item.text or "" for item in run.iter(f"{{{DML_NS}}}t")
                         ).strip()
-                        if not text:
+                        if not text or not text.replace("\u200b", ""):
                             continue
                         props = run.find(f"{{{DML_NS}}}rPr")
                         size_hpt = _parse_size(props.get("sz") if props is not None else None)
@@ -92,15 +106,20 @@ def audit_pptx(path: Path) -> dict[str, object]:
             _format_pt(size_hpt): count
             for size_hpt, count in sorted(observed.items(), reverse=True)
         },
+        "fixed_asset_exempt_slide_numbers": sorted(exemptions),
     }
 
 
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--pptx", type=Path, required=True)
+    parser.add_argument("--exempt-slide-number", type=int, action="append", default=[])
     args = parser.parse_args()
     try:
-        result = audit_pptx(args.pptx.expanduser().resolve())
+        result = audit_pptx(
+            args.pptx.expanduser().resolve(),
+            exempt_slide_numbers=set(args.exempt_slide_number),
+        )
     except ValueError as exc:
         print(json.dumps({
             "schema": POLICY_SCHEMA,

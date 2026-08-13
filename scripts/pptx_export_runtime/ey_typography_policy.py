@@ -15,6 +15,7 @@ POLICY_SCHEMA = "ey-deck.typography-policy.v1"
 
 # DrawingML stores font sizes in hundredths of a point.
 ROLE_SIZES = (
+    ("display_title", 4000, "53.3333"),
     ("title", 2400, "32"),
     ("subtitle", 1800, "24"),
     ("body_heading_emphasis", 1400, "18.6667"),
@@ -26,6 +27,7 @@ ROLE_SIZES = (
 ALLOWED_HPT = frozenset(size_hpt for _role, size_hpt, _svg_px in ROLE_SIZES)
 BODY_MASTER_LEVELS_HPT = (1000, 1000, 800, 800, 800, 800, 800, 800, 800)
 SPEC_LOCK_ROWS = (
+    ("display_title", "53.3333"),
     ("title", "32"),
     ("subtitle", "24"),
     ("body_heading_emphasis", "18.6667"),
@@ -104,6 +106,24 @@ def audit_svg_typography(path: Path) -> dict[str, object]:
         raise TypographyPolicyError(f"cannot resolve typography in {path}: {exc}") from exc
 
     observed: Counter[int] = Counter()
+    if (root.get("data-ey-fixed-ending") or "").strip().lower() == "true":
+        for _text, size_px in records:
+            try:
+                observed[font_px_to_hpt(size_px)] += 1
+            except ValueError as exc:
+                raise TypographyPolicyError(
+                    f"cannot resolve fixed ending typography in {path}: {exc}"
+                ) from exc
+        return {
+            **policy_payload(),
+            "fixed_asset_exception": "ending-source-typography",
+            "visible_text_fragment_count": sum(observed.values()),
+            "observed_pptx_pt_counts": {
+                _format_pt(size_hpt): count
+                for size_hpt, count in sorted(observed.items(), reverse=True)
+            },
+        }
+
     violations: list[str] = []
     for text, size_px in records:
         try:

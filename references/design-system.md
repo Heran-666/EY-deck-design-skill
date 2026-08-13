@@ -17,17 +17,32 @@ point size. Do not use intermediate or ad hoc sizes.
 
 | Text role | PPTX | SVG `font-size` | Choice rule |
 |---|---:|---:|---|
+| Display title | 40 pt | `53.3333` | Cover and Section divider titles only, when bound to those bundled Layouts |
 | Title | 24 pt | `32` | Page title |
 | Subtitle | 18 pt | `24` | Subtitle or title-supporting statement |
 | Body heading | 12 or 14 pt | `16` or `18.6667` | Use 14 pt for higher importance or lower density; 12 pt for denser or secondary headings |
-| Body content | 8 or 10 pt | `10.6667` or `13.3333` | Use 10 pt for higher importance or lower density; 8 pt for denser or secondary content |
+| Body content | 8 or 10 pt | `10.6667` or `13.3333` | Default to 10 pt. Use 8 pt only for genuinely dense content after composition and container sizing have been optimized |
 | Other information | 6 pt | `8` | Notes, sources, annotations, and other tertiary information |
 
 Both permitted body-heading sizes and both permitted body-content sizes may
 appear on one page when importance differs. Choose only by information density
-and importance. If the approved content still does not fit, revise the
-composition or reopen the content decision; never create another size or shrink
-principal content below its role.
+and importance. A framed text block must fit its container: do not leave a
+large unused right or lower zone around short 8 pt copy. Prefer, in order:
+
+1. use 10 pt body copy;
+2. right-size or recompose the container;
+3. reopen content when the approved argument is materially incomplete;
+4. add only a semantic device that explains a relationship, sequence,
+   comparison, evidence status, or takeaway.
+
+Never add decorative filler or invent copy. The Stage 1 preflight rejects a
+normal Content-page 8 pt text block with four or fewer rendered lines unless
+the block carries an explicit `data-density-justification="dense-table"` or
+`data-density-justification="compact-matrix"` on itself or an ancestor. Use
+either exception only when 10 pt cannot fit after the composition and
+container have been optimized. If approved content still does not fit, revise
+the composition or reopen the content decision; never create another size or
+shrink principal content below its role.
 
 Except for this fixed typography scale, these remain directional principles,
 not SVG implementation rules. The bounded authoring action decides exact

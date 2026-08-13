@@ -26,6 +26,7 @@ XLINK_HREF = "{http://www.w3.org/1999/xlink}href"
 URL_RE = re.compile(r"url\(\s*(['\"]?)(.*?)\1\s*\)", re.IGNORECASE)
 FONT_FAMILY_RE = re.compile(r"(?:^|;)\s*font-family\s*:\s*([^;]+)", re.IGNORECASE)
 COLOR_RE = re.compile(r"#[0-9A-Fa-f]{6}\b")
+STRUCTURED_EXPORT_SCHEMA = "ey-deck.structured-template-export.v1"
 
 
 def sha256(path: Path) -> str:
@@ -106,6 +107,7 @@ def inspect_svg(path: Path) -> dict:
         "height": root.get("height") or viewbox.split()[3],
         "fonts": fonts,
         "colors": colors,
+        "fixed_ending": (root.get("data-ey-fixed-ending") or "").strip().lower() == "true",
     }
 
 
@@ -138,7 +140,57 @@ def format_name(viewbox: str) -> str:
     return "custom"
 
 
-def build_lock(records: list[dict], page_count: int) -> str:
+def structured_lock_sections(structure: dict | None, page_count: int) -> str:
+    if structure is None:
+        return "## pptx_structure\n- mode: flat"
+    pages = structure.get("pages")
+    masters = structure.get("masters")
+    layouts = structure.get("layouts")
+    if not isinstance(pages, list) or len(pages) != page_count:
+        raise ValueError("structured template page roster does not match confirmed SVGs")
+    if not isinstance(masters, dict) or not masters:
+        raise ValueError("structured template manifest has no masters")
+    if not isinstance(layouts, dict) or not layouts:
+        raise ValueError("structured template manifest has no layouts")
+    master_rows = "\n".join(
+        f"- {key}: {value}" for key, value in masters.items()
+    )
+    layout_rows: list[str] = []
+    for key, value in layouts.items():
+        if not isinstance(value, dict):
+            raise ValueError(f"structured template layout is invalid: {key}")
+        prototype = Path(str(value.get("prototype", ""))).stem
+        layout_rows.append(
+            f"- {key}: {value.get('master')} | {value.get('name')} | template:{prototype}"
+        )
+    assignment_rows: list[str] = []
+    prototype_rows: list[str] = []
+    for index, value in enumerate(pages, start=1):
+        if not isinstance(value, dict) or value.get("page") != f"P{index:02d}":
+            raise ValueError("structured template pages must be ordered P01..Pn")
+        layout_key = value.get("layout_key")
+        prototype = Path(str(value.get("prototype", ""))).stem
+        assignment_rows.append(f"- P{index:02d}: {layout_key}")
+        prototype_rows.append(f"- P{index:02d}: {prototype}")
+    return f"""## pptx_structure
+- mode: structured
+- template_adherence: {structure.get('template_adherence', 'strict')}
+- template_reuse_scope: {structure.get('template_reuse_scope', 'layout')}
+
+## pptx_masters
+{master_rows}
+
+## pptx_layouts
+{chr(10).join(layout_rows)}
+
+## page_pptx_layouts
+{chr(10).join(assignment_rows)}
+
+## page_layouts
+{chr(10).join(prototype_rows)}"""
+
+
+def build_lock(records: list[dict], page_count: int, structure: dict | None = None) -> str:
     viewbox = records[0]["viewbox"]
     font = first_font(records)
     typography_rows = typography_lock_rows()
@@ -182,15 +234,56 @@ def build_lock(records: list[dict], page_count: int) -> str:
 ## page_rhythm
 {rhythm}
 
-## pptx_structure
-- mode: flat
+{structured_lock_sections(structure, page_count)}
 
 ## forbidden
 - storyline, content planning, page design, SVG authoring, web preview, staged confirmation
 """
 
 
-def prepare(project_dir: Path, svg_paths: list[Path]) -> dict:
+def load_and_stage_structure(
+    project_dir: Path,
+    structure_manifest_path: Path | None,
+) -> dict | None:
+    if structure_manifest_path is None:
+        return None
+    path = structure_manifest_path.expanduser().resolve()
+    try:
+        structure = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ValueError(f"cannot load structured template manifest: {exc}") from exc
+    if structure.get("schema_version") != STRUCTURED_EXPORT_SCHEMA:
+        raise ValueError("structured template manifest has the wrong schema version")
+    templates = structure.get("templates")
+    if not isinstance(templates, list) or not templates:
+        raise ValueError("structured template manifest has no staged prototypes")
+    destination_dir = project_dir / "templates"
+    destination_dir.mkdir(parents=True, exist_ok=False)
+    observed: dict[str, str] = {}
+    for item in templates:
+        if not isinstance(item, dict):
+            raise ValueError("structured template prototype record is invalid")
+        source = Path(str(item.get("path", ""))).expanduser().resolve()
+        expected = str(item.get("sha256", ""))
+        if not source.is_file() or sha256(source) != expected:
+            raise ValueError(f"structured template prototype is missing or stale: {source}")
+        target = destination_dir / source.name
+        if target.suffix.lower() != ".svg" or target.name in observed:
+            raise ValueError(f"structured template prototype name is invalid: {source.name}")
+        shutil.copy2(source, target)
+        observed[target.name] = sha256(target)
+    for layout_key, layout in structure.get("layouts", {}).items():
+        prototype_name = str(layout.get("prototype", "")) if isinstance(layout, dict) else ""
+        if observed.get(prototype_name) != layout.get("prototype_sha256"):
+            raise ValueError(f"structured template layout prototype is stale: {layout_key}")
+    return structure
+
+
+def prepare(
+    project_dir: Path,
+    svg_paths: list[Path],
+    structure_manifest_path: Path | None = None,
+) -> dict:
     project_dir = project_dir.resolve()
     if project_dir.exists() and any(project_dir.iterdir()):
         raise ValueError(f"fresh project directory is not empty: {project_dir}")
@@ -208,6 +301,8 @@ def prepare(project_dir: Path, svg_paths: list[Path]) -> dict:
     if len(viewboxes) != 1:
         raise ValueError("all confirmed SVGs must use the same viewBox")
 
+    structure = load_and_stage_structure(project_dir, structure_manifest_path)
+
     original_dir = project_dir / "source_original"
     svg_dir = project_dir / "svg_output"
     original_dir.mkdir(parents=True, exist_ok=False)
@@ -223,7 +318,22 @@ def prepare(project_dir: Path, svg_paths: list[Path]) -> dict:
         destination = svg_dir / f"P{index:02d}.svg"
         shutil.copy2(source, original)
         shutil.copy2(source, destination)
-        normalization = normalize_confirmed_svg(destination)
+        fixed_ending = bool(source_records[index - 1].get("fixed_ending"))
+        if fixed_ending:
+            unchanged_sha256 = sha256(destination)
+            normalization = {
+                "schema": "ey-deck.confirmed-svg-normalization.v1",
+                "source_sha256": unchanged_sha256,
+                "normalized_sha256": unchanged_sha256,
+                "style_elements_removed": 0,
+                "elements_with_inlined_rules": 0,
+                "inlined_property_count": 0,
+                "canvas_normalized": False,
+                "changed": False,
+                "fixed_asset_exception": "ending-source-preserved",
+            }
+        else:
+            normalization = normalize_confirmed_svg(destination)
         record = inspect_svg(destination)
         typography = audit_svg_typography(destination)
         observed_pptx_pt_counts.update(typography["observed_pptx_pt_counts"])
@@ -238,9 +348,10 @@ def prepare(project_dir: Path, svg_paths: list[Path]) -> dict:
             "normalized_sha256": sha256(destination),
             "normalization": normalization,
             "typography": typography,
+            "asset_role": "fixed-ending" if fixed_ending else "storyline",
         })
     (project_dir / "spec_lock.md").write_text(
-        build_lock(normalized_records, len(pages)), encoding="utf-8"
+        build_lock(normalized_records, len(pages), structure), encoding="utf-8"
     )
     observed_colors = Counter(
         str(color).upper()
@@ -251,6 +362,15 @@ def prepare(project_dir: Path, svg_paths: list[Path]) -> dict:
         "schema": "ey-deck.confirmed-svg-export-runtime.v1",
         "page_order": pages,
         "source_policy": "confirmed SVGs are the sole page source",
+        "pptx_structure": "structured" if structure else "flat",
+        "template_profile": (
+            {
+                "profile_id": structure.get("profile_id"),
+                "profile_fingerprint": structure.get("profile_fingerprint"),
+            }
+            if structure
+            else None
+        ),
         "observed_visual_values": {
             "colors": dict(sorted(observed_colors.items())),
         },
@@ -276,10 +396,11 @@ def main() -> int:
         description="Prepare a fresh EY export project from ordered confirmed SVG files."
     )
     parser.add_argument("--project-dir", type=Path, required=True)
+    parser.add_argument("--structure-manifest", type=Path)
     parser.add_argument("svg", type=Path, nargs="+")
     args = parser.parse_args()
     try:
-        manifest = prepare(args.project_dir, args.svg)
+        manifest = prepare(args.project_dir, args.svg, args.structure_manifest)
     except TypographyPolicyError as exc:
         print(f"Confirmed SVG typography blocked: {exc}")
         return 3

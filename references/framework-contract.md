@@ -16,7 +16,7 @@ Before approval, use optional `working/intake-summary.md`. After approval, merge
 ## Current position
 
 - Framework version: 2.6
-- Workflow version: 3.8
+- Workflow version: 3.9
 - Storyline version: 1.0
 - Output filename: <user-requested or deterministic plain filename ending in .pptx>
 
@@ -56,6 +56,12 @@ Before approval, use optional `working/intake-summary.md`. After approval, merge
 
 Use one sequential Slide ID system only; do not add Page Keys. Initialize `Requested authoring mode` and every effective page `Authoring mode` under [authoring-modes.md](authoring-modes.md). After content approval, the controller synchronizes the Storyline heading to the exact approved audience-facing title. Do not duplicate approved copy in `Content scope` or `Confirmed decisions`.
 
+Every new Storyline starts with exactly one `Cover` at S01. At six or more
+substantive pages, include one `Agenda` at S02 and at least one `Section
+divider`. Cover, Agenda, and Section divider pages must use `Simplified`;
+content pages use the project selection. Agenda binds the dedicated Agenda
+template base.
+
 Keep Design hard rules to exactly the two fields above and keep Project-specific rules within 1,200 characters. Put generic EY rules nowhere in this file. Project context fields are compact framing, not an intake transcript or source register. Set `Deliverable type` to the user-confirmed primary type; for a proposal, retain its Formal RFP response, Client-development proposal, or Hybrid subtype inside `Core need`, `Scope boundaries`, or `Confirmed decisions` only when it materially governs the work.
 
 Legacy schemas are accepted only by controller `migrate`; normal commands reject them.
@@ -75,13 +81,13 @@ Use only:
 5. `SVG confirmed`
 6. `Protected placeholder`
 
-The controller derives the workflow stage, Stage 1 subflow, active page, next action, artifact readiness, and paths. Do not store them. `Reopened` is an event, not a state. Content-scope reopening returns to `Content reviewing`; design-scope reopening retains approved content and returns to `Content locked`.
+The controller derives the workflow stage, Stage 1 subflow, active page, next action, artifact readiness, and paths. Stage 1 always selects the first non-terminal Slide ID and completes that page before moving forward; page type and `Review mode` never reorder production. Do not store derived state. `Reopened` is an event, not a state. Content-scope reopening returns to `Content reviewing`; design-scope reopening retains approved content and returns to `Content locked`.
 
 `Open items` must be `None` before content can lock. Keep `Narrative role`, `Next connection`, `Confirmed decisions`, and `Open items` within 500 characters; keep `Content scope` within 700 characters. `Next connection` alone records each boundary to the following page; do not store the inverse relation again. Replace superseded decisions instead of appending history.
 
 ## 4. Targeted loading
 
-For content review, controller `next` emits Project context, project-specific hard rules, the active Storyline entry, and compact adjacent context. For SVG production it materializes those build-relevant fields plus the exact approved `content.md` section into one hash-bound `working/packets/<Slide ID>-authoring.md`; every candidate for that page reuses the same packet. `next --format json` returns action, pages, `command_when`, unambiguous command data, effective page authoring mode, packet path/hash when applicable, and minimum route metadata.
+For content review, controller `next` emits Project context, project-specific hard rules, the active Storyline entry, and compact adjacent context. For SVG production it materializes those build-relevant fields, the exact approved `content.md` section, and the Page type-selected structured-template binding into one hash-bound `working/packets/<Slide ID>-authoring.md`; every candidate for that page reuses the same packet and Layout. `next --format json` returns action, pages, `command_when`, unambiguous command data, effective page authoring mode, packet path/hash, template prototype/path/hash/contract when applicable, and minimum route metadata.
 
 Do not load the complete Storyline during ordinary page work.
 

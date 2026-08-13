@@ -152,8 +152,16 @@ def migrate_workflow(
     text = migrate_legacy_project_schema(text)
     current = h2_section(text, "Current position")
     original_position = line_fields(current)
+    migration_target_version = (
+        WORKFLOW_VERSION
+        if any(
+            page.fields.get("Page type", "").strip().lower() == "cover"
+            for page in page_entries(text)
+        )
+        else "3.8"
+    )
     if (
-        original_position.get("Workflow version") == WORKFLOW_VERSION
+        original_position.get("Workflow version") == migration_target_version
         and original_position.get("Framework version") == FRAMEWORK_VERSION
         and original_position.get("Output filename")
         and "Final PPTX owner" not in original_position
@@ -172,7 +180,7 @@ def migrate_workflow(
     for field in ("Current phase", "Active page", "Next action"):
         updated = re.sub(rf"^- {re.escape(field)}:.*\n", "", updated, flags=re.MULTILINE)
     updated = replace_field(updated, "Framework version", FRAMEWORK_VERSION)
-    updated = replace_field(updated, "Workflow version", WORKFLOW_VERSION)
+    updated = replace_field(updated, "Workflow version", migration_target_version)
     updated = re.sub(
         r"^- (?:Last checkpoint|PPTX status|Final PPTX|Final PPTX owner|Final PPTX requirement):.*\n?",
         "",
@@ -314,7 +322,7 @@ def migrate_workflow(
             write_json(content_receipt, {
                 "slide_id": page.slide_id,
                 "content_sha256": text_sha256(section),
-                "approval_note": f"Migrated to workflow {WORKFLOW_VERSION}",
+                "approval_note": f"Migrated to workflow {migration_target_version}",
                 "created_at": now(),
             })
         slide_dir = project_dir / "svg_working" / page.slide_id
@@ -378,7 +386,7 @@ def migrate_workflow(
             project_dir / "working" / "receipts" / "final-qa.json",
         ])
     receipts = project_dir / "working" / "receipts"
-    archive_items(project_dir, "workflow-3.8-renamed", list(receipts.glob("S*-svg-selection.json")))
+    archive_items(project_dir, "workflow-3.9-renamed", list(receipts.glob("S*-svg-selection.json")))
     old_handoff = receipts / "ppt-master-handoff.json"
     new_handoff = receipts / "confirmed-export-handoff.json"
     if old_handoff.is_file() and not new_handoff.exists():

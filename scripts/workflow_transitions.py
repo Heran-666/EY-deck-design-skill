@@ -42,6 +42,7 @@ from workflow_spec import (
     WORKFLOW_VERSION,
 )
 from workflow_state import current_group, update_page
+from workflow_templates import template_candidate_errors
 
 
 def record_handoff_result(text: str, project_dir: Path, raw: str) -> None:
@@ -111,6 +112,7 @@ def record_page_author_result(text: str, project_dir: Path, raw: str) -> None:
             raise ValueError(f"page authoring artifact must be the requested path: {expected}")
         contract = packet.get("visible_copy_contract")
         problems = candidate_errors(artifact)
+        problems.extend(template_candidate_errors(artifact, packet.get("template_binding")))
         if isinstance(contract, dict):
             problems.extend(visible_copy_errors(artifact, contract))
         else:
@@ -141,11 +143,17 @@ def record_page_author_result(text: str, project_dir: Path, raw: str) -> None:
         artifact_sha256 = sha256(artifact)
         payload["artifact_sha256"] = artifact_sha256
         payload["visible_copy_contract_sha256"] = packet["visible_copy_contract_sha256"]
+        payload["template_structure_contract_sha256"] = packet[
+            "template_structure_contract_sha256"
+        ]
         payload["preflight_gate"] = {
             "schema": PAGE_PREFLIGHT_GATE_SCHEMA,
             "status": "PASS",
             "artifact_sha256": artifact_sha256,
             "visible_copy_contract_sha256": packet["visible_copy_contract_sha256"],
+            "template_structure_contract_sha256": packet[
+                "template_structure_contract_sha256"
+            ],
         }
     else:
         required = {key: result.get(key) for key in ("stage", "reason", "repair_scope", "resume_from")}

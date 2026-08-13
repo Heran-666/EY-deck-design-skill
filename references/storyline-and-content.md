@@ -17,6 +17,13 @@ Define what the audience should understand, believe, decide, prioritize, or do. 
 
 Build a concise audience journey from the confirmed starting point to the desired outcome. Use the logic selected in [deliverable-types.md](deliverable-types.md); make each page earn its place and make adjacent pages connect.
 
+Use the same navigation skeleton for every deliverable type: S01 is always the
+Cover. A Storyline with at least six substantive pages also includes an Agenda
+at S02 and one or more Section dividers at meaningful chapter boundaries. This
+structure is independent of proposal logic; Sharing deck, Training,
+Interpretation, and Other decks follow it too. Keep structural pages minimal
+and reserve substantive argument for content pages.
+
 For proposals, establish the client purpose or tension; isolate the few challenges or principles that matter; state a differentiated thesis; show how the methodology answers the purpose; show how the approach converts it into work and deliverables; then establish value, credibility, and fit with supported evidence or protected placeholders. Make differentiation visible early and reinforce it through client value, methodology, approach, deliverables, and working style. Do not rely on a generic late-stage “why us” page unless the RFP or Storyline warrants one.
 
 For non-proposals, do not manufacture a commercial decision journey. Use the confirmed sharing, learning, interpretation, briefing, workshop, or other audience outcome. Do not claim that presented content or proposed work alone will solve issues driven by policy, incentives, operating ownership, technology, data quality, or adoption unless scope and evidence support the claim.
@@ -88,6 +95,14 @@ Prefer substantive density over decorative emptiness. For normal content pages, 
 
 When a page feels sparse, strengthen the argument before adding decoration. When it feels crowded, prioritize the content before shrinking text or splitting the page. Record only the semantic relationship, visual focus, and primary/supporting information; let the bounded page-authoring action own composition and adjacent-page visual variety under [design-system.md](design-system.md).
 
+Before locking a normal content page, explicitly check whether its approved
+argument is sufficient for the promised page role. If the only plausible
+composition would put short copy in oversized frames, enrich the approved
+explanation with missing evidence, implications, criteria, steps, or caveats
+when supported by the source. Do not pad wording. If the argument is already
+complete, leave the copy unchanged and let page authoring use 10 pt body text,
+smaller containers, or a semantic visual device.
+
 ## 8. Quality review
 
 Confirm that:
@@ -98,3 +113,6 @@ Confirm that:
 - concepts, evidence, action, methodology, deliverables, and value are not conflated;
 - evidence objects prove their stated purpose and claims are verified, labeled, or protected;
 - the Visual Direction preserves meaning without prescribing the final layout.
+- normal content pages have enough approved substance for their page role, and
+  any intentionally concise page can be composed without oversized empty text
+  frames or unjustified 8 pt body copy.

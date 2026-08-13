@@ -36,6 +36,19 @@ After type confirmation and before Storyline drafting, ask the user to choose `S
 
 ## 4. Build the type-appropriate Storyline
 
+Apply one universal structural shell before the type-specific argument below:
+
+- place exactly one `Cover` at S01 for every deliverable type;
+- when there are at least six substantive pages, place one `Agenda` at S02 and
+  at least one `Section divider` before the relevant major chapter;
+- allow Agenda or divider pages in shorter decks when they materially improve
+  navigation, but do not add them as decoration;
+- mark Cover, Agenda, and Section divider pages `Simplified`; apply the user's
+  requested mode only to substantive content pages.
+
+Agenda uses its dedicated two-column numbered-card Layout while owning its directory
+composition as editable page content.
+
 ### Proposal
 
 Use [client-and-rfp-contexts.md](client-and-rfp-contexts.md) and [storyline-and-content.md](storyline-and-content.md). Anchor the sequence in the decision, requirements, thesis, scope, approach, deliverables, value, and evidence.
@@ -62,6 +75,6 @@ Choose one primary type and only the necessary secondary behavior. Surface confl
 
 ## 5. Present the Storyline for approval
 
-For every confirmed type, show the complete page sequence with provisional Slide ID, title or purpose, narrative role, adjacency logic, review mode, effective authoring mode, and protected status. Briefly explain the overall narrative arc and how it serves the confirmed audience outcome.
+For every confirmed type, show the complete page sequence beginning with S01 Cover, with provisional Slide ID, title or purpose, narrative role, adjacency logic, review mode, effective authoring mode, and protected status. Briefly explain the overall narrative arc and how it serves the confirmed audience outcome.
 
 Obtain explicit approval before creating `framework.md` or `content.md`, unless the user expressly waives the Storyline gate. After approval, all types use the same controller-governed workflow, with each page following its own effective authoring mode.

@@ -164,6 +164,26 @@ def normalize_page(source: Path, destination: Path) -> dict[str, object]:
     root = tree.getroot()
     source_snapshot = text_snapshot(source_root)
     before_sha256 = sha256(destination)
+    if (source_root.get("data-ey-fixed-ending") or "").strip().lower() == "true":
+        exact_copy_passed = source.read_bytes() == destination.read_bytes()
+        return {
+            "source_path": str(source.resolve()),
+            "source_sha256": sha256(source),
+            "normalized_path": str(destination.resolve()),
+            "input_normalized_sha256": before_sha256,
+            "normalized_sha256": sha256(destination),
+            "detected_before": [],
+            "parent_baseline_repairs": [],
+            "paragraph_blocks_normalized": 0,
+            "exact_copy": {
+                "status": "PASS" if exact_copy_passed else "FAIL",
+                "source_text_frames": len(source_snapshot),
+                "normalized_text_frames": len(text_snapshot(root)),
+            },
+            "detected_after": [],
+            "fixed_asset_exception": "ending-source-topology-preserved",
+            "status": "PASS" if exact_copy_passed else "BLOCKED",
+        }
     # Detect against the untouched confirmed source before applying any
     # topology rewrite to the isolated working copy.
     before_violations = topology_violations(source_root)

@@ -6,7 +6,7 @@ Use this policy whenever the controller or export runner reports a failure.
 
 | Gate | Retain here | Exclude from this gate |
 |---|---|---|
-| Page preflight (`page-author-result`) | path and artifact identity; XML/root/canvas; self-containment and CSS-free boundary; exact visible-copy bindings; fixed typography scale | candidate count; A/B distinction; rendered bounds; user decision; deep native-PPTX compatibility; package checks |
+| Page preflight (`page-author-result`) | path and artifact identity; XML/root/canvas; self-containment and CSS-free boundary; exact visible-copy bindings; fixed typography scale; bound template root, fixed atoms, definitions, and placeholder contract | candidate count; A/B distinction; rendered bounds; user decision; deep native-PPTX compatibility; package checks |
 | Browser preview | network isolation; font-ready rendering; exact DOM copy; computed visibility; non-empty and on-canvas bounds; equal-size PNGs; renderer/PNG/hash evidence | repeated XML/CSS/typography parsing when a current preflight receipt matches; subjective design judgment; native-PPTX compatibility |
 | Initial or revision presentation | mode-required single or A/B preview evidence; equal canonical canvas when comparing; targeted revision integrity; user-decision evidence; A/B hash and material-difference observations only for Standard pages | repeated page-preflight checks; content reapproval; Stage 2 compatibility |
 | Canonical handoff | exactly one confirmed SVG per page; page order; terminal states; confirmed/canonical/presentation hashes and receipts | design review; preview regeneration; candidate re-evaluation; deep SVG compatibility |
@@ -14,7 +14,7 @@ Use this policy whenever the controller or export runner reports a failure.
 | PPTX postflight and handoff | readable package; slide count; relationships; transition/animation OOXML; exported typography; required output; terminal-result integrity | upstream authoring, preview, candidate-decision, or semantic-design checks |
 
 Treat one current page-preflight receipt as sufficient evidence only when its
-schema, artifact hash, packet hash, and visible-copy-contract hash match. If any
+schema, artifact hash, packet hash, visible-copy-contract hash, and structured-template-contract hash match. If any
 bound value changes, rerun page preflight. Never reuse it across the confirmed
 export boundary.
 
@@ -24,7 +24,12 @@ Block only when continuing would invalidate approved meaning, evidence, determin
 
 - schema/state corruption, stale hashes, wrong paths, missing receipts, or wrong page order;
 - changed, missing, duplicated, hidden, or materially off-canvas approved visible copy;
-- any visible text outside the fixed 24/18/14/12/10/8/6 pt typography scale;
+- any visible text outside the fixed 40/24/18/14/12/10/8/6 pt typography scale; 40 pt is reserved for bound Cover and Section divider display titles;
+- on a normal Content page, compact 8 pt body copy with four or fewer rendered
+  lines unless an optimized dense table or compact matrix carries the explicit
+  density justification defined in `design-system.md`; an oversized frame
+  around short 8 pt copy is a Stage 1 source-SVG defect;
+- missing, stale, or changed template profile/prototype hashes, root Master/Layout identity, fixed template atoms/definitions (including exact template-fixed copy), or placeholder ids/types/bounds;
 - missing mode-required user presentation or decision evidence;
 - an authored SVG `<text>` that would become multiple native PowerPoint text
   boxes in merge mode;
@@ -33,6 +38,11 @@ Block only when continuing would invalidate approved meaning, evidence, determin
 - unavailable or changed bound runtimes and validators.
 
 Use `source-svg` only for a defect in the named SVG bytes, `user-decision` only for unresolved meaning or approval, and `environment` for missing/changing runtimes, validators, permissions, or dependencies.
+
+For content-frame fit, use `source-svg` when the approved copy is sufficient
+and the remedy is 10 pt type, a smaller/recomposed container, or a semantic
+visual device. Use `user-decision` only when the page's approved argument is
+materially incomplete and must be reopened; never let page authoring pad copy.
 
 ## Non-blocking findings
 

@@ -128,11 +128,7 @@ def directive(text: str, project_dir: Path) -> tuple[str, list[PageEntry]]:
         if prepared is None:
             return "PREPARE_CONFIRMED_EXPORT", pages
         return "RUN_CONFIRMED_EXPORT", pages
-    if phase in {
-        "Stage 1 — Body page loop",
-        "Stage 1 — Structural page review",
-        "Stage 1 — Agenda review",
-    }:
+    if phase == "Stage 1 — Sequential page loop":
         group = current_group(text)
         if not group:
             raise ValueError("derived phase has no active page group")
@@ -406,7 +402,8 @@ def directive_payload(text: str, project_dir: Path, controller: Path) -> dict:
     elif action == "COLLECT_REVISION_CONFIRMATION":
         payload["command_when"] = (
             "first send the complete request-bound Base/Revision comparison in one user message, "
-            "with both previews side by side at equal scale; never show the revision alone. "
+            "with each equal-scale preview in its own standalone image block; never put local "
+            "preview images in a Markdown table or show the revision alone. "
             "After an explicit user decision use after_keep_base to retain the displayed Base or "
             "after_confirmation to confirm the displayed Revision; for another targeted change use "
             "for_targeted_changes"
@@ -421,6 +418,9 @@ def directive_payload(text: str, project_dir: Path, controller: Path) -> dict:
         packet = current_authoring_packet(project_dir, page.slide_id)
         if not packet or packet.get("framework_page_sha256") != text_sha256(page.text):
             raise ValueError("authoring packet is not prepared for the current page")
+        template_binding = packet.get("template_binding")
+        if not isinstance(template_binding, dict):
+            raise ValueError("authoring packet has no structured template binding")
         payload.update({
             "route": "$ey-deck-design / Page SVG Authoring",
             "route_instruction": EY_PAGE_AUTHORING_INSTRUCTION,
@@ -432,6 +432,13 @@ def directive_payload(text: str, project_dir: Path, controller: Path) -> dict:
             "packet_path": packet["packet_path"],
             "packet_sha256": packet["packet_sha256"],
             "visible_copy_contract_sha256": packet["visible_copy_contract_sha256"],
+            "template_profile_id": template_binding["profile_id"],
+            "template_layout": template_binding["layout_key"],
+            "template_prototype": template_binding["prototype_path"],
+            "template_prototype_sha256": template_binding["prototype_sha256"],
+            "template_structure_contract_sha256": template_binding[
+                "structure_contract_sha256"
+            ],
         })
         if action == "GENERATE_SVG_B":
             payload["option_kernel"] = B_OPTION_KERNEL
@@ -452,7 +459,7 @@ def directive_payload(text: str, project_dir: Path, controller: Path) -> dict:
         )
         payload["user_display"] = {
             "required": True,
-            "mode": "side-by-side-equal-scale",
+            "mode": "standalone-blocks-equal-scale",
             "send_in_one_message": True,
             "base_version": base_version,
             "revision_version": revision_id,
@@ -466,9 +473,10 @@ def directive_payload(text: str, project_dir: Path, controller: Path) -> dict:
                 selected_working_path(project_dir, page.slide_id, revision_id).resolve()
             ),
             "instruction": (
-                "Show this exact Base/Revision pair together before asking the user to retain the "
-                "Base, confirm the Revision, or request another targeted change; never show the "
-                "revision alone."
+                "Show this exact Base/Revision pair together using one standalone image block per "
+                "preview before asking the user to retain the Base, confirm the Revision, or request "
+                "another targeted change; never put local preview images in a Markdown table or show "
+                "the revision alone."
             ),
         }
     if action == "PRESENT_PAGE_REVIEW":

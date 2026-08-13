@@ -14,6 +14,8 @@ from workflow_io import text_sha256
 
 COPY_CONTRACT_SCHEMA = "ey-deck.visible-copy.v1"
 COPY_ID_ATTRIBUTE = "data-copy-id"
+COPY_SCOPE_ATTRIBUTE = "data-copy-scope"
+TEMPLATE_FIXED_COPY_SCOPE = "template-fixed"
 XML_SPACE_ATTRIBUTE = "{http://www.w3.org/XML/1998/namespace}space"
 _BLOCK_HEADING = re.compile(r"^#{4,5}\s+(S\d{2}-B[0-9.]+)｜(.+?)\s*$")
 _SECTION_HEADING = re.compile(r"^###\s+(.+?)\s*$")
@@ -231,9 +233,27 @@ def visible_copy_errors(path: Path, contract: dict) -> list[str]:
                 )
         active_id = own_id or inherited_id
         tag = element.tag.rsplit("}", 1)[-1].lower()
+        copy_scope = (element.get(COPY_SCOPE_ATTRIBUTE) or "").strip()
+        template_fixed = copy_scope == TEMPLATE_FIXED_COPY_SCOPE
+        if copy_scope and not template_fixed:
+            errors.append(
+                f"unsupported {COPY_SCOPE_ATTRIBUTE} {copy_scope!r} in {path}"
+            )
+        if template_fixed:
+            layer = (element.get("data-pptx-layer") or "").strip().lower()
+            editable = (element.get("data-pptx-editable") or "").strip().lower()
+            if tag != "text" or layer not in {"master", "layout"} or editable != "false":
+                errors.append(
+                    "template-fixed visible copy must be a non-editable Master/Layout "
+                    f"text atom in {path}"
+                )
+            if own_id or inherited_id:
+                errors.append(
+                    f"template-fixed visible copy cannot also use {COPY_ID_ATTRIBUTE} in {path}"
+                )
         if tag == "text" and not active_id:
             text = normalize_visible_text(logical_svg_text(element))
-            if text:
+            if text and not template_fixed:
                 errors.append(f"unbound visible SVG text {text!r} in {path}")
         if own_id:
             if tag not in {"text", "g"}:

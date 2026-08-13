@@ -24,6 +24,7 @@ from workflow_paths import (
 )
 from workflow_preview_evidence import presentation_preview_errors
 from workflow_spec import PAGE_PREFLIGHT_GATE_SCHEMA
+from workflow_templates import page_template_binding, template_candidate_errors
 
 
 def active_revision(project_dir: Path, slide_id: str) -> dict | None:
@@ -74,6 +75,15 @@ def current_authoring_packet(project_dir: Path, slide_id: str) -> dict | None:
         contract = page_visible_copy_contract(project_dir, slide_id)
     except (OSError, ValueError):
         return None
+    binding = payload.get("template_binding")
+    if not isinstance(binding, dict):
+        return None
+    prototype = Path(str(binding.get("prototype_path", "")))
+    if (
+        not prototype.is_file()
+        or binding.get("prototype_sha256") != sha256(prototype)
+    ):
+        return None
     if (
         payload.get("slide_id") != slide_id
         or payload.get("packet_path") != str(packet.resolve())
@@ -87,7 +97,12 @@ def current_authoring_packet(project_dir: Path, slide_id: str) -> dict | None:
 
 def authoring_packet_valid(project_dir: Path, page: PageEntry) -> bool:
     packet = current_authoring_packet(project_dir, page.slide_id)
-    return bool(packet and packet.get("framework_page_sha256") == text_sha256(page.text))
+    return bool(
+        packet
+        and packet.get("framework_page_sha256") == text_sha256(page.text)
+        and packet.get("template_binding")
+        == page_template_binding(page.fields.get("Page type", ""))
+    )
 
 
 def page_visible_copy_contract(project_dir: Path, slide_id: str) -> dict:
@@ -125,6 +140,8 @@ def page_author_completion_valid(project_dir: Path, slide_id: str, version: str)
         and result.get("artifact_sha256") == artifact_sha256
         and result.get("visible_copy_contract_sha256")
         == packet.get("visible_copy_contract_sha256")
+        and result.get("template_structure_contract_sha256")
+        == packet.get("template_structure_contract_sha256")
         and packet_matches
     )
     if not base_valid:
@@ -137,6 +154,8 @@ def page_author_completion_valid(project_dir: Path, slide_id: str, version: str)
         and preflight.get("artifact_sha256") == artifact_sha256
         and preflight.get("visible_copy_contract_sha256")
         == packet.get("visible_copy_contract_sha256")
+        and preflight.get("template_structure_contract_sha256")
+        == packet.get("template_structure_contract_sha256")
     ):
         return True
 
@@ -145,6 +164,7 @@ def page_author_completion_valid(project_dir: Path, slide_id: str, version: str)
     return (
         not candidate_errors(artifact)
         and not visible_copy_errors(artifact, packet["visible_copy_contract"])
+        and not template_candidate_errors(artifact, packet.get("template_binding"))
     )
 
 
@@ -393,14 +413,27 @@ def ensure_authoring_packet(text: str, project_dir: Path, page: PageEntry) -> di
     with contextlib.redirect_stdout(buffer):
         print_build_context(text, project_dir, [page])
     contract = page_visible_copy_contract(project_dir, page.slide_id)
+    template_binding = page_template_binding(page.fields.get("Page type", ""))
+    if template_binding is None:
+        raise ValueError(f"{page.slide_id} has no authorable template binding")
     contract_json = json.dumps(contract, ensure_ascii=False, indent=2)
+    template_json = json.dumps(template_binding, ensure_ascii=False, indent=2)
     packet_text = (
         f"# Locked Page SVG Authoring Packet｜{page.slide_id}\n\n"
         "Use this exact packet for every requested candidate. Version-specific output paths and revision notes are "
-        "controller directives, not page-content memory. Every visible SVG text run must be bound "
-        "to exactly one approved item below with `data-copy-id`; Build-only text must never be "
-        "visible. Text may be split into nested tspans inside one bound element or group.\n\n"
+        "controller directives, not page-content memory. Every page-authored visible SVG text run must be bound "
+        "to exactly one approved item below with `data-copy-id`; inherited text marked "
+        "`data-copy-scope=\"template-fixed\"` belongs to the template and must remain exact. "
+        "Build-only text must never be visible. Text may be split into nested tspans inside one bound element or group. "
+        "Start from the exact structured-template prototype below. Preserve its root Master/Layout "
+        "identity, every fixed Master/Layout atom byte-for-byte, and every placeholder "
+        "id/type/index/bounds. Replace only placeholder content; the content-region proxy may "
+        "contain the page-specific composition. For an Agenda, start from the dedicated agenda "
+        "prototype and replace only its title and agenda-region placeholder content.\n\n"
         + buffer.getvalue().strip()
+        + "\n\n## Bound structured template\n\n```json\n"
+        + template_json
+        + "\n```\n"
         + "\n\n## Machine-enforced visible copy\n\n```json\n"
         + contract_json
         + "\n```\n"
@@ -415,6 +448,8 @@ def ensure_authoring_packet(text: str, project_dir: Path, page: PageEntry) -> di
         "framework_page_sha256": text_sha256(page.text),
         "visible_copy_contract": contract,
         "visible_copy_contract_sha256": contract["contract_sha256"],
+        "template_binding": template_binding,
+        "template_structure_contract_sha256": template_binding["structure_contract_sha256"],
         "created_at": now(),
     }
     write_json(receipt_path_value, payload)

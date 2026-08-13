@@ -9,6 +9,7 @@ import tempfile
 import unittest
 import zipfile
 from pathlib import Path
+from xml.etree import ElementTree as ET
 
 
 SKILL = Path(
@@ -136,14 +137,45 @@ def legacy_proposal_framework(status: str = "Content locked", version: str = "2.
 
 
 def svg(color: str = "#FFE600", extra: str = "", slide_id: str = "S01") -> str:
-    return f'''<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720">
-<rect width="1280" height="720" fill="#000000"/>
-<rect x="80" y="120" width="420" height="240" fill="{color}"/>{extra}
-<text data-copy-id="{slide_id}-title" x="80" y="80" fill="#FFFFFF">Decision page</text>
-<text data-copy-id="{slide_id}-core-insight" x="80" y="420" fill="#FFFFFF">Evidence supports action</text>
-<text data-copy-id="{slide_id}-B1-heading" x="80" y="470" fill="#FFFFFF">Evidence</text>
-<text data-copy-id="{slide_id}-B1-detail" x="80" y="520" fill="#FFFFFF">A complete and approved statement for leadership decision-making.</text>
-</svg>'''
+    root = ET.parse(
+        SKILL / "assets" / "templates" / "ey-gradient-dark-v1" / "content.svg"
+    ).getroot()
+    groups = {child.get("id"): child for child in root if child.tag.endswith("g")}
+    title = list(groups["content-title"])[0]
+    title.set("data-copy-id", f"{slide_id}-title")
+    title.text = "Decision page"
+    subtitle = list(groups["content-subtitle"])[0]
+    subtitle.text = ""
+    region = groups["content-region"]
+    for child in list(region):
+        region.remove(child)
+    ET.SubElement(region, "{http://www.w3.org/2000/svg}rect", {
+        "x": "80", "y": "170", "width": "420", "height": "240", "fill": color,
+    })
+    for copy_id, y, size, value in (
+        (f"{slide_id}-core-insight", "440", "16", "Evidence supports action"),
+        (f"{slide_id}-B1-heading", "480", "18.6667", "Evidence"),
+        (
+            f"{slide_id}-B1-detail",
+            "525",
+            "13.3333",
+            "A complete and approved statement for leadership decision-making.",
+        ),
+    ):
+        node = ET.SubElement(region, "{http://www.w3.org/2000/svg}text", {
+            "data-copy-id": copy_id,
+            "x": "80",
+            "y": y,
+            "fill": "#FFFFFF",
+            "font-family": "Microsoft YaHei",
+            "font-size": size,
+        })
+        node.text = value
+    if extra:
+        wrapper = ET.fromstring(f'<g xmlns="http://www.w3.org/2000/svg">{extra}</g>')
+        for child in list(wrapper):
+            region.append(child)
+    return ET.tostring(root, encoding="unicode")
 
 
 def write_json(path: Path, payload: dict) -> None:
@@ -195,6 +227,14 @@ def setup_ab(project: Path) -> None:
             "packet_path": packet["packet_path"],
             "packet_sha256": packet["packet_sha256"],
             "visible_copy_contract_sha256": packet["visible_copy_contract_sha256"],
+            "template_structure_contract_sha256": packet["template_structure_contract_sha256"],
+            "preflight_gate": {
+                "schema": "ey-deck.page-preflight.v2",
+                "status": "PASS",
+                "artifact_sha256": sha256(artifact),
+                "visible_copy_contract_sha256": packet["visible_copy_contract_sha256"],
+                "template_structure_contract_sha256": packet["template_structure_contract_sha256"],
+            },
             "active": False,
             "terminal_result": terminal_result,
         })
@@ -304,6 +344,14 @@ def setup_batch_ab(project: Path) -> None:
                 "packet_path": packet["packet_path"],
                 "packet_sha256": packet["packet_sha256"],
                 "visible_copy_contract_sha256": packet["visible_copy_contract_sha256"],
+                "template_structure_contract_sha256": packet["template_structure_contract_sha256"],
+                "preflight_gate": {
+                    "schema": "ey-deck.page-preflight.v2",
+                    "status": "PASS",
+                    "artifact_sha256": sha256(artifact),
+                    "visible_copy_contract_sha256": packet["visible_copy_contract_sha256"],
+                    "template_structure_contract_sha256": packet["template_structure_contract_sha256"],
+                },
                 "active": False,
                 "terminal_result": terminal_result,
             })
@@ -382,7 +430,63 @@ class LightweightWorkflowTests(unittest.TestCase):
             "Not applicable",
         )
 
-    def test_mixed_batch_decision_directive_is_explicit_per_page(self) -> None:
+    def test_new_multi_page_storyline_requires_opening_cover(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "framework.md"
+            first = framework("Not started", version="3.9")
+            second = framework("Not started", version="3.9", slide_id="S02")
+            second = second[second.index("### S02｜") :]
+            path.write_text(first.rstrip() + "\n\n" + second, encoding="utf-8")
+            errors = validate_framework(path, None)
+            self.assertTrue(any("requires one opening Cover at S01" in item for item in errors))
+
+    def test_long_storyline_requires_agenda_and_divider(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "framework.md"
+            cover = (
+                framework("Not started", version="3.9")
+                .replace("- Page type: Standard content", "- Page type: Cover")
+                .replace("- Authoring mode: Standard", "- Authoring mode: Simplified")
+            )
+            pages = [cover.rstrip()]
+            for index in range(2, 8):
+                slide_id = f"S{index:02d}"
+                page = framework("Not started", version="3.9", slide_id=slide_id)
+                pages.append(page[page.index(f"### {slide_id}｜") :].rstrip())
+            path.write_text("\n\n".join(pages) + "\n", encoding="utf-8")
+            errors = validate_framework(path, None)
+            self.assertTrue(any("requires an Agenda" in item for item in errors))
+            self.assertTrue(any("requires at least one Section divider" in item for item in errors))
+
+    def test_sequential_loop_selects_first_unfinished_slide(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project = Path(tmp)
+            cover = (
+                framework("Not started")
+                .replace("- Page type: Standard content", "- Page type: Cover")
+                .replace("- Authoring mode: Standard", "- Authoring mode: Simplified")
+            )
+            second = framework("Not started", slide_id="S02")
+            second = second[second.index("### S02｜") :]
+            text = cover.rstrip() + "\n\n" + second
+            action, pages = directive(text, project)
+            self.assertEqual(action, "PRESENT_PAGE_REVIEW")
+            self.assertEqual([page.slide_id for page in pages], ["S01"])
+
+            advanced = text.replace(
+                "- Status: Not started",
+                "- Status: SVG confirmed",
+                1,
+            ).replace(
+                "- Confirmed version: Pending",
+                "- Confirmed version: A",
+                1,
+            )
+            action, pages = directive(advanced, project)
+            self.assertEqual(action, "PRESENT_PAGE_REVIEW")
+            self.assertEqual([page.slide_id for page in pages], ["S02"])
+
+    def test_mixed_batch_metadata_does_not_override_slide_order(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             project = Path(tmp)
             first = (
@@ -399,9 +503,8 @@ class LightweightWorkflowTests(unittest.TestCase):
             payload = directive_payload(text, project, CONTROLLER)
 
             self.assertEqual(payload["action"], "COLLECT_SVG_DECISION")
-            self.assertEqual(payload["pages"], ["S01", "S02"])
+            self.assertEqual(payload["pages"], ["S01"])
             self.assertIn("single A preview", payload["command_when"])
-            self.assertIn("A/B comparison", payload["command_when"])
             self.assertEqual(
                 payload["decision_requirements"],
                 [
@@ -411,28 +514,18 @@ class LightweightWorkflowTests(unittest.TestCase):
                         "required_display": "single-A-preview",
                         "allowed_selections": ["A"],
                         "allowed_repair_versions": ["A"],
-                    },
-                    {
-                        "slide_id": "S02",
-                        "authoring_mode": "Standard",
-                        "required_display": "A/B-comparison",
-                        "allowed_selections": ["A", "B"],
-                        "allowed_repair_versions": ["A", "B"],
-                    },
+                    }
                 ],
             )
-            simplified_repair = payload["commands"]["repair_before_user_display_S01"]
-            standard_repair = payload["commands"]["repair_before_user_display_S02"]
+            simplified_repair = payload["commands"]["repair_before_user_display"]
             self.assertIn("--page S01 --version A", simplified_repair)
             self.assertNotIn("<A_OR_B>", simplified_repair)
-            self.assertIn("--page S02 --version '<A_OR_B>'", standard_repair)
-            self.assertNotIn("repair_before_user_display", payload["commands"])
             self.assertIn(
-                "--selections 'S01=A,S02=<A_OR_B>'",
+                "--selections S01=A",
                 payload["commands"]["after_confirmation_or_selection"],
             )
 
-    def test_multi_page_simplified_repair_command_never_allows_b(self) -> None:
+    def test_sequential_simplified_repair_command_never_allows_b(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             project = Path(tmp)
             first = (
@@ -451,11 +544,11 @@ class LightweightWorkflowTests(unittest.TestCase):
             payload = directive_payload(text, project, CONTROLLER)
 
             repair = payload["commands"]["repair_before_user_display"]
-            self.assertIn("--page '<ACTIVE_PAGE>' --version A", repair)
+            self.assertIn("--page S01 --version A", repair)
             self.assertNotIn("<A_OR_B>", repair)
             self.assertEqual(
                 [item["allowed_selections"] for item in payload["decision_requirements"]],
-                [["A"], ["A"]],
+                [["A"]],
             )
 
     def test_simplified_page_skips_b_and_confirms_single_option(self) -> None:
@@ -711,13 +804,32 @@ class LightweightWorkflowTests(unittest.TestCase):
             self.assertFalse((project / "working" / "packets" / "S01-authoring.md").exists())
             prepared = prepare_authoring(project)
             self.assertEqual(prepared.returncode, 0, prepared.stdout + prepared.stderr)
+            self.assertTrue((project / "svg_working" / "S01").is_dir())
             payload = json.loads(run(project, "next", "--format", "json").stdout)
             self.assertEqual(payload["action"], "GENERATE_SVG_A")
             self.assertIn("page-author-result", payload["commands"]["record_result"])
             packet = Path(payload["packet_path"])
             self.assertTrue(packet.is_file())
             self.assertEqual(payload["packet_sha256"], sha256(packet))
+            self.assertEqual(payload["template_layout"], "content")
+            prototype = Path(payload["template_prototype"])
+            self.assertTrue(prototype.is_file())
+            self.assertEqual(payload["template_prototype_sha256"], sha256(prototype))
             self.assertNotIn("Evidence supports action", result.stdout)
+
+    def test_present_ab_uses_standalone_local_image_blocks(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project = Path(tmp)
+            setup_locked(project)
+            setup_ab(project)
+            presented = run(project, "present-ab")
+            self.assertEqual(presented.returncode, 0, presented.stdout + presented.stderr)
+            self.assertIn("### A｜EY option A", presented.stdout)
+            self.assertIn("### B｜EY option B", presented.stdout)
+            self.assertRegex(presented.stdout, r"(?m)^!\[S01 A PNG preview\]\(<.*\.png>\)$")
+            self.assertRegex(presented.stdout, r"(?m)^!\[S01 B PNG preview\]\(<.*\.png>\)$")
+            self.assertNotIn("| A｜EY option A | B｜EY option B |", presented.stdout)
+            self.assertNotRegex(presented.stdout, r"(?m)^\|.*PNG preview.*\|$")
 
     def test_provisional_content_is_promoted_without_rewriting(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -816,7 +928,7 @@ class LightweightWorkflowTests(unittest.TestCase):
             setup_locked(project)
             self.assertEqual(prepare_authoring(project).returncode, 0)
             root = project / "svg_working" / "S01"
-            root.mkdir(parents=True)
+            self.assertTrue(root.is_dir())
             a = root / "A.svg"
             a.write_text(svg("#FFE600"), encoding="utf-8")
             recorded_a = run(
@@ -854,7 +966,7 @@ class LightweightWorkflowTests(unittest.TestCase):
             setup_locked(project)
             self.assertEqual(prepare_authoring(project).returncode, 0)
             root = project / "svg_working" / "S01"
-            root.mkdir(parents=True)
+            self.assertTrue(root.is_dir())
             a = root / "A.svg"
             a.write_text(svg("#FFE600"), encoding="utf-8")
             self.assertEqual(run(
@@ -1003,11 +1115,12 @@ class LightweightWorkflowTests(unittest.TestCase):
             self.assertEqual(completed.returncode, 0, completed.stdout + completed.stderr)
             presented = run(project, "present-ab")
             self.assertEqual(presented.returncode, 0, presented.stdout + presented.stderr)
-            self.assertIn("| A｜EY option A | B｜EY option B |", presented.stdout)
+            self.assertIn("### A｜EY option A", presented.stdout)
+            self.assertIn("### B｜EY option B", presented.stdout)
             self.assertFalse(list((project / "svg_working" / "S01").glob("R*.svg")))
             self.assertFalse(list((project / "working" / "receipts").glob("S01-R*.json")))
 
-    def test_batch_candidate_repair_preserves_other_page_decisions(self) -> None:
+    def test_later_batch_page_cannot_be_repaired_before_current_page_finishes(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             project = Path(tmp)
             setup_batch_ab(project)
@@ -1017,9 +1130,8 @@ class LightweightWorkflowTests(unittest.TestCase):
             selectable = run(project, "next", "--format", "json")
             self.assertEqual(selectable.returncode, 0, selectable.stdout + selectable.stderr)
             payload = json.loads(selectable.stdout)
-            self.assertEqual(payload["pages"], ["S01", "S02"])
-            self.assertIn("<ACTIVE_PAGE>", payload["commands"]["repair_before_user_display"])
-            self.assertIn("<ACTIVE_PAGE>", payload["commands"]["for_targeted_changes"])
+            self.assertEqual(payload["pages"], ["S01"])
+            self.assertIn("--page S01", payload["commands"]["repair_before_user_display"])
 
             repaired = run(
                 project,
@@ -1031,7 +1143,8 @@ class LightweightWorkflowTests(unittest.TestCase):
                 "--note",
                 "S02 title overlap",
             )
-            self.assertEqual(repaired.returncode, 0, repaired.stdout + repaired.stderr)
+            self.assertNotEqual(repaired.returncode, 0)
+            self.assertIn("S02 is not in the active page group", repaired.stdout)
             framework_text = (project / "framework.md").read_text(encoding="utf-8")
             self.assertEqual(framework_text.count("- Status: Content locked"), 1)
             self.assertEqual(framework_text.count("- Status: Awaiting SVG decision"), 1)
@@ -1041,23 +1154,20 @@ class LightweightWorkflowTests(unittest.TestCase):
             next_result = run(project, "next", "--format", "json")
             self.assertEqual(next_result.returncode, 0, next_result.stdout + next_result.stderr)
             next_payload = json.loads(next_result.stdout)
-            self.assertEqual(next_payload["action"], "GENERATE_SVG_B")
-            self.assertEqual(next_payload["pages"], ["S02"])
+            self.assertEqual(next_payload["action"], "COLLECT_SVG_DECISION")
+            self.assertEqual(next_payload["pages"], ["S01"])
 
-            b_path = project / "svg_working" / "S02" / "B.svg"
-            b_path.write_text(svg("#35A36F", slide_id="S02"), encoding="utf-8")
-            completed = run(
+            confirmed = run(
                 project,
-                "page-author-result",
-                "--result-json",
-                json.dumps({
-                    "status": "COMPLETE",
-                    "route": "page-svg-authoring",
-                    "artifact_path": str(b_path.resolve()),
-                    "material_differences": ["Repaired S02 B remains distinct"],
-                }),
+                "advance",
+                "--event",
+                "svg-confirmed",
+                "--page",
+                "S01",
+                "--selections",
+                "S01=A",
             )
-            self.assertEqual(completed.returncode, 0, completed.stdout + completed.stderr)
+            self.assertEqual(confirmed.returncode, 0, confirmed.stdout + confirmed.stderr)
             ready = run(project, "next", "--format", "json")
             self.assertEqual(ready.returncode, 0, ready.stdout + ready.stderr)
             ready_payload = json.loads(ready.stdout)
@@ -1384,6 +1494,16 @@ class LightweightWorkflowTests(unittest.TestCase):
             result = run(project, "next")
             self.assertIn("STAGE_1_COMPLETE", result.stdout)
             self.assertNotIn("CHECKPOINT", result.stdout)
+            self.assertEqual(prepare_export(project).returncode, 0)
+            payload = json.loads(run(project, "next", "--format", "json").stdout)
+            manifest = json.loads(Path(payload["export_manifest"]).read_text())
+            self.assertEqual(manifest["pptx_structure"], "structured")
+            self.assertEqual(
+                [(item["slide_id"], item["asset_role"]) for item in manifest["ordered_slides"]],
+                [("S01", "storyline"), ("EY-END", "fixed-ending")],
+            )
+            bundle = manifest["template_bundle"]
+            self.assertTrue(Path(bundle["structure_manifest_path"]).is_file())
 
     def test_protected_page_materializes_with_only_identity_receipt(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -1447,6 +1567,7 @@ class LightweightWorkflowTests(unittest.TestCase):
             pptx.parent.mkdir(parents=True, exist_ok=True)
             with zipfile.ZipFile(pptx, "w") as package:
                 package.writestr("ppt/slides/slide1.xml", "<slide/>")
+                package.writestr("ppt/slides/slide2.xml", "<slide/>")
             valid_pptx = pptx.read_bytes()
             result = run(
                 project,
@@ -1517,7 +1638,10 @@ class LightweightWorkflowTests(unittest.TestCase):
             payload = json.loads(run(project, "next", "--format", "json").stdout)
             manifest_path = Path(payload["export_manifest"])
             manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-            self.assertEqual(manifest["schema_version"], "ey-deck.confirmed-svg-export.v3")
+            self.assertEqual(manifest["schema_version"], "ey-deck.confirmed-svg-export.v4")
+            self.assertEqual(manifest["pptx_structure"], "flat")
+            self.assertEqual(manifest["ordered_slides"][-1]["slide_id"], "EY-END")
+            self.assertEqual(manifest["ordered_slides"][-1]["asset_role"], "fixed-ending")
             self.assertEqual(
                 manifest["runtime_bindings"]["bundled_python"],
                 str(FAKE_BUNDLED_PYTHON),
@@ -1854,6 +1978,14 @@ class LightweightWorkflowTests(unittest.TestCase):
                 "packet_path": packet["packet_path"],
                 "packet_sha256": packet["packet_sha256"],
                 "visible_copy_contract_sha256": packet["visible_copy_contract_sha256"],
+                "template_structure_contract_sha256": packet["template_structure_contract_sha256"],
+                "preflight_gate": {
+                    "schema": "ey-deck.page-preflight.v2",
+                    "status": "PASS",
+                    "artifact_sha256": sha256(working_svg),
+                    "visible_copy_contract_sha256": packet["visible_copy_contract_sha256"],
+                    "template_structure_contract_sha256": packet["template_structure_contract_sha256"],
+                },
                 "active": False,
                 "terminal_result": {
                     "status": "COMPLETE",

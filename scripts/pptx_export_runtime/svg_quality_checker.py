@@ -2552,6 +2552,9 @@ class SVGQualityChecker:
         before PPTX generation.  Imported groups whose original txBody is
         preserved bypass ordinary text conversion and are excluded.
         """
+        if (root.get('data-ey-fixed-ending') or '').strip().lower() == 'true':
+            result['info']['fixed_asset_exception'] = 'ending-source-topology-preserved'
+            return
         bucket = self._text_topology_issue_bucket(result, svg_path)
         if _flatten_positional_tspans is None:
             bucket.append(

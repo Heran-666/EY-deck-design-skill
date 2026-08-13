@@ -8,15 +8,23 @@ import re
 import shutil
 from pathlib import Path
 
+from framework_lib import page_entries
 from workflow_io import read_json, sha256, text_sha256, write_json
 from workflow_paths import export_root
 from workflow_runtime import stage2_runtime_path, validate_stage2_runtime
+from workflow_templates import (
+    STRUCTURED_EXPORT_SCHEMA,
+    load_template_profile,
+    page_template_binding,
+    template_candidate_errors,
+)
 
 
-EXPORT_SCHEMA = "ey-deck.confirmed-svg-export.v3"
+EXPORT_SCHEMA = "ey-deck.confirmed-svg-export.v4"
 TERMINAL_SCHEMA = "ey-deck.confirmed-svg-terminal-result.v1"
 TERMINAL_VALIDATOR = Path(__file__).resolve().parent / "validate_terminal_result.py"
 EXPORT_RUNNER = Path(__file__).resolve().parent / "run_confirmed_export.py"
+FIXED_ENDING_SLIDE_ID = "EY-END"
 
 
 def validate_output_filename(value: str) -> str:
@@ -30,7 +38,7 @@ def validate_output_filename(value: str) -> str:
     return filename
 
 
-def export_fingerprint(records: list[dict[str, str]], output_filename: str) -> str:
+def export_fingerprint(records: list[dict[str, object]], output_filename: str) -> str:
     payload = {
         "schema_version": EXPORT_SCHEMA,
         "output_filename": validate_output_filename(output_filename),
@@ -44,14 +52,102 @@ def _project_slug(name: str) -> str:
     return value[:48] or "deck"
 
 
-def canonical_records(project_dir: Path, slide_ids: list[str]) -> list[dict[str, str]]:
-    records: list[dict[str, str]] = []
+def canonical_records(project_dir: Path, slide_ids: list[str]) -> list[dict[str, object]]:
+    framework_path = project_dir / "framework.md"
+    if not framework_path.is_file():
+        raise ValueError("framework.md is missing")
+    pages = {
+        page.slide_id: page
+        for page in page_entries(framework_path.read_text(encoding="utf-8"))
+    }
+    records: list[dict[str, object]] = []
+    if FIXED_ENDING_SLIDE_ID in slide_ids:
+        raise ValueError(f"{FIXED_ENDING_SLIDE_ID} is reserved for the bundled fixed ending")
     for slide_id in slide_ids:
         source = project_dir / "svg_output" / f"{slide_id}.svg"
         if not source.is_file():
             raise ValueError(f"canonical SVG is missing: {source}")
-        records.append({"slide_id": slide_id, "sha256": sha256(source)})
+        page = pages.get(slide_id)
+        if page is None:
+            raise ValueError(f"framework page is missing: {slide_id}")
+        page_type = page.fields.get("Page type", "")
+        binding = page_template_binding(page_type)
+        if binding is not None:
+            problems = template_candidate_errors(source, binding)
+            if problems:
+                raise ValueError(f"{slide_id} template contract failed: " + "; ".join(problems))
+        records.append({
+            "slide_id": slide_id,
+            "sha256": sha256(source),
+            "page_type": page_type,
+            "template_binding": binding,
+            "asset_role": "storyline",
+        })
+    ending_binding = page_template_binding("Ending")
+    if not isinstance(ending_binding, dict):
+        raise ValueError("bundled fixed ending has no structured template binding")
+    ending_source = Path(str(ending_binding["prototype_path"]))
+    problems = template_candidate_errors(ending_source, ending_binding)
+    if problems:
+        raise ValueError("bundled fixed ending template contract failed: " + "; ".join(problems))
+    records.append({
+        "slide_id": FIXED_ENDING_SLIDE_ID,
+        "sha256": sha256(ending_source),
+        "page_type": "Ending",
+        "template_binding": ending_binding,
+        "asset_role": "fixed-ending",
+    })
     return records
+
+
+def record_source_path(project_dir: Path, record: dict[str, object]) -> Path:
+    if record.get("asset_role") == "fixed-ending":
+        binding = record.get("template_binding")
+        if not isinstance(binding, dict):
+            raise ValueError("bundled fixed ending has no template binding")
+        source = Path(str(binding.get("prototype_path", ""))).expanduser().resolve()
+    else:
+        source = project_dir / "svg_output" / f"{record['slide_id']}.svg"
+    if not source.is_file() or sha256(source) != record.get("sha256"):
+        raise ValueError(f"record source is missing or stale: {record.get('slide_id')}")
+    return source
+
+
+def structured_template_plan(records: list[dict[str, object]]) -> dict | None:
+    if any(record.get("template_binding") is None for record in records):
+        return None
+    profile = load_template_profile()
+    pages = []
+    for index, record in enumerate(records, start=1):
+        binding = record["template_binding"]
+        assert isinstance(binding, dict)
+        pages.append({
+            "page": f"P{index:02d}",
+            "slide_id": record["slide_id"],
+            "layout_key": binding["layout_key"],
+            "prototype": Path(str(binding["prototype_path"])).name,
+            "prototype_sha256": binding["prototype_sha256"],
+        })
+    return {
+        "schema_version": STRUCTURED_EXPORT_SCHEMA,
+        "profile_id": profile["profile_id"],
+        "profile_fingerprint": profile["profile_fingerprint"],
+        "profile_manifest_sha256": profile["manifest_sha256"],
+        "template_adherence": profile["template_adherence"],
+        "template_reuse_scope": profile["template_reuse_scope"],
+        "masters": profile["masters"],
+        "layouts": {
+            key: {
+                "name": value["name"],
+                "master": value["master"],
+                "prototype": Path(str(value["prototype_path"])).name,
+                "prototype_sha256": value["prototype_sha256"],
+                "structure_contract_sha256": value["structure_contract"]["contract_sha256"],
+            }
+            for key, value in sorted(profile["layouts"].items())
+        },
+        "pages": pages,
+    }
 
 
 def bound_stage2_runtime(project_dir: Path) -> dict:
@@ -70,6 +166,7 @@ def export_plan(project_dir: Path, slide_ids: list[str], output_filename: str) -
     filename = validate_output_filename(output_filename)
     records = canonical_records(project_dir, slide_ids)
     runtime = bound_stage2_runtime(project_dir)
+    template_plan = structured_template_plan(records)
     fingerprint = export_fingerprint(records, filename)
     workspace = export_root(project_dir) / f"{_project_slug(project_dir.name)}-{fingerprint[:16]}"
     staged = [
@@ -77,6 +174,12 @@ def export_plan(project_dir: Path, slide_ids: list[str], output_filename: str) -
             "slide_id": record["slide_id"],
             "svg_path": str((workspace / "svg_input" / f"{record['slide_id']}.svg").resolve()),
             "sha256": record["sha256"],
+            "asset_role": record["asset_role"],
+            "template_layout_key": (
+                record["template_binding"]["layout_key"]
+                if isinstance(record.get("template_binding"), dict)
+                else None
+            ),
         }
         for record in records
     ]
@@ -90,6 +193,7 @@ def export_plan(project_dir: Path, slide_ids: list[str], output_filename: str) -
         "filename": filename,
         "records": records,
         "staged": staged,
+        "structured_template": template_plan,
     }
 
 
@@ -129,10 +233,10 @@ def prepare_export_workspace(
     input_dir.mkdir(parents=True, exist_ok=True)
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    staged: list[dict[str, str]] = []
+    staged: list[dict[str, object]] = []
     for record in records:
         slide_id = record["slide_id"]
-        source = project_dir / "svg_output" / f"{slide_id}.svg"
+        source = record_source_path(project_dir, record)
         target = input_dir / f"{slide_id}.svg"
         if not target.is_file() or sha256(target) != record["sha256"]:
             shutil.copy2(source, target)
@@ -140,7 +244,43 @@ def prepare_export_workspace(
             "slide_id": slide_id,
             "svg_path": str(target.resolve()),
             "sha256": record["sha256"],
+            "asset_role": record["asset_role"],
+            "template_layout_key": (
+                record["template_binding"]["layout_key"]
+                if isinstance(record.get("template_binding"), dict)
+                else None
+            ),
         })
+
+    template_bundle: dict[str, object] | None = None
+    template_plan = plan.get("structured_template")
+    if isinstance(template_plan, dict):
+        template_dir = workspace / "template_input"
+        template_dir.mkdir(parents=True, exist_ok=True)
+        profile = load_template_profile()
+        staged_templates: list[dict[str, str]] = []
+        for layout_key, layout in sorted(profile["layouts"].items()):
+            source = Path(str(layout["prototype_path"]))
+            target = template_dir / source.name
+            if not target.is_file() or sha256(target) != layout["prototype_sha256"]:
+                shutil.copy2(source, target)
+            staged_templates.append({
+                "layout_key": layout_key,
+                "path": str(target.resolve()),
+                "sha256": layout["prototype_sha256"],
+            })
+        structure_manifest = {
+            **template_plan,
+            "templates": staged_templates,
+        }
+        structure_manifest_path = template_dir / "structured-template.json"
+        write_json(structure_manifest_path, structure_manifest)
+        template_bundle = {
+            "schema_version": STRUCTURED_EXPORT_SCHEMA,
+            "structure_manifest_path": str(structure_manifest_path.resolve()),
+            "structure_manifest_sha256": sha256(structure_manifest_path),
+            "profile_fingerprint": template_plan["profile_fingerprint"],
+        }
 
     manifest_path = Path(plan["manifest_path"])
     output_path = Path(plan["output_path"])
@@ -152,6 +292,8 @@ def prepare_export_workspace(
         "schema_version": EXPORT_SCHEMA,
         "svg_set_fingerprint": fingerprint,
         "ordered_slides": staged,
+        "pptx_structure": "structured" if template_bundle else "flat",
+        "template_bundle": template_bundle,
         "output_filename": filename,
         "required_output_path": str(output_path.resolve()),
         "runtime_bindings": runtime,
@@ -193,6 +335,23 @@ def inspect_export_workspace(
         errors.append("export manifest fingerprint is stale")
     if manifest.get("ordered_slides") != plan["staged"]:
         errors.append("export manifest ordered slides are stale")
+    expected_mode = "structured" if isinstance(plan.get("structured_template"), dict) else "flat"
+    if manifest.get("pptx_structure") != expected_mode:
+        errors.append("export manifest PPTX structure mode is stale")
+    template_bundle = manifest.get("template_bundle")
+    if expected_mode == "structured":
+        bundle = template_bundle if isinstance(template_bundle, dict) else {}
+        structure_manifest = Path(str(bundle.get("structure_manifest_path", "")))
+        if (
+            bundle.get("schema_version") != STRUCTURED_EXPORT_SCHEMA
+            or not structure_manifest.is_file()
+            or bundle.get("structure_manifest_sha256") != sha256(structure_manifest)
+            or bundle.get("profile_fingerprint")
+            != plan["structured_template"]["profile_fingerprint"]
+        ):
+            errors.append("structured template bundle is missing or stale")
+    elif template_bundle is not None:
+        errors.append("flat export manifest must not bind a structured template bundle")
     if manifest.get("required_output_path") != str(Path(plan["output_path"]).resolve()):
         errors.append("export manifest output path is stale")
     runtime = manifest.get("runtime_bindings")

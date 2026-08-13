@@ -170,12 +170,19 @@ def execute(manifest_path: Path, expected_manifest_sha256: str) -> dict[str, obj
     if not manifest_path.is_file() or sha256(manifest_path) != expected_manifest_sha256:
         raise ValueError("export manifest is missing or does not match the handoff hash")
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    if manifest.get("schema_version") != "ey-deck.confirmed-svg-export.v3":
+    if manifest.get("schema_version") != "ey-deck.confirmed-svg-export.v4":
         raise ValueError("export manifest has an unsupported schema version")
     ordered = manifest.get("ordered_slides")
     if not isinstance(ordered, list) or not ordered:
         raise ValueError("export manifest has no ordered slides")
     slide_ids = [str(item["slide_id"]) for item in ordered]
+    fixed_ending_indexes = [
+        index
+        for index, item in enumerate(ordered, start=1)
+        if item.get("asset_role") == "fixed-ending"
+    ]
+    if fixed_ending_indexes != [len(ordered)]:
+        raise ValueError("export manifest must contain exactly one fixed ending as the last slide")
     workspace = manifest_path.parent.resolve()
     python = str(manifest.get("runtime_bindings", {}).get("bundled_python", ""))
     if not Path(python).is_file():
@@ -197,6 +204,28 @@ def execute(manifest_path: Path, expected_manifest_sha256: str) -> dict[str, obj
             raise ValueError(f"staged SVG is missing or stale: {item.get('slide_id')}")
         svg_paths.append(str(path))
 
+    prepare_args: list[str] = []
+    structure_mode = manifest.get("pptx_structure")
+    if structure_mode == "structured":
+        bundle = manifest.get("template_bundle")
+        if not isinstance(bundle, dict):
+            raise ValueError("structured export has no template bundle")
+        structure_manifest = Path(
+            str(bundle.get("structure_manifest_path", ""))
+        ).expanduser().resolve()
+        try:
+            structure_manifest.relative_to(workspace)
+        except ValueError as exc:
+            raise ValueError("structured template manifest escapes the export workspace") from exc
+        if (
+            not structure_manifest.is_file()
+            or bundle.get("structure_manifest_sha256") != sha256(structure_manifest)
+        ):
+            raise ValueError("structured template manifest is missing or stale")
+        prepare_args = ["--structure-manifest", str(structure_manifest)]
+    elif structure_mode != "flat":
+        raise ValueError("export manifest has an unsupported PPTX structure mode")
+
     attempts = workspace / "attempts"
     attempts.mkdir(exist_ok=True)
     project = Path(tempfile.mkdtemp(prefix="confirmed-", dir=attempts)).resolve()
@@ -205,6 +234,7 @@ def execute(manifest_path: Path, expected_manifest_sha256: str) -> dict[str, obj
         "prepare_confirmed_svg_export.py",
         "--project-dir",
         str(project),
+        *prepare_args,
         *svg_paths,
     )
     if prepared.returncode != 0:
@@ -317,7 +347,12 @@ def execute(manifest_path: Path, expected_manifest_sha256: str) -> dict[str, obj
         return validate_terminal(python, manifest_path, manifest, result)
 
     typography = run_step(
-        python, "assert_pptx_typography.py", "--pptx", str(output)
+        python,
+        "assert_pptx_typography.py",
+        "--pptx",
+        str(output),
+        "--exempt-slide-number",
+        str(fixed_ending_indexes[0]),
     )
     if typography.returncode != 0:
         result = blocked(

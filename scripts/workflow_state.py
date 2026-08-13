@@ -34,7 +34,7 @@ def page_type(page: PageEntry) -> str:
 
 
 def is_structural(page: PageEntry) -> bool:
-    return page_type(page) in {"cover", "section divider"}
+    return page_type(page) in {"cover", "agenda", "section divider"}
 
 
 def is_agenda(page: PageEntry) -> bool:
@@ -51,22 +51,14 @@ def unresolved(pages: list[PageEntry]) -> list[PageEntry]:
 
 def derived_phase(text: str) -> str:
     pages = page_entries(text)
-    if unresolved([page for page in pages if is_body(page)]):
-        return "Stage 1 — Body page loop"
-    if unresolved([page for page in pages if is_structural(page)]):
-        return "Stage 1 — Structural page review"
-    if unresolved([page for page in pages if is_agenda(page)]):
-        return "Stage 1 — Agenda review"
+    if unresolved(pages):
+        return "Stage 1 — Sequential page loop"
     return "Stage 2 — EY confirmed SVG export"
 
 
 def phase_pages(pages: list[PageEntry], phase: str) -> list[PageEntry]:
-    if phase == "Stage 1 — Body page loop":
-        return [page for page in pages if is_body(page)]
-    if phase == "Stage 1 — Structural page review":
-        return [page for page in pages if is_structural(page)]
-    if phase == "Stage 1 — Agenda review":
-        return [page for page in pages if is_agenda(page)]
+    if phase == "Stage 1 — Sequential page loop":
+        return pages
     return []
 
 
@@ -76,16 +68,7 @@ def current_group(text: str) -> list[PageEntry]:
     remaining = unresolved(phase_pages(pages, phase))
     if not remaining:
         return []
-    first = remaining[0]
-    if phase == "Stage 1 — Structural page review":
-        return remaining
-    if phase == "Stage 1 — Agenda review":
-        return [first]
-    if first.fields.get("Review mode") == "Batch":
-        chapter = first.fields.get("Chapter")
-        return [
-            page
-            for page in remaining
-            if page.fields.get("Review mode") == "Batch" and page.fields.get("Chapter") == chapter
-        ]
-    return [first]
+    # Page order is the production authority. Review-mode metadata may still
+    # guide how the user discusses content, but it never lets a later slide
+    # overtake or batch with the first unfinished slide.
+    return [remaining[0]]

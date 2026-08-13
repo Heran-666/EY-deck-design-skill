@@ -1,7 +1,7 @@
 interface:
   display_name: "EY Deck Design"
-  short_description: "Build confirmed SVGs and an editable PPTX"
-  default_prompt: "Use $ey-deck-design to build an approved Storyline and confirmed SVG pages, then export them with its bundled deterministic runtime as one editable PPTX."
+  short_description: "Build template-bound SVGs and an editable PPTX"
+  default_prompt: "Use $ey-deck-design to build an approved Storyline and template-bound confirmed SVG pages, then export them with its bundled structured runtime as one editable PPTX."
 
 policy:
   allow_implicit_invocation: false

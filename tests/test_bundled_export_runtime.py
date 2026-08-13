@@ -7,6 +7,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+import zipfile
 from pathlib import Path
 
 
@@ -243,9 +244,61 @@ class BundledExportRuntimeTests(unittest.TestCase):
             project = Path(tmp) / "ey-project"
             output = project / "svg_output"
             output.mkdir(parents=True)
-            (output / "S01.svg").write_text(CSS_SVG, encoding="utf-8")
-            (output / "S02.svg").write_text(
-                CSS_SVG.replace("Title", "Second page").replace("#000000", "#101820"),
+            template_dir = ROOT / "assets" / "templates" / "ey-gradient-dark-v1"
+            (output / "S01.svg").write_bytes((template_dir / "cover.svg").read_bytes())
+            (output / "S02.svg").write_bytes((template_dir / "content.svg").read_bytes())
+            (project / "framework.md").write_text(
+                """# Presentation Framework
+
+## Current position
+- Framework version: 2.6
+- Workflow version: 3.8
+- Storyline version: 1.0
+- Output filename: EY-confirmed-export.pptx
+
+## Project context
+- Deliverable name: Runtime integration
+- Audience: Test
+- Deliverable type: Sharing deck
+- Requested authoring mode: Standard
+- Audience outcome: Test export
+- Core need: Test export
+- Storyline thesis: Test export
+- Scope boundaries: None
+- Protected content: None
+
+## Design hard rules
+- Canvas: ppt169, SVG 1280 × 720
+- Project-specific rules: None
+
+## Confirmed Storyline
+
+### S01｜Cover
+- Chapter: Opening
+- Page type: Cover
+- Narrative role: Open
+- Content scope: Title
+- Next connection: S02
+- Review mode: Page-by-page
+- Authoring mode: Simplified
+- Status: SVG confirmed
+- Confirmed decisions: None
+- Open items: None
+- Confirmed version: A
+
+### S02｜Content
+- Chapter: Main
+- Page type: Standard content
+- Narrative role: Explain
+- Content scope: Content
+- Next connection: None
+- Review mode: Page-by-page
+- Authoring mode: Standard
+- Status: SVG confirmed
+- Confirmed decisions: None
+- Open items: None
+- Confirmed version: A
+""",
                 encoding="utf-8",
             )
             bind_stage2_runtime(project, bundled_python, "integration-test")
@@ -266,6 +319,20 @@ class BundledExportRuntimeTests(unittest.TestCase):
             artifact = Path(terminal["artifact_path"])
             self.assertTrue(artifact.is_file())
             self.assertGreater(artifact.stat().st_size, 0)
+            with zipfile.ZipFile(artifact) as package:
+                names = package.namelist()
+                self.assertEqual(
+                    len([name for name in names if name.startswith("ppt/slideMasters/slideMaster") and name.endswith(".xml")]),
+                    2,
+                )
+                self.assertEqual(
+                    len([name for name in names if name.startswith("ppt/slideLayouts/slideLayout") and name.endswith(".xml")]),
+                    5,
+                )
+                self.assertEqual(
+                    len([name for name in names if name.startswith("ppt/slides/slide") and name.endswith(".xml")]),
+                    3,
+                )
 
 
 if __name__ == "__main__":

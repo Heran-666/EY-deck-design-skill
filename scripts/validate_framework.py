@@ -13,8 +13,11 @@ from workflow_spec import (
     FRAMEWORK_VERSION,
     PAGE_AUTHORING_MODES,
     PAGE_STATES,
+    READABLE_WORKFLOW_VERSIONS,
     REQUESTED_AUTHORING_MODES,
+    LONG_DECK_CONTENT_THRESHOLD,
     WORKFLOW_VERSION,
+    initial_authoring_mode,
 )
 
 
@@ -159,9 +162,10 @@ def validate(framework: Path, project_dir: Path | None) -> list[str]:
             f"Framework version must be {FRAMEWORK_VERSION}: "
             f"{current_values.get('Framework version')}"
         )
-    if current_values.get("Workflow version") != WORKFLOW_VERSION:
+    if current_values.get("Workflow version") not in READABLE_WORKFLOW_VERSIONS:
         errors.append(
-            f"Workflow version must be {WORKFLOW_VERSION}: {current_values.get('Workflow version')}"
+            f"Workflow version must be one of {sorted(READABLE_WORKFLOW_VERSIONS)}: "
+            f"{current_values.get('Workflow version')}"
         )
     if not re.fullmatch(r"\d+(?:\.\d+)?", current_values.get("Storyline version", "")):
         errors.append("Storyline version must be a numeric version such as 1.0")
@@ -180,6 +184,9 @@ def validate(framework: Path, project_dir: Path | None) -> list[str]:
         errors.append("Storyline Slide IDs must be unique and sequential from S01")
     canonical_ids: set[str] = set()
     cover_ids: list[str] = []
+    agenda_ids: list[str] = []
+    divider_ids: list[str] = []
+    substantive_ids: list[str] = []
     for page in pages:
         errors.extend(required_fields(page.text, PAGE_FIELDS, page.slide_id))
         if len(page.text) > 2600:
@@ -188,6 +195,12 @@ def validate(framework: Path, project_dir: Path | None) -> list[str]:
         normalized_type = page.fields.get("Page type", "").strip().lower()
         if normalized_type == "cover":
             cover_ids.append(page.slide_id)
+        elif normalized_type == "agenda":
+            agenda_ids.append(page.slide_id)
+        elif normalized_type == "section divider":
+            divider_ids.append(page.slide_id)
+        elif normalized_type != "protected placeholder":
+            substantive_ids.append(page.slide_id)
         if state not in PAGE_STATES:
             errors.append(f"{page.slide_id} has unsupported Status: {state}")
         for field, limit in LENGTH_LIMITS.items():
@@ -198,6 +211,16 @@ def validate(framework: Path, project_dir: Path | None) -> list[str]:
             errors.append(
                 f"{page.slide_id} Authoring mode must be Simplified, Standard, or Not applicable"
             )
+        elif normalized_type in {"cover", "agenda", "section divider"}:
+            expected_mode = initial_authoring_mode(
+                requested_authoring_mode,
+                page.fields.get("Page type", ""),
+            )
+            if authoring_mode != expected_mode:
+                errors.append(
+                    f"{page.slide_id} {page.fields.get('Page type')} requires Authoring mode "
+                    f"{expected_mode} for requested mode {requested_authoring_mode}"
+                )
         confirmed = page.fields.get("Confirmed version", "")
         confirmed_pattern = (
             r"(?:A|R[1-9]\d*)" if authoring_mode == "Simplified" else r"(?:A|B|R[1-9]\d*)"
@@ -244,10 +267,30 @@ def validate(framework: Path, project_dir: Path | None) -> list[str]:
         if page.fields.get("Review mode") not in {"Page-by-page", "Batch"}:
             errors.append(f"{page.slide_id} Review mode must be Page-by-page or Batch")
 
+    current_workflow = current_values.get("Workflow version")
+    if current_workflow == WORKFLOW_VERSION and not cover_ids:
+        errors.append("Every workflow 3.9 Storyline requires one opening Cover at S01")
     if len(cover_ids) > 1:
         errors.append("Confirmed Storyline may contain only one Cover: " + ", ".join(cover_ids))
     if cover_ids and cover_ids[0] != "S01":
         errors.append("The single opening Cover must be S01")
+    if len(agenda_ids) > 1:
+        errors.append("Confirmed Storyline may contain only one Agenda: " + ", ".join(agenda_ids))
+    if agenda_ids and agenda_ids[0] != "S02":
+        errors.append("Agenda must immediately follow the opening Cover at S02")
+    if (
+        current_workflow == WORKFLOW_VERSION
+        and cover_ids
+        and len(substantive_ids) >= LONG_DECK_CONTENT_THRESHOLD
+    ):
+        if not agenda_ids:
+            errors.append(
+                f"A deck with {LONG_DECK_CONTENT_THRESHOLD} or more substantive pages requires an Agenda"
+            )
+        if not divider_ids:
+            errors.append(
+                f"A deck with {LONG_DECK_CONTENT_THRESHOLD} or more substantive pages requires at least one Section divider"
+            )
 
     if project_dir:
         svg_dir = project_dir / "svg_output"

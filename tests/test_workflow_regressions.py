@@ -24,6 +24,8 @@ from workflow_copy_contract import (  # noqa: E402
 )
 from workflow_doctor import preview_failure_issue  # noqa: E402
 from workflow_controller import reopen_pages  # noqa: E402
+from workflow_templates import page_template_binding, template_candidate_errors  # noqa: E402
+from svg_boundary import candidate_errors  # noqa: E402
 
 
 CONTENT = r"""## S01｜Approved title
@@ -149,6 +151,28 @@ class VisibleCopyContractTests(unittest.TestCase):
             errors = visible_copy_errors(path, contract)
             self.assertTrue(any("unbound visible SVG text" in error for error in errors))
 
+    def test_non_editable_template_fixed_copy_is_inherited(self) -> None:
+        contract = visible_copy_contract(CONTENT, "S01")
+        fixed = (
+            '<text data-copy-scope="template-fixed" data-pptx-layer="layout" '
+            'data-pptx-editable="false">Fixed template tagline.</text>'
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "A.svg"
+            path.write_text(annotated_svg(contract, extra=fixed), encoding="utf-8")
+            self.assertEqual([], visible_copy_errors(path, contract))
+
+    def test_template_fixed_scope_cannot_hide_page_authored_copy(self) -> None:
+        contract = visible_copy_contract(CONTENT, "S01")
+        hidden = '<text data-copy-scope="template-fixed">Invented page copy.</text>'
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "A.svg"
+            path.write_text(annotated_svg(contract, extra=hidden), encoding="utf-8")
+            errors = visible_copy_errors(path, contract)
+            self.assertTrue(
+                any("must be a non-editable Master/Layout text atom" in error for error in errors)
+            )
+
     def test_changed_and_missing_copy_are_rejected(self) -> None:
         contract = visible_copy_contract(CONTENT, "S01")
         svg = annotated_svg(contract)
@@ -230,6 +254,7 @@ class PagePreflightReuseTests(unittest.TestCase):
                 "packet_sha256": "packet-hash",
                 "visible_copy_contract_sha256": "copy-hash",
                 "visible_copy_contract": {"contract_sha256": "copy-hash"},
+                "template_structure_contract_sha256": "template-hash",
             }
             result = {
                 "status": "COMPLETE",
@@ -242,11 +267,13 @@ class PagePreflightReuseTests(unittest.TestCase):
                 "packet_path": packet["packet_path"],
                 "packet_sha256": packet["packet_sha256"],
                 "visible_copy_contract_sha256": "copy-hash",
+                "template_structure_contract_sha256": "template-hash",
                 "preflight_gate": {
                     "schema": controller.PAGE_PREFLIGHT_GATE_SCHEMA,
                     "status": "PASS",
                     "artifact_sha256": artifact_sha256,
                     "visible_copy_contract_sha256": "copy-hash",
+                    "template_structure_contract_sha256": "template-hash",
                 },
             }
             patches = (
@@ -282,6 +309,129 @@ class PagePreflightReuseTests(unittest.TestCase):
                 self.assertFalse(
                     controller.page_author_completion_valid(project, "S01", "A")
                 )
+
+
+class StructuredTemplateContractTests(unittest.TestCase):
+    def test_agenda_uses_dedicated_layout(self) -> None:
+        agenda = page_template_binding("Agenda")
+        divider = page_template_binding("Section divider")
+        self.assertIsNotNone(agenda)
+        self.assertIsNotNone(divider)
+        assert agenda is not None and divider is not None
+        self.assertEqual(agenda["layout_key"], "agenda")
+        self.assertNotEqual(agenda["prototype_path"], divider["prototype_path"])
+        self.assertNotEqual(
+            agenda["structure_contract_sha256"],
+            divider["structure_contract_sha256"],
+        )
+        prototype_text = Path(agenda["prototype_path"]).read_text(encoding="utf-8")
+        self.assertEqual(prototype_text.count(">Agenda item</text>"), 7)
+        self.assertNotIn("Short supporting detail", prototype_text)
+        with tempfile.TemporaryDirectory() as tmp:
+            candidate = Path(tmp) / "S02.svg"
+            prototype = Path(agenda["prototype_path"])
+            authored = prototype.read_text(encoding="utf-8").replace(
+                "</svg>",
+                '<text data-copy-id="S02-B1-heading" x="820" y="260" '
+                'fill="#FFFFFF" font-size="18.6667">01 First chapter</text>\n</svg>',
+            )
+            candidate.write_text(authored, encoding="utf-8")
+            self.assertEqual(template_candidate_errors(candidate, agenda), [])
+
+    def test_ending_has_dedicated_fixed_layout(self) -> None:
+        ending = page_template_binding("Ending")
+        self.assertIsNotNone(ending)
+        assert ending is not None
+        self.assertEqual(ending["layout_key"], "ending")
+        prototype = Path(ending["prototype_path"])
+        self.assertIn('data-ey-fixed-ending="true"', prototype.read_text(encoding="utf-8"))
+        self.assertEqual(template_candidate_errors(prototype, ending), [])
+
+
+class ContentFitPolicyTests(unittest.TestCase):
+    def _svg(self, *, font_size: str, lines: int, justification: str = "") -> str:
+        density = (
+            f' data-density-justification="{justification}"' if justification else ""
+        )
+        tspans = "".join(
+            f'<tspan x="80" y="{180 + index * 20}">Body line {index + 1}</tspan>'
+            for index in range(lines)
+        )
+        return (
+            '<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" '
+            'viewBox="0 0 1280 720" data-pptx-layout="content">'
+            f'<text data-copy-id="S01-B1-detail" x="80" y="180" '
+            f'font-size="{font_size}"{density}>{tspans}</text></svg>'
+        )
+
+    def test_short_8pt_body_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "short.svg"
+            path.write_text(self._svg(font_size="10.6667", lines=4), encoding="utf-8")
+            self.assertTrue(any("content-fit policy" in error for error in candidate_errors(path)))
+
+    def test_10pt_or_genuinely_dense_8pt_body_passes(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            cases = {
+                "ten.svg": self._svg(font_size="13.3333", lines=3),
+                "five-lines.svg": self._svg(font_size="10.6667", lines=5),
+                "dense.svg": self._svg(
+                    font_size="10.6667", lines=3, justification="dense-table"
+                ),
+            }
+            for name, svg in cases.items():
+                path = root / name
+                path.write_text(svg, encoding="utf-8")
+                self.assertEqual([], candidate_errors(path), name)
+
+    def test_page_type_mapping_and_fixed_atom_tamper_detection(self) -> None:
+        binding = page_template_binding("Section divider")
+        self.assertIsNotNone(binding)
+        assert binding is not None
+        self.assertEqual(binding["layout_key"], "divider")
+        with tempfile.TemporaryDirectory() as tmp:
+            candidate = Path(tmp) / "S02.svg"
+            prototype = Path(binding["prototype_path"])
+            candidate.write_bytes(prototype.read_bytes())
+            self.assertEqual(template_candidate_errors(candidate, binding), [])
+            candidate.write_text(
+                candidate.read_text(encoding="utf-8").replace(
+                    'id="divider-rule"',
+                    'id="divider-rule-tampered"',
+                    1,
+                ),
+                encoding="utf-8",
+            )
+            self.assertTrue(
+                any(
+                    "fixed Master/Layout atoms" in item
+                    for item in template_candidate_errors(candidate, binding)
+                )
+            )
+
+    def test_cover_fixed_tagline_is_hash_protected(self) -> None:
+        binding = page_template_binding("Cover")
+        self.assertIsNotNone(binding)
+        assert binding is not None
+        with tempfile.TemporaryDirectory() as tmp:
+            candidate = Path(tmp) / "S01.svg"
+            prototype = Path(binding["prototype_path"])
+            candidate.write_bytes(prototype.read_bytes())
+            candidate.write_text(
+                candidate.read_text(encoding="utf-8").replace(
+                    "The better the world works.",
+                    "The better the slide works.",
+                    1,
+                ),
+                encoding="utf-8",
+            )
+            self.assertTrue(
+                any(
+                    "fixed Master/Layout atoms" in item
+                    for item in template_candidate_errors(candidate, binding)
+                )
+            )
 
 
 class PreviewRegressionTests(unittest.TestCase):

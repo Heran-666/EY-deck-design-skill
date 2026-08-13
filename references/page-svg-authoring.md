@@ -10,12 +10,41 @@ emphasis, semantic relationship, and fixed constraint. Choose the composition,
 geometry, hierarchy, typography, wrapping, grouping, spacing, and visual
 treatment needed to communicate the approved meaning.
 
+Read the packet's bound structured-template prototype and use it as the literal
+starting SVG. Keep the root `data-pptx-master*` and `data-pptx-layout*`
+attributes, every root-level fixed atom carrying `data-pptx-layer`, and every
+placeholder id/type/index/bounds unchanged. Replace carrier text inside title
+and subtitle placeholders. Replace only the children of the `content-region`
+proxy with the page-specific composition. Never put page content below `y=650`.
+For revisions and A/B candidates, retain the same bound Layout.
+
+For an `Agenda`, use the bound `EY Agenda` prototype as its literal base. Keep
+its background, fixed atoms, title placeholder, and composite agenda-region
+placeholder intact. Replace the agenda-region children with the approved
+directory items using the supplied two-column numbered-card grammar. Balance
+the columns; use four-left/three-right for seven items. Retain a yellow left
+rule, yellow number, and exactly one white agenda-item label on each card. Do
+not add a subtitle, description, or supporting-detail line. The single label
+may wrap when needed but remains one agenda item. Do not retain unused sample
+cards.
+
 Apply the complete typography scale in `design-system.md` to every visible text
 run. Author with its listed SVG `font-size` values and do not invent an
 intermediate size so the exported PPTX lands on the stated point sizes.
+Default normal Content-page body copy to 10 pt. Before returning `COMPLETE`,
+inspect every framed text block at rendered size and repair any obvious unused
+right/lower zone by enlarging the type, right-sizing/recomposing the frame, or
+adding a meaning-bearing visual device. Never invent words. If the approved
+argument itself is insufficient, return a user-decision block so content can be
+reopened. The static preflight enforces the narrow 8 pt rule from
+`design-system.md`; passing that check does not replace visual judgment.
 
 Treat the packet's machine-enforced visible-copy JSON as authoritative. Bind
-every visible text run to exactly one listed item with `data-copy-id`. Put the
+every page-authored visible text run to exactly one listed item with
+`data-copy-id`. Text already present in the prototype with
+`data-copy-scope="template-fixed"` is inherited Layout/Master content: preserve
+its text, attributes, position, and root-level atom identity exactly and do not
+give it a page `data-copy-id`. Put the
 attribute on one `<text>` element or one containing `<g>` and split wrapping or
 emphasis only into descendants of that bound element. Do not nest bindings,
 repeat an ID, expose an unbound text run, or render Build-only text. Optional
@@ -41,7 +70,7 @@ targets from the supplied base. If the resulting revision is byte-identical to
 its base, report it normally; the controller records a non-blocking advisory.
 
 Perform one normal authoring check for exact-copy bindings, typography-scale
-compliance, legibility, clipping, overlap, missing content, canvas,
+and content-frame fit, legibility, clipping, overlap, missing content, canvas,
 self-containment, and CSS-free export readiness. Fix detected issues once, then
 return exactly one terminal JSON object:
 
