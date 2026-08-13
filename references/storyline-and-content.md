@@ -26,6 +26,15 @@ and reserve substantive argument for content pages.
 
 Keep all type-specific sequence, input, safeguard, and completion rules in the selected type policy. This file owns only reasoning shared by every deliverable type.
 
+When presenting the Storyline for approval, summarize each page's planned
+content as bullets under `Content Summary`. For `Next connection`, name the
+specific part of the current content page that creates the need for the next
+content page. Do not show a connection for structural or protected pages, the
+last page, or a content page followed by a Cover, Agenda, Section divider or
+chapter page, Ending or closing page, or Protected placeholder; display
+`Not applicable` instead. Follow the complete fixed display contract in
+[deliverable-types.md](deliverable-types.md).
+
 ## 2. Page argument
 
 Define these before writing substantive blocks:

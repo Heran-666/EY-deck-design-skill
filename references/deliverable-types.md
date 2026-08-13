@@ -73,6 +73,34 @@ For a hybrid, choose one primary type and only the necessary secondary behavior.
 
 ## 5. Present the Storyline for approval
 
-For every confirmed type, show the complete page sequence beginning with S01 Cover, with provisional Slide ID, title or purpose, narrative role, adjacency logic, review mode, effective authoring mode, and protected status. Briefly explain the overall narrative arc and how it serves the confirmed audience outcome.
+For every confirmed type, briefly explain the overall narrative arc and how it serves the confirmed audience outcome, then show the complete page sequence beginning with S01 Cover. Use the following fixed field order for every displayed page:
+
+1. `Slide ID`
+2. `Page title / purpose`
+3. `Page type`
+4. `Narrative role`
+5. `Content Summary`
+6. `Next connection`
+7. `Authoring mode`
+
+Format `Content Summary` as a short bullet list, normally two to four bullets. Each bullet summarizes one distinct content block, claim, evidence group, or audience takeaway planned for the page. Keep it at Storyline level: do not draft exact on-slide copy, invent unsupported facts, or include visual-design instructions.
+
+Show a substantive `Next connection` only when the current page is a content page and the immediately following page is also a content page. Explain which specific claim, evidence, question, conclusion, or implication on the current page creates the need for the following page; do not merely write “leads to the next page.” Display `Not applicable` when the current page is structural or protected, has no following page, or the next page is a Cover, Agenda, Section divider/chapter page, Ending/closing page, or Protected placeholder.
+
+Do not display `Review mode` or a separate `Protected status`. `Review mode` remains internal workflow metadata, while `Page type: Protected placeholder` is sufficient to identify a protected page in the Storyline.
+
+Use this page block unless a compact table can preserve the bullet hierarchy and all fields without ambiguity:
+
+```markdown
+### <Slide ID>｜<Page title / purpose>
+
+- Page type: <type>
+- Narrative role: <why this page exists>
+- Content Summary:
+  - <planned content point>
+  - <planned content point>
+- Next connection: <specific content-to-content bridge | Not applicable>
+- Authoring mode: <Simplified | Standard | Not applicable>
+```
 
 Obtain explicit approval before creating `framework.md` or `content.md`, unless the user expressly waives the Storyline gate. After approval, all types use the same controller-governed workflow, with each page following its own effective authoring mode.

@@ -675,6 +675,30 @@ class RecoveryRegressionTests(unittest.TestCase):
 
 
 class DocumentationRegressionTests(unittest.TestCase):
+    def test_storyline_display_contract_is_fixed_and_excludes_internal_fields(self) -> None:
+        skill_root = Path(__file__).resolve().parents[1]
+        contract = (skill_root / "references" / "deliverable-types.md").read_text(
+            encoding="utf-8"
+        )
+        section = contract[contract.index("## 5. Present the Storyline for approval") :]
+        required = (
+            "`Slide ID`",
+            "`Page title / purpose`",
+            "`Page type`",
+            "`Narrative role`",
+            "`Content Summary`",
+            "`Next connection`",
+            "`Authoring mode`",
+        )
+        positions = [section.index(field) for field in required]
+        self.assertEqual(positions, sorted(positions))
+        self.assertIn("Format `Content Summary` as a short bullet list", section)
+        self.assertIn(
+            "which specific claim, evidence, question, conclusion, or implication",
+            section,
+        )
+        self.assertIn("Do not display `Review mode` or a separate `Protected status`", section)
+
     def test_local_markdown_links_resolve_from_their_document_directory(self) -> None:
         skill_root = Path(__file__).resolve().parents[1]
         markdown_files = [skill_root / "SKILL.md", *sorted((skill_root / "references").glob("*.md"))]
