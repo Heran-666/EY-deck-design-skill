@@ -5,6 +5,7 @@ import os
 import tempfile
 import unittest
 from pathlib import Path
+from xml.etree import ElementTree as ET
 
 
 SKILL = Path(__file__).resolve().parents[1]
@@ -13,7 +14,7 @@ import sys
 
 sys.path.insert(0, str(SCRIPTS))
 
-from preview_renderer import ensure_preview_pair, png_dimensions  # noqa: E402
+from preview_renderer import ensure_preview_pair, ensure_preview_single, png_dimensions  # noqa: E402
 from workflow_copy_contract import visible_copy_contract  # noqa: E402
 
 
@@ -22,6 +23,72 @@ from workflow_copy_contract import visible_copy_contract  # noqa: E402
     "set EY_RUN_BROWSER_PREVIEW_TESTS=1 for the local Chromium smoke test",
 )
 class RealPreviewRendererTests(unittest.TestCase):
+    def test_real_agenda_template_passes_browser_visible_copy_gate(self) -> None:
+        labels = [
+            "战略背景与目标",
+            "行业趋势与关键挑战",
+            "核心方法与工作路径",
+            "重点任务与交付成果",
+            "项目计划与里程碑",
+            "治理机制与质量保障",
+            "团队经验与下一步行动",
+        ]
+        blocks = "\n\n".join(
+            f"#### S02-B{index}｜{label}" for index, label in enumerate(labels, 1)
+        )
+        section = f"""## S02｜目录
+
+### On-slide content
+- Title: 目录
+
+{blocks}
+
+### Visual Direction（Build-only）
+- Page type: Agenda
+- Visual focus: 七个章节名称
+- Information hierarchy: 标题后依次阅读七个章节名称
+- Relationship to preserve: 七个章节按汇报顺序并列展开
+- Fixed constraints: 保留批准的章节名称与顺序
+- Avoid: 不得加入章节说明或摘要
+
+### Sources
+- On-slide source: None
+- Source details: No external sources
+"""
+        contract = visible_copy_contract(section, "S02")
+        tree = ET.parse(SKILL / "assets" / "templates" / "ey-gradient-dark-v1" / "agenda.svg")
+        root = tree.getroot()
+        title_group = next(element for element in root.iter() if element.get("id") == "agenda-title")
+        title = next(element for element in title_group.iter() if element.tag.rsplit("}", 1)[-1] == "text")
+        title.set("data-copy-id", "S02-title")
+        title.text = "目录"
+        region = next(element for element in root.iter() if element.get("id") == "agenda-content-region")
+        cards = [element for element in region if element.tag.rsplit("}", 1)[-1] == "g"]
+        for index, (card, label) in enumerate(zip(cards, labels), 1):
+            number, heading = [
+                element for element in card if element.tag.rsplit("}", 1)[-1] == "text"
+            ]
+            number.set("data-copy-id", f"S02-B{index}-number")
+            number.text = f"{index:02d}"
+            heading.set("data-copy-id", f"S02-B{index}-heading")
+            heading.text = label
+
+        with tempfile.TemporaryDirectory() as tmp:
+            project = Path(tmp)
+            working = project / "svg_working" / "S02"
+            working.mkdir(parents=True)
+            candidate = working / "A.svg"
+            tree.write(candidate, encoding="utf-8", xml_declaration=True)
+            records = ensure_preview_single(
+                project,
+                "S02",
+                "A",
+                copy_contract=contract,
+            )
+            png = project / records["A"]["preview_png"]
+            self.assertEqual(png_dimensions(png), (1280, 720))
+            self.assertEqual(records["A"]["visible_copy_status"], "PASS")
+
     def test_copy_gate_ignores_pretty_print_tspan_indentation(self) -> None:
         section = """## S01｜转向“持续 / hello world
 

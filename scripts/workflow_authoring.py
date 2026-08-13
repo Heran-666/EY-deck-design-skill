@@ -110,7 +110,24 @@ def page_visible_copy_contract(project_dir: Path, slide_id: str) -> dict:
     if not content_path.is_file():
         raise ValueError(f"approved content is missing for {slide_id}")
     section = content_section(content_path.read_text(encoding="utf-8"), slide_id)
-    return visible_copy_contract(section, slide_id)
+    framework_path = project_dir / "framework.md"
+    if not framework_path.is_file():
+        raise ValueError(f"framework is missing for {slide_id}")
+    page = next(
+        (
+            item
+            for item in page_entries(framework_path.read_text(encoding="utf-8"))
+            if item.slide_id == slide_id
+        ),
+        None,
+    )
+    if page is None:
+        raise ValueError(f"framework page is missing for {slide_id}")
+    return visible_copy_contract(
+        section,
+        slide_id,
+        expected_page_type=page.fields.get("Page type", ""),
+    )
 
 
 def page_author_completion_valid(project_dir: Path, slide_id: str, version: str) -> bool:

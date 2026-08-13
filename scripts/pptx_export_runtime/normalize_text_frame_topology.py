@@ -31,6 +31,20 @@ from svg_finalize.flatten_tspan import (
 
 SVG_NS = "http://www.w3.org/2000/svg"
 SCHEMA = "ey-deck.text-frame-topology-normalization.v1"
+FLAT_STRUCTURE_METADATA_ATTRS = frozenset({
+    "data-pptx-layer",
+    "data-pptx-layout",
+    "data-pptx-layout-kind",
+    "data-pptx-layout-name",
+    "data-pptx-master",
+    "data-pptx-master-name",
+    "data-pptx-show-inherited-shapes",
+    "data-pptx-show-master-shapes",
+    "data-pptx-placeholder",
+    "data-pptx-binding",
+    "data-pptx-carrier",
+    "data-pptx-idx",
+})
 
 
 def sha256(path: Path) -> str:
@@ -118,6 +132,50 @@ def text_snapshot(root: ET.Element) -> list[dict[str, object]]:
     return records
 
 
+def _semantic_xml_value(value: str | None) -> str | None:
+    """Ignore serializer-only indentation while preserving authored content."""
+    if value is None or not value.strip():
+        return None
+    return value
+
+
+def _semantic_xml_snapshot(element: ET.Element) -> tuple[object, ...]:
+    return (
+        element.tag,
+        tuple(sorted(element.attrib.items())),
+        _semantic_xml_value(element.text),
+        _semantic_xml_value(element.tail),
+        tuple(_semantic_xml_snapshot(child) for child in list(element)),
+    )
+
+
+def _fixed_asset_equivalence(
+    source_root: ET.Element,
+    normalized_root: ET.Element,
+) -> tuple[bool, str, int]:
+    """Permit only Flat-mode removal of converter-only structure metadata.
+
+    Fixed ending slides normally require byte identity. Flat export must remove
+    structured-template routing attributes from its isolated working copy, so
+    compare parsed trees after removing exactly that allowlisted metadata from
+    a source clone. Geometry, image payloads, visible text, IDs, editability,
+    and every other attribute remain part of the strict comparison.
+    """
+    source_clone = copy.deepcopy(source_root)
+    removed = 0
+    for element in source_clone.iter():
+        for attribute in FLAT_STRUCTURE_METADATA_ATTRS:
+            if attribute in element.attrib:
+                del element.attrib[attribute]
+                removed += 1
+    equivalent = (
+        removed > 0
+        and _semantic_xml_snapshot(source_clone)
+        == _semantic_xml_snapshot(normalized_root)
+    )
+    return equivalent, "flat-structure-metadata-only", removed
+
+
 def _safe_parent_baseline_repairs(root: ET.Element) -> list[dict[str, object]]:
     repairs: list[dict[str, object]] = []
     for text_element in root.iter(f"{{{SVG_NS}}}text"):
@@ -165,7 +223,17 @@ def normalize_page(source: Path, destination: Path) -> dict[str, object]:
     source_snapshot = text_snapshot(source_root)
     before_sha256 = sha256(destination)
     if (source_root.get("data-ey-fixed-ending") or "").strip().lower() == "true":
-        exact_copy_passed = source.read_bytes() == destination.read_bytes()
+        byte_identity = source.read_bytes() == destination.read_bytes()
+        structure_only = False
+        equivalence_mode = "byte-identical"
+        removed_structure_metadata = 0
+        if not byte_identity:
+            (
+                structure_only,
+                equivalence_mode,
+                removed_structure_metadata,
+            ) = _fixed_asset_equivalence(source_root, root)
+        exact_copy_passed = byte_identity or structure_only
         return {
             "source_path": str(source.resolve()),
             "source_sha256": sha256(source),
@@ -177,6 +245,9 @@ def normalize_page(source: Path, destination: Path) -> dict[str, object]:
             "paragraph_blocks_normalized": 0,
             "exact_copy": {
                 "status": "PASS" if exact_copy_passed else "FAIL",
+                "byte_identity": byte_identity,
+                "equivalence_mode": equivalence_mode,
+                "flat_structure_metadata_removed": removed_structure_metadata,
                 "source_text_frames": len(source_snapshot),
                 "normalized_text_frames": len(text_snapshot(root)),
             },

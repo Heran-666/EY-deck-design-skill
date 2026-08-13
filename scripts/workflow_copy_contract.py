@@ -9,6 +9,7 @@ import unicodedata
 from pathlib import Path
 from xml.etree import ElementTree
 
+from workflow_agenda import agenda_schema_errors, page_type_from_section
 from workflow_io import text_sha256
 
 
@@ -95,11 +96,28 @@ def _markdown_table_cells(line: str) -> list[str]:
     return cells
 
 
-def visible_copy_contract(section: str, slide_id: str) -> dict:
+def visible_copy_contract(
+    section: str,
+    slide_id: str,
+    *,
+    expected_page_type: str | None = None,
+) -> dict:
     """Extract approved visible strings while excluding every Build-only field."""
     heading = re.search(rf"^## {re.escape(slide_id)}｜", section, re.MULTILINE)
     if not heading:
         raise ValueError(f"missing approved content section for {slide_id}")
+
+    page_type = page_type_from_section(section)
+    expected_type = (expected_page_type or "").strip().lower()
+    if expected_type and page_type != expected_type:
+        raise ValueError(
+            f"{slide_id} content Page type {page_type or 'Missing'!r} does not match "
+            f"framework Page type {expected_page_type!r}"
+        )
+    if page_type == "agenda":
+        agenda_errors = agenda_schema_errors(section, slide_id)
+        if agenda_errors:
+            raise ValueError("; ".join(agenda_errors))
 
     items: list[dict[str, object]] = []
     used_ids: set[str] = set()
@@ -115,6 +133,7 @@ def visible_copy_contract(section: str, slide_id: str) -> dict:
 
     section_name = ""
     block_id = ""
+    agenda_index = 0
     table_rows: dict[str, int] = {}
     for raw_line in section.splitlines():
         line = raw_line.rstrip()
@@ -128,7 +147,12 @@ def visible_copy_contract(section: str, slide_id: str) -> dict:
             block_id = block_match.group(1)
             if not block_id.startswith(slide_id + "-"):
                 raise ValueError(f"foreign content block in {slide_id}: {block_id}")
-            add(f"{block_id}-heading", "block-heading", block_match.group(2))
+            if page_type == "agenda":
+                agenda_index += 1
+                add(f"{block_id}-number", "agenda-number", f"{agenda_index:02d}")
+                add(f"{block_id}-heading", "agenda-item", block_match.group(2))
+            else:
+                add(f"{block_id}-heading", "block-heading", block_match.group(2))
             continue
 
         field_match = _FIELD.match(line)

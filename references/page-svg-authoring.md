@@ -26,7 +26,10 @@ the columns; use four-left/three-right for seven items. Retain a yellow left
 rule, yellow number, and exactly one white agenda-item label on each card. Do
 not add a subtitle, description, or supporting-detail line. The single label
 may wrap when needed but remains one agenda item. Do not retain unused sample
-cards.
+cards. Bind each yellow number to the packet's `<block-id>-number` item and the
+white label to `<block-id>-heading`; both are page-authored editable text. Do
+not mark an Agenda number `template-fixed`, leave it unbound, combine it with
+the label in one text box, or renumber it independently of the packet.
 
 Apply the complete typography scale in `design-system.md` to every visible text
 run. Author with its listed SVG `font-size` values and do not invent an

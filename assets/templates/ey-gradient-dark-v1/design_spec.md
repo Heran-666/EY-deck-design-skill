@@ -24,6 +24,7 @@ PowerPoint Masters and five reusable Layouts.
 - Layout: `cover` / `EY Cover`
 - Slots: optional project type or core insight, title, optional subtitle
 - Fixed Layout copy: `The better the question. The better the answer. The better the world works.` at `x=51`, baseline `y=679`
+- Fixed template brand: authentic EY mark with the two-line lockup `Shape the future` / `with confidence`; both are exact vector outlines reconstructed from the supplied Cover Layout group, and must never be retyped or authored as page copy
 
 ### 2. Agenda (`agenda.svg`)
 
@@ -50,12 +51,21 @@ PowerPoint Masters and five reusable Layouts.
 
 - Master: `ey-dark` / `EY Dark`
 - Layout: `ending` / `EY Ending`
-- Treatment: the complete user-supplied ending slide is embedded as one fixed full-slide image; do not reflow, restyle, translate, or revise it.
+- Treatment: the complete user-supplied ending slide is embedded as one fixed full-slide image with no cleanup, mask, parameterization, or overlay; do not reflow, restyle, translate, revise, or otherwise change it.
 - Slots: none
 - Fixed behavior: append this unchanged legal/brand page after every generated
   deck; do not expose it to Storyline, content, or page-authoring updates
+- Export behavior: preserve the embedded full-slide PNG bytes; do not resize or
+  JPEG-reencode this fixed asset
 
 The title/subtitle/content coordinates are contract data. Page authoring may
 change only placeholder content. It must retain the root Master/Layout identity,
 fixed-layer atom roster, placeholder ids/types/bounds, and inherited-shape
 visibility.
+
+Agenda, Section divider, and Content each retain one identical, authentic EY
+mark as fixed template content. Its canvas bounds are reconstructed from the
+shared source Master group at approximately `x=1184.383`, `y=667.333`,
+`w=31.817`, `h=32.667`; preserve the exact three path geometries in the
+prototype files. The separate fixed Ending remains exactly as supplied, even
+where its brand treatment differs from authored pages.

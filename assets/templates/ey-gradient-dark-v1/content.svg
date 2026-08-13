@@ -1,8 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720" data-pptx-master="ey-dark" data-pptx-master-name="EY Dark" data-pptx-layout="content" data-pptx-layout-name="EY Content" data-pptx-show-master-shapes="true" data-pptx-show-inherited-shapes="true">
   <rect id="dark-master-bg" data-pptx-layer="master" data-pptx-editable="false" x="0" y="0" width="1280" height="720" fill="#000000"/>
-  <path id="content-ey-beam" data-pptx-layer="layout" data-pptx-editable="false" d="M1184 667 H1216 L1184 679 Z" fill="#FFE600"/>
-  <path id="content-ey-e" data-pptx-layer="layout" data-pptx-editable="false" d="M1184 684 H1199 V688 H1189 V691 H1198 V695 H1189 V700 H1184 Z" fill="#FFFFFF"/>
-  <path id="content-ey-y" data-pptx-layer="layout" data-pptx-editable="false" d="M1200 684 H1205 L1208 689 L1211 684 H1217 L1211 693 V700 H1205 V693 Z" fill="#FFFFFF"/>
+  <path id="dark-template-ey-beam" data-pptx-layer="layout" data-pptx-editable="false" d="M1216.200105 667.333333 L1184.383307 679 L1216.200105 673.333333 Z" fill="#FFE600"/>
+  <path id="dark-template-ey-e" data-pptx-layer="layout" data-pptx-editable="false" d="M1189.547290 693.5 L1195.377593 693.5 L1195.377593 690.166667 L1189.547290 690.166667 L1189.547290 687.5 L1195.877334 687.5 L1193.711792 683.833333 L1184.549887 683.833333 L1184.549887 700 L1197.543134 700 L1197.543134 696.166667 L1189.547290 696.166667 Z" fill="#FFFFFF"/>
+  <path id="dark-template-ey-y" data-pptx-layer="layout" data-pptx-editable="false" d="M1206.038719 683.833333 L1203.373438 689.166667 L1200.708156 683.833333 L1195.377593 683.833333 L1200.874736 693.5 L1200.874736 700 L1205.705559 700 L1205.705559 693.5 L1211.369282 683.833333 Z" fill="#FFFFFF"/>
   <g id="content-title" data-pptx-placeholder="title" data-pptx-idx="1" data-pptx-bounds="48 50 1128 43">
     <text data-pptx-carrier="true" x="48" y="82" fill="#FFFFFF" font-family="EYInterstate, Microsoft YaHei, Calibri, sans-serif" font-size="32" font-weight="700">Page title</text>
   </g>

@@ -1582,6 +1582,14 @@ def convert_svg_to_slide_shapes(
     svg_path = Path(svg_path)
     tree = ET.parse(str(svg_path))
     root = tree.getroot()
+    fixed_asset = (
+        (root.get('data-ey-fixed-ending') or '').strip().lower() == 'true'
+    )
+    if fixed_asset and image_optimize:
+        # The supplied EY ending slide is a locked visual asset. Re-encoding
+        # its full-slide PNG as JPEG changes colors and antialiasing even when
+        # geometry is untouched, so preserve the embedded bytes verbatim.
+        image_optimize = False
     _hydrate_native_payloads(root, svg_path)
     try:
         parse_project_svg_root(
@@ -1619,6 +1627,11 @@ def convert_svg_to_slide_shapes(
             ) from exc
     trace_events: list[dict[str, Any]] | None = [] if trace_out is not None else None
     trace_steps: list[dict[str, Any]] = []
+    if fixed_asset:
+        trace_steps.append({
+            'action': 'preserve-fixed-ending-raster-bytes',
+            'image_optimize': False,
+        })
 
     from ..geometry_properties import (
         GeometryStyleError,

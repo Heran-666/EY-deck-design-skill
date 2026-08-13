@@ -37,6 +37,12 @@ Block only when continuing would invalidate approved meaning, evidence, determin
 - unreadable/corrupt PPTX, dangling relationships, wrong slide count, or invalid transition/animation OOXML;
 - unavailable or changed bound runtimes and validators.
 
+Flat export may remove structured-only Master/Layout/layer/placeholder metadata
+from isolated Stage 2 working copies. Treat this as a permitted technical
+normalization only when source bytes remain untouched, visible text remains
+exact, and the normalization receipt records the removed-attribute count and
+new working hash.
+
 Use `source-svg` only for a defect in the named SVG bytes, `user-decision` only for unresolved meaning or approval, and `environment` for missing/changing runtimes, validators, permissions, or dependencies.
 
 For content-frame fit, use `source-svg` when the approved copy is sufficient

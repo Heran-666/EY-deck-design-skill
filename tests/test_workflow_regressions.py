@@ -9,12 +9,14 @@ import tempfile
 import unittest
 from pathlib import Path
 from unittest import mock
+from xml.etree import ElementTree as ET
 
 
 SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 
 from preview_renderer import preview_paths  # noqa: E402
+from framework_lib import PageEntry  # noqa: E402
 import workflow_authoring as authoring  # noqa: E402
 import workflow_cli  # noqa: E402
 import workflow_controller as controller  # noqa: E402
@@ -22,7 +24,9 @@ from workflow_copy_contract import (  # noqa: E402
     visible_copy_contract,
     visible_copy_errors,
 )
+from workflow_agenda import agenda_schema_errors  # noqa: E402
 from workflow_doctor import preview_failure_issue  # noqa: E402
+from workflow_content import provisional_content_errors  # noqa: E402
 from workflow_controller import reopen_pages  # noqa: E402
 from workflow_templates import page_template_binding, template_candidate_errors  # noqa: E402
 from svg_boundary import candidate_errors  # noqa: E402
@@ -63,6 +67,30 @@ CONTENT = r"""## S01｜Approved title
 ### Sources
 - On-slide source: Approved source.
 - Source details: Never render source details.
+"""
+
+AGENDA_CONTENT = """## S02｜目录
+
+### On-slide content
+- Title: 目录
+
+#### S02-B1｜战略背景与目标
+
+#### S02-B2｜核心方法与路径
+
+#### S02-B3｜实施计划与保障
+
+### Visual Direction（Build-only）
+- Page type: Agenda
+- Visual focus: 三个章节名称
+- Information hierarchy: 标题后依次阅读三个章节名称
+- Relationship to preserve: 三个章节按汇报顺序并列展开
+- Fixed constraints: 保留批准的章节名称与顺序
+- Avoid: 不得加入章节说明或摘要
+
+### Sources
+- On-slide source: None
+- Source details: No external sources
 """
 
 
@@ -234,6 +262,77 @@ class VisibleCopyContractTests(unittest.TestCase):
             path.write_text(svg, encoding="utf-8")
             errors = visible_copy_errors(path, contract)
             self.assertTrue(any("S01-title changed" in error for error in errors))
+
+    def test_agenda_contract_generates_editable_number_bindings(self) -> None:
+        contract = visible_copy_contract(AGENDA_CONTENT, "S02")
+        agenda_items = [
+            (item["id"], item["role"], item["text"])
+            for item in contract["items"]
+            if str(item["id"]).startswith("S02-B")
+        ]
+        self.assertEqual(
+            agenda_items,
+            [
+                ("S02-B1-number", "agenda-number", "01"),
+                ("S02-B1-heading", "agenda-item", "战略背景与目标"),
+                ("S02-B2-number", "agenda-number", "02"),
+                ("S02-B2-heading", "agenda-item", "核心方法与路径"),
+                ("S02-B3-number", "agenda-number", "03"),
+                ("S02-B3-heading", "agenda-item", "实施计划与保障"),
+            ],
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "agenda.svg"
+            path.write_text(annotated_svg(contract), encoding="utf-8")
+            self.assertEqual([], visible_copy_errors(path, contract))
+            path.write_text(
+                annotated_svg(contract).replace(">01</text>", ">1</text>", 1),
+                encoding="utf-8",
+            )
+            self.assertTrue(
+                any("S02-B1-number changed" in error for error in visible_copy_errors(path, contract))
+            )
+
+    def test_agenda_schema_rejects_supporting_detail_before_authoring(self) -> None:
+        invalid = AGENDA_CONTENT.replace(
+            "#### S02-B1｜战略背景与目标\n",
+            "#### S02-B1｜战略背景与目标\n- Detail: 这行不应进入目录页。\n",
+        )
+        errors = agenda_schema_errors(invalid, "S02")
+        self.assertTrue(any("supporting-detail" in error for error in errors))
+        with self.assertRaisesRegex(ValueError, "supporting-detail"):
+            visible_copy_contract(invalid, "S02")
+
+        review = (
+            "# Presentation Build Specification\n\n"
+            "## Deck build profile（Build-only）\n"
+            "- Language: Chinese\n\n"
+            + invalid
+        )
+        page = PageEntry("S02", "目录", "", {"Page type": "Agenda"})
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "provisional-content.md"
+            path.write_text(review, encoding="utf-8")
+            gate_errors = provisional_content_errors(path, [page])
+        self.assertTrue(any("supporting-detail" in error for error in gate_errors))
+
+    def test_agenda_schema_allows_only_title_and_sequential_heading_items(self) -> None:
+        invalid = AGENDA_CONTENT.replace(
+            "- Title: 目录\n",
+            "- Title: 目录\n- Subtitle: 汇报结构\n",
+        ).replace("#### S02-B2｜", "##### S02-B3｜")
+        errors = agenda_schema_errors(invalid, "S02")
+        self.assertTrue(any("On-slide content supports only Title" in error for error in errors))
+        self.assertTrue(any("top-level sequential blocks" in error for error in errors))
+
+    def test_framework_agenda_type_cannot_be_bypassed_in_content(self) -> None:
+        disguised = AGENDA_CONTENT.replace("- Page type: Agenda", "- Page type: Standard content")
+        with self.assertRaisesRegex(ValueError, "does not match framework Page type"):
+            visible_copy_contract(
+                disguised,
+                "S02",
+                expected_page_type="Agenda",
+            )
 
 
 class PagePreflightReuseTests(unittest.TestCase):
@@ -432,6 +531,88 @@ class ContentFitPolicyTests(unittest.TestCase):
                     for item in template_candidate_errors(candidate, binding)
                 )
             )
+
+    def test_cover_logo_and_shape_the_future_lock_are_template_fixed(self) -> None:
+        binding = page_template_binding("Cover")
+        self.assertIsNotNone(binding)
+        assert binding is not None
+        prototype = Path(binding["prototype_path"])
+        root = ET.parse(prototype).getroot()
+        by_id = {element.get("id"): element for element in root.iter() if element.get("id")}
+        for element_id in (
+            "cover-ey-beam",
+            "cover-ey-e",
+            "cover-ey-y",
+            "cover-ey-slogan",
+        ):
+            self.assertEqual(by_id[element_id].get("data-pptx-layer"), "layout")
+            self.assertEqual(by_id[element_id].get("data-pptx-editable"), "false")
+        self.assertEqual(
+            by_id["cover-ey-slogan"].get("data-template-copy"),
+            "Shape the future with confidence",
+        )
+        self.assertNotIn("cover-ey-slogan-line-1", by_id)
+        self.assertGreater(len(by_id["cover-ey-slogan"].get("d") or ""), 10000)
+        with tempfile.TemporaryDirectory() as tmp:
+            candidate = Path(tmp) / "S01.svg"
+            candidate.write_text(
+                prototype.read_text(encoding="utf-8").replace(
+                    "M1221.204515 542.538898", "M1220.204515 542.538898", 1
+                ),
+                encoding="utf-8",
+            )
+            self.assertTrue(any(
+                "fixed Master/Layout atoms" in item
+                for item in template_candidate_errors(candidate, binding)
+            ))
+
+    def test_dark_authored_page_logo_is_one_correct_shared_template_atom_set(self) -> None:
+        expected_paths = {
+            "dark-template-ey-beam": "M1216.200105 667.333333 L1184.383307 679 L1216.200105 673.333333 Z",
+            "dark-template-ey-e": "M1189.547290 693.5 L1195.377593 693.5 L1195.377593 690.166667 L1189.547290 690.166667 L1189.547290 687.5 L1195.877334 687.5 L1193.711792 683.833333 L1184.549887 683.833333 L1184.549887 700 L1197.543134 700 L1197.543134 696.166667 L1189.547290 696.166667 Z",
+            "dark-template-ey-y": "M1206.038719 683.833333 L1203.373438 689.166667 L1200.708156 683.833333 L1195.377593 683.833333 L1200.874736 693.5 L1200.874736 700 L1205.705559 700 L1205.705559 693.5 L1211.369282 683.833333 Z",
+        }
+        signatures = []
+        for page_type in ("Agenda", "Section divider", "Standard content"):
+            binding = page_template_binding(page_type)
+            self.assertIsNotNone(binding)
+            assert binding is not None
+            root = ET.parse(Path(binding["prototype_path"])).getroot()
+            atoms = {
+                element.get("id"): element
+                for element in root.iter()
+                if element.get("id") in {
+                    "dark-template-ey-beam", "dark-template-ey-e", "dark-template-ey-y"
+                }
+            }
+            self.assertEqual(set(atoms), {
+                "dark-template-ey-beam", "dark-template-ey-e", "dark-template-ey-y"
+            })
+            self.assertTrue(all(
+                element.get("data-pptx-layer") == "layout"
+                and element.get("data-pptx-editable") == "false"
+                for element in atoms.values()
+            ))
+            self.assertEqual(
+                {key: atoms[key].get("d") for key in atoms},
+                expected_paths,
+            )
+            signatures.append(tuple(
+                (key, atoms[key].get("d"), atoms[key].get("fill"))
+                for key in sorted(atoms)
+            ))
+        self.assertTrue(all(signature == signatures[0] for signature in signatures[1:]))
+
+    def test_fixed_ending_has_no_template_overlay(self) -> None:
+        binding = page_template_binding("Ending")
+        self.assertIsNotNone(binding)
+        assert binding is not None
+        root = ET.parse(Path(binding["prototype_path"])).getroot()
+        direct_children = list(root)
+        self.assertEqual(
+            [element.get("id") for element in direct_children],
+            ["dark-master-bg", "ending-source-slide"],
+        )
 
 
 class PreviewRegressionTests(unittest.TestCase):

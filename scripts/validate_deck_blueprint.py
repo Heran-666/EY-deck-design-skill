@@ -10,6 +10,7 @@ from collections import Counter
 from pathlib import Path
 
 from framework_lib import duplicate_line_fields, line_fields, page_entries
+from workflow_agenda import agenda_schema_errors
 
 
 SLIDE_RE = re.compile(r"^## (S\d{2})｜", re.MULTILINE)
@@ -322,6 +323,7 @@ def validate_slide(slide_id: str, section: str) -> tuple[list[str], str]:
             errors.append(f"{slide_id} uses 对比重点 without an explicit comparison relationship")
     if normalized_type in {"agenda", "section divider"} and re.search(r"ImageGen", section, re.IGNORECASE):
         errors.append(f"{slide_id} {page_type} must not mention or use ImageGen")
+    errors.extend(agenda_schema_errors(section, slide_id))
     if normalized_type != "cover":
         for line in section.splitlines():
             if re.search(r"ImageGen", line, re.IGNORECASE) and re.search(

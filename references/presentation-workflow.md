@@ -48,6 +48,12 @@ Design reopen retains the content receipt. Content reopen invalidates it. Both a
 
 Run the emitted `prepare-export` command. The controller stages confirmed SVG copies in an external export workspace, appends the hash-bound fixed Ending prototype, and writes one manifest with their order, hashes, output filename, required output path, bundled exporter fingerprint, validated Python runtime, terminal-result validator, and—when every Storyline page is authored—the structured template profile and prototype hashes. Run the printed deterministic exporter command directly. It binds and preserves an untouched source copy, detects text-frame topology, deterministically normalizes only the isolated working copy, proves exact text identity, and reruns topology before PPTX generation. A successful technical normalization continues without another image display or user decision. The runtime then creates two native Masters and five Layouts from the staged template profile, treats observed confirmed paints and typography already verified against the fixed scale as inherited input, preserves the fixed Ending page's source typography exception, runs the remaining SVG/PPTX gates, and validates its exact terminal JSON before returning it. A mixed deck containing a Protected placeholder uses flat structure to avoid reauthoring protected bytes while still appending the Ending. A valid contextual color missing from the synthesized stable-role palette is inherited evidence, never a Stage 2 block by itself; an out-of-scale visible text size outside the fixed Ending asset is a `source-svg` block.
 
+For a flat mixed deck, strip structured-only Master/Layout/layer/placeholder
+attributes from the isolated normalized working copies before the SVG quality
+gate. Never strip or rewrite the confirmed source files or the retained
+`source_original/` copies; include the removed-attribute count and final working
+hash in the normalization receipt.
+
 Stage 2 never trusts the reusable page-preflight receipt in place of its own
 checks. It independently verifies the staged SVG hashes, pre-normalization
 topology, isolated-copy normalization, exact-copy identity, post-normalization

@@ -21,31 +21,48 @@
       "name": "EY Cover",
       "master": "ey-cover",
       "prototype": "cover.svg",
-      "page_types": ["cover"]
+      "page_types": [
+        "cover"
+      ]
     },
     "agenda": {
       "name": "EY Agenda",
       "master": "ey-dark",
       "prototype": "agenda.svg",
-      "page_types": ["agenda"]
+      "page_types": [
+        "agenda"
+      ]
     },
     "divider": {
       "name": "EY Section Divider",
       "master": "ey-dark",
       "prototype": "divider.svg",
-      "page_types": ["section divider"]
+      "page_types": [
+        "section divider"
+      ]
     },
     "content": {
       "name": "EY Content",
       "master": "ey-dark",
       "prototype": "content.svg",
-      "page_types": ["standard content", "methodology", "approach", "table-led", "chart-led", "deliverable", "case", "other"]
+      "page_types": [
+        "standard content",
+        "methodology",
+        "approach",
+        "table-led",
+        "chart-led",
+        "deliverable",
+        "case",
+        "other"
+      ]
     },
     "ending": {
       "name": "EY Ending",
       "master": "ey-dark",
       "prototype": "ending.svg",
-      "page_types": ["ending"]
+      "page_types": [
+        "ending"
+      ]
     }
   },
   "fallback_layout": "content",
@@ -53,14 +70,21 @@
     "media/cover-gradient.png": "31d0af94f24444abbb52a8e455e948081515fe0f54760f7093bbe2491a607eeb",
     "media/divider-glow.png": "f964596e0ab96ff3aa566c4695089399ee8ca074d64a93990bc2b4f6b8091e3e",
     "media/ending-background.png": "476a9f68c258ec5c3b5da4eda78f4f0b478faf128a693f0955ddfdc79556bbac",
-    "media/ending-slide.png": "6ec9518abe75424aa999aea65f3d6df102f3468d327a800493b5ddb202a357cb"
+    "media/ending-slide.png": "f997aa31f1b1926d1c7251c000e3111563094c3c923b89ce1d61ce23f4895aa9"
   },
   "source_provenance": {
-    "recovery_basis": "PPT Master inspection artifacts retained from the user-provided cover, divider, and body PPTX files",
+    "recovery_basis": "PPT Master inspection artifacts retained from the user-provided cover, agenda, divider, body, and ending PPTX files",
     "cover_master_part": "/ppt/slideMasters/slideMaster2.xml",
     "cover_master_sha256": "ab1a13c1cc69b0b70f61d0e46b1629db517ad8adcd9e4c4feb18cda84f231ea3",
     "dark_master_part": "/ppt/slideMasters/slideMaster1.xml",
     "dark_master_sha256": "25c4182f179e6369690c628556cc43c8e131d3ce84005d3fb",
-    "note": "The cover frame, dedicated agenda composition, and fixed ending page were refreshed from the user-supplied PPTX references on 2026-08-13. The profile remains a current-contract structured reconstruction, not a byte-preserving source-template import."
+    "ending_reference_pptx_sha256": "cdefc415bbf28d7ed9cc495daf81e7a264011ab5c303a705c8bff9af1da6ebbb",
+    "agenda_reference_pptx_sha256": "f4a96ec0f51dede6c074ebea3591967c099865688a438217598c2cb8977d354b",
+    "divider_reference_pptx_sha256": "fc85139174b813cb75f9f6d4edd0bb2a2c76cf8a8e89bb089e98063e4c5ec45f",
+    "content_reference_pptx_sha256": "30279ead29b583c94f8715830049897e7f9f86d25de4aa33afc6179a410dd04b",
+    "dark_master_ey_mark_sha256": "d35c9686ec7f72e740225e24d087743e2f8ff298fdeb5c2424104896819990c8",
+    "cover_reference_pptx_sha256": "0e6ebf78bc095ea9e515f5d92b5b00f37af2a0452d82daddd89631e7fc6d250d",
+    "cover_brand_group_sha256": "af871d4aec325a7400e58e034e1fee6a6498305c3776d464299e18626be0fc14",
+    "note": "The cover frame, authentic fixed EY marks, exact cover lockup 'Shape the future with confidence', dedicated agenda composition, and unchanged fixed ending page were refreshed from the user-supplied PPTX references on 2026-08-13. The profile remains a current-contract structured reconstruction, not a byte-preserving source-template import."
   }
 }

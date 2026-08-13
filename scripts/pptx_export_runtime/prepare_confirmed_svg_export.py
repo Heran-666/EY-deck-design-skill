@@ -27,6 +27,20 @@ URL_RE = re.compile(r"url\(\s*(['\"]?)(.*?)\1\s*\)", re.IGNORECASE)
 FONT_FAMILY_RE = re.compile(r"(?:^|;)\s*font-family\s*:\s*([^;]+)", re.IGNORECASE)
 COLOR_RE = re.compile(r"#[0-9A-Fa-f]{6}\b")
 STRUCTURED_EXPORT_SCHEMA = "ey-deck.structured-template-export.v1"
+FLAT_FORBIDDEN_STRUCTURE_ATTRS = frozenset({
+    "data-pptx-layer",
+    "data-pptx-layout",
+    "data-pptx-layout-kind",
+    "data-pptx-layout-name",
+    "data-pptx-master",
+    "data-pptx-master-name",
+    "data-pptx-show-inherited-shapes",
+    "data-pptx-show-master-shapes",
+    "data-pptx-placeholder",
+    "data-pptx-binding",
+    "data-pptx-carrier",
+    "data-pptx-idx",
+})
 
 
 def sha256(path: Path) -> str:
@@ -109,6 +123,23 @@ def inspect_svg(path: Path) -> dict:
         "colors": colors,
         "fixed_ending": (root.get("data-ey-fixed-ending") or "").strip().lower() == "true",
     }
+
+
+def strip_flat_structure_metadata(path: Path) -> int:
+    """Strip structured-only metadata from one isolated flat-export copy."""
+    try:
+        tree = ET.parse(path)
+    except (OSError, ET.ParseError) as exc:
+        raise ValueError(f"cannot strip flat-mode structure metadata from {path}: {exc}") from exc
+    removed = 0
+    for element in tree.getroot().iter():
+        for attribute in FLAT_FORBIDDEN_STRUCTURE_ATTRS:
+            if attribute in element.attrib:
+                del element.attrib[attribute]
+                removed += 1
+    if removed:
+        tree.write(path, encoding="utf-8", xml_declaration=False)
+    return removed
 
 
 def first_font(records: list[dict]) -> str:
@@ -334,6 +365,12 @@ def prepare(
             }
         else:
             normalization = normalize_confirmed_svg(destination)
+        if structure is None:
+            removed_structure_metadata = strip_flat_structure_metadata(destination)
+            if removed_structure_metadata:
+                normalization["flat_structure_metadata_removed"] = removed_structure_metadata
+                normalization["normalized_sha256"] = sha256(destination)
+                normalization["changed"] = True
         record = inspect_svg(destination)
         typography = audit_svg_typography(destination)
         observed_pptx_pt_counts.update(typography["observed_pptx_pt_counts"])

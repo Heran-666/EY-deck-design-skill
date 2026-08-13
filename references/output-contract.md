@@ -86,6 +86,26 @@ The page heading after `## <Slide ID>｜` must equal the exact `Title:` field. `
 
 Do not add a wireframe, coordinates, measurements, element table, spatial zones, named composition, or specific layout. Text, table, and chart blocks are content forms; combine them only when each has a distinct argumentative role. Protected pages live only in `framework.md` and `svg_output/`; do not add them to provisional or canonical `content.md`.
 
+`Agenda` is the one page-type-specific exception to the general content forms.
+Its `On-slide content` contains `Title` only, followed by one or more sequential
+top-level blocks whose headings are the exact directory labels:
+
+```markdown
+### On-slide content
+- Title: 目录
+
+#### S02-B1｜战略背景与目标
+
+#### S02-B2｜核心方法与路径
+```
+
+Do not add `Subtitle`, `Core insight`, `Detail`, Child logic, Emphasis,
+table/chart content, description, or supporting detail to an Agenda item. Do
+not prefix the label with a number. The controller derives zero-padded editable
+number copy (`01`, `02`, ...) from the approved block order and binds each one
+as `<block-id>-number`; the label remains `<block-id>-heading`. Invalid Agenda
+fields fail provisional-content validation before page authoring.
+
 ## 4. Content rules
 
 Treat every on-slide sentence and visible character as final. Page authoring may wrap text but must not add, remove, shorten, or rewrite approved wording without reopening the page in conversation.
@@ -96,6 +116,9 @@ insight, Detail, table/chart cells, Unit, Period, visible notes, and On-slide
 source. It excludes Child logic, table/chart purpose, Visual Direction, Source
 details, and emphasis annotations because those fields are Build-only. Page
 authoring binds the resulting IDs; do not invent IDs manually in `content.md`.
+For an Agenda, it additionally contains one deterministic `agenda-number` item
+for every label block. These number items are system-derived visible copy, not
+template-fixed copy: they must be bound and exported as editable text.
 
 Annotate emphasis by quoting the exact target substring. Use only `关键重点`, `次级重点`, `对比重点`, and `普通加粗`. Use `对比重点` only when the page's `Relationship to preserve` states an explicit comparison or contrast; otherwise use yellow, pale yellow, or white emphasis.
 

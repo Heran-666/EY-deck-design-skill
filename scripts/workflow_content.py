@@ -61,7 +61,11 @@ def provisional_content_errors(path: Path, expected_pages: list[PageEntry]) -> l
         contract_errors: list[str] = []
         try:
             contract_errors = copy_contract_errors(
-                visible_copy_contract(section, page.slide_id)
+                visible_copy_contract(
+                    section,
+                    page.slide_id,
+                    expected_page_type=page.fields.get("Page type", ""),
+                )
             )
         except ValueError as exc:
             contract_errors = [str(exc)]
