@@ -83,7 +83,7 @@ Use only:
 
 The controller derives the workflow stage, Stage 1 subflow, active page, next action, artifact readiness, and paths. Stage 1 always selects the first non-terminal Slide ID and completes that page before moving forward; page type and `Review mode` never reorder production. Do not store derived state. `Reopened` is an event, not a state. Content-scope reopening returns to `Content reviewing`; design-scope reopening retains approved content and returns to `Content locked`.
 
-`Open items` must be `None` before content can lock. Keep `Narrative role`, `Next connection`, `Confirmed decisions`, and `Open items` within 500 characters; keep `Content scope` within 700 characters. `Next connection` alone records each boundary to the following page; do not store the inverse relation again. Replace superseded decisions instead of appending history.
+`Open items` must be `None` before content can lock. Keep `Narrative role`, `Next connection`, `Confirmed decisions`, and `Open items` within 500 characters; keep `Content scope` within 700 characters. Store a substantive `Next connection` only for a content page followed immediately by another content page; name the specific claim, evidence, question, conclusion, or implication that creates the transition. Use `None` for structural or protected pages, the last page, and any page followed by a Cover, Agenda, Section divider or chapter page, Ending or closing page, or Protected placeholder. Do not store the inverse relation. Replace superseded decisions instead of appending history.
 
 ## 4. Targeted loading
 

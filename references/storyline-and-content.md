@@ -24,6 +24,15 @@ structure is independent of proposal logic; Sharing deck, Training,
 Interpretation, and Other decks follow it too. Keep structural pages minimal
 and reserve substantive argument for content pages.
 
+When presenting the Storyline for approval, summarize each page's planned
+content as bullets under `Content Summary`. For `Next connection`, name the
+specific part of the current content page that creates the need for the next
+content page. Do not show a connection for structural or protected pages, the
+last page, or a content page followed by a Cover, Agenda, Section divider or
+chapter page, Ending or closing page, or Protected placeholder; display
+`Not applicable` instead. Follow the complete fixed display contract in
+[deliverable-types.md](deliverable-types.md).
+
 For proposals, establish the client purpose or tension; isolate the few challenges or principles that matter; state a differentiated thesis; show how the methodology answers the purpose; show how the approach converts it into work and deliverables; then establish value, credibility, and fit with supported evidence or protected placeholders. Make differentiation visible early and reinforce it through client value, methodology, approach, deliverables, and working style. Do not rely on a generic late-stage “why us” page unless the RFP or Storyline warrants one.
 
 For non-proposals, do not manufacture a commercial decision journey. Use the confirmed sharing, learning, interpretation, briefing, workshop, or other audience outcome. Do not claim that presented content or proposed work alone will solve issues driven by policy, incentives, operating ownership, technology, data quality, or adoption unless scope and evidence support the claim.
