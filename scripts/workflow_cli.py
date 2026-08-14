@@ -40,6 +40,12 @@ from workflow_content import (
     review_receipt_path,
 )
 from workflow_directives import directive, directive_payload, print_directive
+from workflow_design import (
+    design_workflow_enabled,
+    ensure_design_context,
+    record_design_decision,
+    record_visual_qa,
+)
 from workflow_doctor import preview_failure_issue
 from workflow_export import prepare_export_workspace, validate_output_filename
 from workflow_handoff import output_filename
@@ -50,6 +56,7 @@ from workflow_paths import (
     receipt_path,
     revision_active_path,
     selected_working_path,
+    visual_qa_path,
     working_paths,
 )
 from workflow_preview_evidence import (
@@ -85,7 +92,7 @@ class CommandContext:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser()
     sub = parser.add_subparsers(dest='command', required=True)
-    for name in ('bootstrap', 'doctor', 'init', 'next', 'audit', 'prepare-authoring', 'prepare-export', 'validate-review', 'present-review', 'present-single', 'present-ab', 'repair-candidate', 'request-revision', 'present-revision', 'advance', 'update-page', 'set-output-filename', 'migrate', 'materialize-protected', 'page-author-result', 'resume-page-author', 'handoff-result', 'resume-handoff'):
+    for name in ('bootstrap', 'doctor', 'init', 'next', 'audit', 'prepare-design', 'record-design-decision', 'prepare-authoring', 'prepare-visual-qa', 'visual-qa-result', 'repair-visual-qa', 'prepare-export', 'validate-review', 'present-review', 'present-single', 'present-ab', 'repair-candidate', 'request-revision', 'present-revision', 'advance', 'update-page', 'set-output-filename', 'migrate', 'materialize-protected', 'page-author-result', 'resume-page-author', 'handoff-result', 'resume-handoff'):
         command = sub.add_parser(name)
         command.add_argument('legacy_framework', nargs='?', type=Path, help=argparse.SUPPRESS)
         command.add_argument('--framework', dest='framework_option', type=Path)
@@ -120,6 +127,12 @@ def build_parser() -> argparse.ArgumentParser:
             command.add_argument('--filename', required=True)
         if name == 'prepare-authoring':
             command.add_argument('--page', required=True)
+        if name in {'prepare-design', 'prepare-visual-qa', 'repair-visual-qa'}:
+            command.add_argument('--page', required=True)
+        if name in {'record-design-decision', 'visual-qa-result'}:
+            source = command.add_mutually_exclusive_group(required=True)
+            source.add_argument('--result-json')
+            source.add_argument('--result-file', type=Path)
         if name == 'page-author-result':
             source = command.add_mutually_exclusive_group(required=True)
             source.add_argument('--result-json')
@@ -176,6 +189,10 @@ def handle_reopen(context: CommandContext) -> int:
 
 def handle_repair_candidate(context: CommandContext) -> int:
     args, project_dir, framework, text, controller = _unpack(context)
+    current_action, _selected = directive(text, project_dir)
+    if design_workflow_enabled(text) and current_action == 'REPAIR_VISUAL_QA':
+        print('Candidate repair blocked: use the emitted repair-visual-qa command for a Visual QA block')
+        return 1
     try:
         text = repair_candidate(text, project_dir, args.page, args.version, args.note)
         atomic_write(framework, text)
@@ -183,6 +200,26 @@ def handle_repair_candidate(context: CommandContext) -> int:
         print(f'Candidate repair blocked: {exc}')
         return 1
     print(f'Reopened {args.page} {args.version} for same-slot candidate repair.')
+    print_directive(text, project_dir, controller)
+    return 0
+
+
+def handle_repair_visual_qa(context: CommandContext) -> int:
+    args, project_dir, framework, text, controller = _unpack(context)
+    try:
+        action, page, version = _directive_version(text, project_dir)
+        if action != 'REPAIR_VISUAL_QA' or page.slide_id != args.page:
+            raise ValueError(f'current action is {action}')
+        qa = read_json(visual_qa_path(project_dir, page.slide_id, version))
+        issues = qa.get('issues')
+        if qa.get('status') != 'BLOCKED' or not isinstance(issues, list) or not issues:
+            raise ValueError('current Visual QA receipt has no controller-defined blocking issues')
+        text = repair_candidate(text, project_dir, page.slide_id, version, '; '.join(issues))
+        atomic_write(framework, text)
+    except (OSError, ValueError) as exc:
+        print(f'Visual QA repair blocked: {exc}')
+        return 1
+    print(f'Reopened {page.slide_id} {version} from controller-defined Visual QA issues.')
     print_directive(text, project_dir, controller)
     return 0
 
@@ -262,6 +299,82 @@ def handle_prepare_authoring(context: CommandContext) -> int:
     return 0
 
 
+def _directive_version(text: str, project_dir: Path) -> tuple[str, PageEntry, str]:
+    payload = directive_payload(text, project_dir, Path(__file__).resolve())
+    pages = page_entries(text)
+    page = next(item for item in pages if item.slide_id == payload['pages'][0])
+    return str(payload['action']), page, str(payload.get('version', ''))
+
+
+def handle_prepare_design(context: CommandContext) -> int:
+    args, project_dir, framework, text, controller = _unpack(context)
+    try:
+        action, page, version = _directive_version(text, project_dir)
+        if action != 'PREPARE_PAGE_DESIGN' or page.slide_id != args.page:
+            raise ValueError(f'current action is {action}')
+        ensure_design_context(text, project_dir, page, version)
+    except (OSError, ValueError) as exc:
+        print(f'Design preparation blocked: {exc}')
+        return 1
+    print(f'Hash-bound design context prepared for {page.slide_id} {version}.')
+    print_directive(text, project_dir, controller)
+    return 0
+
+
+def handle_record_design_decision(context: CommandContext) -> int:
+    args, project_dir, framework, text, controller = _unpack(context)
+    try:
+        action, page, version = _directive_version(text, project_dir)
+        if action != 'PLAN_PAGE_DESIGN':
+            raise ValueError(f'current action is {action}')
+        raw = args.result_json if args.result_json is not None else args.result_file.read_text(encoding='utf-8')
+        record_design_decision(project_dir, page, version, raw)
+    except (OSError, ValueError) as exc:
+        print(f'Design decision rejected: {exc}')
+        return 1
+    print(f'Persisted Design Decision recorded for {page.slide_id} {version}.')
+    print_directive(text, project_dir, controller)
+    return 0
+
+
+def handle_prepare_visual_qa(context: CommandContext) -> int:
+    args, project_dir, framework, text, controller = _unpack(context)
+    try:
+        action, page, version = _directive_version(text, project_dir)
+        if action != 'PREPARE_VISUAL_QA' or page.slide_id != args.page:
+            raise ValueError(f'current action is {action}')
+        artifact = selected_working_path(project_dir, page.slide_id, version)
+        ensure_preview_single(
+            project_dir,
+            page.slide_id,
+            version,
+            copy_contract=page_visible_copy_contract(project_dir, page.slide_id),
+            prevalidated_source_hash=sha256(artifact),
+        )
+    except (OSError, PreviewError, ValueError) as exc:
+        print(f'Visual QA preview preparation blocked: {exc}')
+        return 1
+    print(f'Rendered single-candidate Visual QA preview for {page.slide_id} {version}.')
+    print_directive(text, project_dir, controller)
+    return 0
+
+
+def handle_visual_qa_result(context: CommandContext) -> int:
+    args, project_dir, framework, text, controller = _unpack(context)
+    try:
+        action, page, version = _directive_version(text, project_dir)
+        if action != 'REVIEW_VISUAL_QA':
+            raise ValueError(f'current action is {action}')
+        raw = args.result_json if args.result_json is not None else args.result_file.read_text(encoding='utf-8')
+        record_visual_qa(project_dir, page, version, raw)
+    except (OSError, ValueError) as exc:
+        print(f'Visual QA result rejected: {exc}')
+        return 1
+    print(f'Independent Visual QA result recorded for {page.slide_id} {version}.')
+    print_directive(text, project_dir, controller)
+    return 0
+
+
 def print_preview_blocks(
     slide_id: str,
     previews: tuple[tuple[str, str, Path], tuple[str, str, Path]],
@@ -313,7 +426,7 @@ def handle_page_author_result(context: CommandContext) -> int:
     except (OSError, ValueError) as exc:
         print(f'Page authoring result rejected: {exc}')
         return 1
-    print('Page SVG Authoring terminal result recorded.')
+    print('Embedded PPT Master SVG Producer terminal result recorded.')
     print_directive(text, project_dir, controller)
     return 0
 
@@ -452,10 +565,16 @@ def handle_present_single(context: CommandContext) -> int:
         print(f'## {page.slide_id}｜Single design confirmation\n')
         print(f'![{page.slide_id} PNG preview](<{a_png}>)\n')
         print(f'Original SVG: [A.svg](<{a_path}>)\n')
-        print(
-            'Before sending this preview to the user, inspect it. If it has a defect, run '
-            'repair-candidate for A. Otherwise ask the user to confirm it or request a targeted revision.\n'
-        )
+        if design_workflow_enabled(text):
+            print(
+                'Independent Visual QA has already passed for this exact rendered candidate. '
+                'Ask the user to confirm it or request a targeted revision.\n'
+            )
+        else:
+            print(
+                'Before sending this preview to the user, inspect it. If it has a defect, run '
+                'repair-candidate for A. Otherwise ask the user to confirm it or request a targeted revision.\n'
+            )
     return 0
 
 
@@ -514,13 +633,21 @@ def handle_present_ab(context: CommandContext) -> int:
             print('\nAdvisories:')
             for advisory in advisories:
                 print(f'- {advisory}')
-        print(
-            '\nBefore sending this comparison to the user, inspect both candidates. If either '
-            'has a defect, run repair-candidate for that same A/B slot and do not create Rn. '
-            'Otherwise send both standalone preview blocks in the same message, never place local '
-            'preview images inside a Markdown table, then ask the user to choose A or B or request '
-            'a targeted revision.\n'
-        )
+        if design_workflow_enabled(text):
+            print(
+                '\nIndependent single-candidate Visual QA has already passed for both exact previews; '
+                'it did not compare their compositional distinctness. Send both standalone preview blocks '
+                'in the same message, never place local preview images inside a Markdown table, then ask '
+                'the user to choose A or B or request a targeted revision.\n'
+            )
+        else:
+            print(
+                '\nBefore sending this comparison to the user, inspect both candidates. If either '
+                'has a defect, run repair-candidate for that same A/B slot and do not create Rn. '
+                'Otherwise send both standalone preview blocks in the same message, never place local '
+                'preview images inside a Markdown table, then ask the user to choose A or B or request '
+                'a targeted revision.\n'
+            )
     return 0
 
 
@@ -859,7 +986,12 @@ COMMAND_HANDLERS = {
     "init": handle_init,
     "audit": handle_audit_command,
     "next": handle_next,
+    "prepare-design": handle_prepare_design,
+    "record-design-decision": handle_record_design_decision,
     "prepare-authoring": handle_prepare_authoring,
+    "prepare-visual-qa": handle_prepare_visual_qa,
+    "visual-qa-result": handle_visual_qa_result,
+    "repair-visual-qa": handle_repair_visual_qa,
     "prepare-export": handle_prepare_export,
     "validate-review": handle_validate_review,
     "page-author-result": handle_page_author_result,

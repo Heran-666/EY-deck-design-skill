@@ -16,7 +16,7 @@ Before approval, use optional `working/intake-summary.md`. After approval, merge
 ## Current position
 
 - Framework version: 2.6
-- Workflow version: 3.9
+- Workflow version: 4.0
 - Storyline version: 1.0
 - Output filename: <user-requested or deterministic plain filename ending in .pptx>
 
@@ -87,7 +87,7 @@ The controller derives the workflow stage, Stage 1 subflow, active page, next ac
 
 ## 4. Targeted loading
 
-For content review, controller `next` emits Project context, project-specific hard rules, the active Storyline entry, and compact adjacent context. For SVG production it materializes those build-relevant fields, the exact approved `content.md` section, and the Page type-selected structured-template binding into one hash-bound `working/packets/<Slide ID>-authoring.md`; every candidate for that page reuses the same packet and Layout. `next --format json` returns action, pages, `command_when`, unambiguous command data, effective page authoring mode, packet path/hash, template prototype/path/hash/contract when applicable, and minimum route metadata.
+For content review, controller `next` emits Project context, project-specific hard rules, the active Storyline entry, and compact adjacent context. Before SVG production it materializes a candidate-specific design-context packet containing the Embedded PPT Master design-module identity, the approved `content.md` section, policy manifest and fingerprint, durable design principles, adjacent-page context, and deck design memory. The Embedded PPT Master Design Lead's persisted Design Decision is a hash-bound receipt. Its SVG Producer reuses one page authoring packet and Layout while receiving the current candidate's decision path/hash. `next --format json` returns all paths and hashes needed to recover after context compaction without relying on conversation memory.
 
 Do not load the complete Storyline during ordinary page work.
 

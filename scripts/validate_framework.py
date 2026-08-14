@@ -268,8 +268,8 @@ def validate(framework: Path, project_dir: Path | None) -> list[str]:
             errors.append(f"{page.slide_id} Review mode must be Page-by-page or Batch")
 
     current_workflow = current_values.get("Workflow version")
-    if current_workflow == WORKFLOW_VERSION and not cover_ids:
-        errors.append("Every workflow 3.9 Storyline requires one opening Cover at S01")
+    if current_workflow in {"3.9", WORKFLOW_VERSION} and not cover_ids:
+        errors.append("Every current Storyline requires one opening Cover at S01")
     if len(cover_ids) > 1:
         errors.append("Confirmed Storyline may contain only one Cover: " + ", ".join(cover_ids))
     if cover_ids and cover_ids[0] != "S01":
@@ -279,7 +279,7 @@ def validate(framework: Path, project_dir: Path | None) -> list[str]:
     if agenda_ids and agenda_ids[0] != "S02":
         errors.append("Agenda must immediately follow the opening Cover at S02")
     if (
-        current_workflow == WORKFLOW_VERSION
+        current_workflow in {"3.9", WORKFLOW_VERSION}
         and cover_ids
         and len(substantive_ids) >= LONG_DECK_CONTENT_THRESHOLD
     ):

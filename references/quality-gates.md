@@ -7,6 +7,7 @@ Use this policy whenever the controller or export runner reports a failure.
 | Gate | Retain here | Exclude from this gate |
 |---|---|---|
 | Page preflight (`page-author-result`) | path and artifact identity; XML/root/canvas; self-containment and CSS-free boundary; exact visible-copy bindings; fixed typography scale; bound template root, fixed atoms, definitions, and placeholder contract | candidate count; A/B distinction; rendered bounds; user decision; deep native-PPTX compatibility; package checks |
+| Independent Visual QA | one candidate's rendered composition fidelity, focal hierarchy, data story, brand expression, and Design Decision fidelity | editing the SVG; comparing A/B; judging whether candidate compositions differ; user selection |
 | Browser preview | network isolation; font-ready rendering; exact DOM copy; computed visibility; non-empty and on-canvas bounds; equal-size PNGs; renderer/PNG/hash evidence | repeated XML/CSS/typography parsing when a current preflight receipt matches; subjective design judgment; native-PPTX compatibility |
 | Initial or revision presentation | mode-required single or A/B preview evidence; equal canonical canvas when comparing; targeted revision integrity; user-decision evidence; A/B hash and material-difference observations only for Standard pages | repeated page-preflight checks; content reapproval; Stage 2 compatibility |
 | Canonical handoff | exactly one confirmed SVG per page; page order; terminal states; confirmed/canonical/presentation hashes and receipts | design review; preview regeneration; candidate re-evaluation; deep SVG compatibility |
@@ -69,7 +70,7 @@ equal-scale browser comparison and explicit user selection; they do not trigger
 base must likewise proceed to the equal-scale Base/Rn comparison and explicit user
 confirmation, with the identity recorded as an advisory.
 
-Apply A/B distinction and difference rules only to `Standard` pages. A `Simplified` page must still pass the same A preflight, browser visibility, explicit confirmation, canonical, export, and PPTX gates; skip only B and comparison-specific evidence.
+Keep A/B distinction and difference evidence advisory for `Standard` pages; it never blocks authoring, Independent Visual QA, comparison, or selection. Independent Visual QA reviews one candidate only. A `Simplified` page must still pass the same A preflight, browser visibility, explicit confirmation, canonical, export, and PPTX gates; skip only B and comparison-specific evidence.
 
 ## Interpretation safeguards
 

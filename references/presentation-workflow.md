@@ -4,7 +4,7 @@ Read this file only for initialization, migration, reopen, reindex, or a control
 
 ## Initialization
 
-Create framework 2.6 / workflow 3.9 `framework.md` with project and page authoring modes from [authoring-modes.md](authoring-modes.md), call `load_workspace_dependencies` in the parent context, then run the single normal-path command:
+Create framework 2.6 / workflow 4.0 `framework.md` with project and page authoring modes from [authoring-modes.md](authoring-modes.md), call `load_workspace_dependencies` in the parent context, then run the single normal-path command:
 
 ```bash
 python3 <controller> bootstrap --project-dir . --bundled-python <absolute-bundled-python> --bundle-version <bundle-version>
@@ -19,7 +19,7 @@ the page to `Content locked` for clean mode-required reauthoring.
 
 ## Page-authoring recovery
 
-Run the emitted `prepare-authoring` command before the bounded authoring action. Stage 1 always operates on the first non-terminal Slide ID, beginning with S01 Cover and continuing in exact Storyline order; no body-first or structural-page batch exists. Record each exact terminal JSON with the printed `page-author-result` command. For `Simplified`, stop initial authoring after A and run `present-single`; require explicit A confirmation or a targeted revision. For `Standard`, continue through B and `present-ab`; a `COMPLETE` B result should include `material_differences`, and the controller derives the A/B comparison summary from both authoring receipts. Identical A/B hashes or missing/empty difference evidence are advisories and continue to comparison and explicit user selection.
+Run the emitted `prepare-design`, record the Embedded PPT Master Design Lead's exact decision, then run `prepare-authoring` before the Embedded PPT Master SVG Producer. After deterministic preflight, run `prepare-visual-qa` and record the subsystem's independent single-candidate Visual QA result before any user display. Stage 1 always operates on the first non-terminal Slide ID, beginning with S01 Cover and continuing in exact Storyline order; no body-first or structural-page batch exists. For `Simplified`, stop initial authoring after A. For `Standard`, continue through B; identical A/B hashes or missing/empty difference evidence remain advisories and continue to comparison and explicit user selection.
 
 `present-single` and `present-ab` create hash-bound rendered presentation evidence; neither proves that the user saw the output. Inspect every required candidate before sending it. Follow the directive's per-page `decision_requirements`. For an agent-detected defect, run the emitted `repair_before_user_display` command, or the matching page-specific command when a batch mixes modes: the controller archives only that candidate slot, its preflight, its preview, and the stale page presentation receipt, then returns that page to same-slot authoring while preserving unrelated page decisions. Show the repaired single option or full A/B comparison as required by its page mode. Use `request-revision` and Rn only for targeted changes requested after user display or after confirmation.
 

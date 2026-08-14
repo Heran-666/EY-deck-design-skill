@@ -23,6 +23,12 @@ from workflow_content import content_section
 from workflow_copy_contract import visible_copy_errors
 from workflow_directives import directive
 from workflow_doctor import export_runtime_binding, run_doctor
+from workflow_design import (
+    DESIGN_MODULE_VERSION,
+    DESIGN_OWNER,
+    current_design_decision,
+    design_page_fingerprint,
+)
 from workflow_handoff import current_export, current_handoff_result
 from workflow_io import atomic_write, now, read_json, sha256, text_sha256, write_json
 from workflow_paths import (
@@ -85,7 +91,15 @@ def record_page_author_result(text: str, project_dir: Path, raw: str) -> None:
     page = selected[0]
     version = author_version_for_action(action, project_dir, page)
     packet = current_authoring_packet(project_dir, page.slide_id)
-    if not packet or packet.get("framework_page_sha256") != text_sha256(page.text):
+    packet_page_matches = bool(
+        packet
+        and (
+            packet.get("framework_design_fingerprint") == design_page_fingerprint(page)
+            if isinstance(packet.get("design_policy_manifest"), dict)
+            else packet.get("framework_page_sha256") == text_sha256(page.text)
+        )
+    )
+    if not packet or not packet_page_matches:
         raise ValueError("run controller next to materialize the current hash-bound page packet first")
     result = parse_terminal_json(raw)
     if result.get("route") != "page-svg-authoring":
@@ -105,6 +119,20 @@ def record_page_author_result(text: str, project_dir: Path, raw: str) -> None:
         "recorded_at": now(),
         "active": status == "BLOCKED",
     }
+    decision = current_design_decision(project_dir, page, version)
+    if isinstance(packet.get("design_policy_manifest"), dict):
+        if decision is None:
+            raise ValueError("page authoring requires the current persisted Design Decision")
+        decision_path = receipt_path(project_dir, page.slide_id, f"{version}-design-decision")
+        payload.update({
+            "design_owner": DESIGN_OWNER,
+            "design_module_version": DESIGN_MODULE_VERSION,
+            "design_producer": "ppt-master-svg-producer",
+            "design_decision_path": str(decision_path.resolve()),
+            "design_decision_sha256": sha256(decision_path),
+            "design_decision_fingerprint": decision["decision_fingerprint"],
+            "design_policy_fingerprint": packet["design_policy_fingerprint"],
+        })
     if status == "COMPLETE":
         artifact = Path(str(result.get("artifact_path", ""))).expanduser().resolve()
         expected = selected_working_path(project_dir, page.slide_id, version).resolve()
@@ -203,6 +231,7 @@ def resume_page_author(
         project_dir / "svg_working" / slide_id,
         project_dir / "svg_output" / f"{slide_id}.svg",
         *authoring_packet_paths(project_dir, slide_id),
+        *list((project_dir / "working" / "packets").glob(f"{slide_id}-*-design-context.json")),
         *page_receipts,
     ])
     target_state = "Content locked" if scope == "design" else "Content reviewing"
@@ -253,6 +282,7 @@ def repair_candidate(
         page_author_result_path(project_dir, slide_id, version),
         preview_png,
         preview_receipt,
+        receipt_path(project_dir, slide_id, f"{version}-visual-qa"),
         receipt_path(
             project_dir,
             slide_id,
@@ -315,6 +345,7 @@ def resume_handoff(text: str, project_dir: Path, pages: list[str], note: str | N
                 project_dir / "svg_working" / slide_id,
                 canonical,
                 *authoring_packet_paths(project_dir, slide_id),
+                *list((project_dir / "working" / "packets").glob(f"{slide_id}-*-design-context.json")),
                 *page_receipts,
             ])
             target_state = "Content reviewing" if scope == "user-decision" else "Content locked"
@@ -338,9 +369,11 @@ def managed_agents_block(controller: Path, skill_root: Path) -> str:
     return f'''{MANAGED_START}
 # EY Deck Design controlled workflow
 
-Read `{skill_root / 'SKILL.md'}` once. On entry, re-entry, or uncertain state, run
+Read `{skill_root / 'SKILL.md'}` once. On entry, re-entry, post-compaction, or uncertain state, run
 `python3 "{controller}" next --project-dir . --format json`; follow only its action,
-`command_when`, and the condition-matching command data. A successful controller command already returns the next directive. Never edit
+`command_when`, and the condition-matching command data. Treat emitted design-context,
+design-policy, Design Decision, deck-memory, preview, and receipt paths/hashes as the recovery
+authority; never reconstruct design rules from conversation memory. A successful controller command already returns the next directive. Never edit
 workflow state manually or create a PPTX here. Record Page SVG and isolated Stage 2 terminal JSON
 with the controller command before continuing.
 {MANAGED_END}'''
@@ -391,6 +424,7 @@ def reopen_pages(
             project_dir / "svg_working" / slide_id,
             project_dir / "svg_output" / f"{slide_id}.svg",
             *authoring_packet_paths(project_dir, slide_id),
+            *list((project_dir / "working" / "packets").glob(f"{slide_id}-*-design-context.json")),
             *page_receipts,
         ])
         target_state = "Content locked" if scope == "design" else "Content reviewing"

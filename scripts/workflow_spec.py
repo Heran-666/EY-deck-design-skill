@@ -5,9 +5,12 @@ from __future__ import annotations
 
 
 FRAMEWORK_VERSION = "2.6"
-WORKFLOW_VERSION = "3.9"
-READABLE_WORKFLOW_VERSIONS = {"3.8", WORKFLOW_VERSION}
+WORKFLOW_VERSION = "4.0"
+READABLE_WORKFLOW_VERSIONS = {"3.8", "3.9", WORKFLOW_VERSION}
 PAGE_PREFLIGHT_GATE_SCHEMA = "ey-deck.page-preflight.v2"
+DESIGN_CONTEXT_SCHEMA = "ey-deck.design-context.v2"
+DESIGN_DECISION_SCHEMA = "ey-deck.design-decision.v2"
+VISUAL_QA_SCHEMA = "ey-deck.visual-qa.v2"
 
 REQUESTED_AUTHORING_MODES = {"Simplified", "Standard"}
 PAGE_AUTHORING_MODES = {"Simplified", "Standard", "Not applicable"}
@@ -37,20 +40,27 @@ LEGACY_MANAGED_START = "<!-- EY-PROPOSAL-WORKFLOW:START -->"
 LEGACY_MANAGED_END = "<!-- EY-PROPOSAL-WORKFLOW:END -->"
 
 EY_PAGE_AUTHORING_INSTRUCTION = (
-    "Use EY Deck Design's bundled Page SVG Authoring contract. Create one complete candidate from "
+    "Act only as Embedded PPT Master's SVG Producer inside EY Deck Design. Create one complete candidate from "
     "the exact hash-bound locked page packet and its bound structured-template prototype at the supplied paths. "
+    "Implement the supplied persisted Design Decision faithfully; do not silently redesign it. If the decision "
+    "cannot be implemented without changing approved meaning or violating the template, return BLOCKED. "
     "Preserve the prototype's root Master/Layout identity, fixed atoms, and placeholder contract. "
-    "Own placeholder content, concept, composition, construction, fit, and normal SVG quality; bind every page-authored visible text run to the packet's exact "
+    "Apply the bundled PPT Master design contract plus EY composition, data-to-visual, and visual-language repertoire: "
+    "honor the committed reading mode and information-model branch, choose one suitable composition family and one "
+    "signature EY gesture, and encode approved quantitative relationships as truthful "
+    "editable visuals instead of defaulting to bordered insight banners, equal text columns, or card grids. "
+    "Own page-local geometry, construction, fit, and normal SVG quality while leaving concept and composition authority "
+    "with the persisted Design Decision; bind every page-authored visible text run to the packet's exact "
     "data-copy-id while preserving inherited template-fixed text exactly, emit only inline SVG attributes/styles with no <style> or class dependency, and "
     "do not initialize a project or enter PPTX export."
 )
 
 B_OPTION_KERNEL = (
-    "B option kernel: design B independently from the same locked content, semantic Visual Direction, "
-    "and EY page-authoring rules; do not optimize, critique, repair, or incrementally polish A. "
-    "Use independent design judgment to produce a genuinely distinct realization while preserving all "
-    "approved copy, data, sources, emphasis, semantic relationships, and fixed constraints. Compare "
-    "with A only after drafting to confirm at least one material design difference and the same canvas."
+    "B option guidance (advisory, never a blocking gate): start from the same locked content and semantic "
+    "Visual Direction without treating A as a repair target. A different suitable composition family or focal "
+    "mechanism may improve the usefulness of the choice, but similarity to A never blocks authoring, Visual QA, "
+    "presentation, or confirmation. Preserve all approved copy, data, sources, emphasis, semantic relationships, "
+    "fixed constraints, and the same canvas."
 )
 
 PREPARE_AUTHORING_ACTIONS = {

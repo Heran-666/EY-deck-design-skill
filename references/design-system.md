@@ -1,6 +1,6 @@
 # EY page design principles
 
-This reference supplies only the basic design intent passed with locked page content through EY's bundled Page SVG Authoring contract. The bounded authoring action owns the actual SVG concept, composition, construction, fitting, assets, and normal quality checks. Do not expand this into a wireframe, coordinate plan, construction manual, or compatibility specification.
+This reference supplies EY policy to the Embedded PPT Master Design Lead and implementation constraints to its SVG Producer. The Design Lead owns concept and composition; the producer owns faithful construction and fit; Independent Visual QA owns the separate rendered review. Do not expand this into a wireframe, coordinate plan, construction manual, or compatibility specification.
 
 ## Canvas and visual language
 
@@ -17,7 +17,7 @@ point size. Do not use intermediate or ad hoc sizes.
 
 | Text role | PPTX | SVG `font-size` | Choice rule |
 |---|---:|---:|---|
-| Display title | 40 pt | `53.3333` | Cover and Section divider titles only, when bound to those bundled Layouts |
+| Display title / hero metric | 40 pt | `53.3333` | Cover and Section divider titles; on Content pages, at most one short hero metric or focal statement inside the content region |
 | Title | 24 pt | `32` | Page title |
 | Subtitle | 18 pt | `24` | Subtitle or title-supporting statement |
 | Body heading | 12 or 14 pt | `16` or `18.6667` | Use 14 pt for higher importance or lower density; 12 pt for denser or secondary headings |
@@ -52,10 +52,26 @@ geometry, wrapping, grouping, spacing, and visual treatment.
 
 Consume the approved semantic `Visual Direction（Build-only）` defined by [output-contract.md](output-contract.md). Preserve its attention priority and meaning without turning it into a card/grid/panel, named composition, coordinate plan, asset list, or wireframe. Retain room for two independent solutions.
 
+For authored Content pages, apply the authoring-only repertoire in
+[composition-and-data-visual-language.md](composition-and-data-visual-language.md).
+Choose one composition family from the approved meaning and use one signature
+EY gesture to establish a first read, second read, and supporting read. Do not
+default to a bordered core-insight banner followed by equal text columns, and
+do not treat a complete set of approved numbers as prose when an editable
+visual encoding communicates the relationship more directly.
+
 ## Page and asset principles
 
 - Only the single opening Cover may optionally use a dark, text-free ImageGen background. Agenda and Section divider pages do not use ImageGen. Other pages use generated imagery only when it materially helps comprehension.
 - Keep tables and charts editable, simple, and evidence-backed. Do not invent missing labels, values, units, dates, caveats, or sources.
+- Use tables for exact multi-field lookup. For trend, ranking, gap,
+  part-to-whole, range, or another approved quantitative relationship, prefer
+  the simplest truthful chart or data mark defined in the authoring-only visual
+  repertoire.
+- On normal Content pages, prefer open composition, meaningful alignment, and
+  negative space over repeated rounded cards, bordered panels, pills, badges,
+  or a dashboard-like grid. The dedicated Agenda Layout remains the card-grid
+  exception.
 - Preserve approved copy, data, sources, emphasis, semantic relationships, and brand constraints.
 
 ## Mode-aware design intent
@@ -65,6 +81,12 @@ For a `Simplified` page, produce one confident complete A solution. Do not lower
 For a `Standard` page, produce two complete interpretations from the same locked packet:
 
 - A: one confident complete solution.
-- B: a materially distinct complete solution, not an optimization, critique, or repair of A.
+- B: another complete solution from its own persisted Design Decision, not a repair of A.
 
-Both preserve the same approved meaning and canvas. B should report its material differences in terminal JSON; identical A/B bytes or insufficient difference evidence are advisory and do not block comparison or user selection. In either mode, the controller owns the manifest, presentation, user decision, revisions, and handoff. See [authoring-modes.md](authoring-modes.md).
+Both preserve the same approved meaning and canvas. A different composition
+family or focal mechanism can improve the usefulness of the choice, but this
+remains advisory. B may report material differences; identical A/B bytes or
+insufficient difference evidence do not block authoring, Independent Visual
+QA, comparison, or user selection. In either mode, the controller owns the
+manifest, presentation, user decision, revisions, and handoff. See
+[authoring-modes.md](authoring-modes.md).

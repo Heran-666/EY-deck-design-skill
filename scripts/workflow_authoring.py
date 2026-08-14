@@ -13,9 +13,17 @@ from framework_lib import PageEntry, h2_section, line_fields, page_entries
 from svg_boundary import candidate_errors, svg_canvas
 from workflow_content import content_section
 from workflow_copy_contract import visible_copy_contract, visible_copy_errors
+from workflow_design import (
+    DESIGN_MODULE_VERSION,
+    DESIGN_OWNER,
+    current_design_decision,
+    design_page_fingerprint,
+    design_policy_manifest,
+)
 from workflow_io import atomic_write, now, read_json, sha256, text_sha256, write_json
 from workflow_paths import (
     authoring_packet_paths,
+    design_decision_path,
     page_author_result_path,
     receipt_path,
     revision_active_path,
@@ -92,14 +100,29 @@ def current_authoring_packet(project_dir: Path, slide_id: str) -> dict | None:
         or payload.get("visible_copy_contract") != contract
     ):
         return None
+    policy = payload.get("design_policy_manifest")
+    if isinstance(policy, dict):
+        try:
+            if policy != design_policy_manifest():
+                return None
+        except (OSError, ValueError):
+            return None
     return payload
 
 
 def authoring_packet_valid(project_dir: Path, page: PageEntry) -> bool:
     packet = current_authoring_packet(project_dir, page.slide_id)
+    framework_matches = bool(
+        packet
+        and (
+            packet.get("framework_design_fingerprint") == design_page_fingerprint(page)
+            if isinstance(packet.get("design_policy_manifest"), dict)
+            else packet.get("framework_page_sha256") == text_sha256(page.text)
+        )
+    )
     return bool(
         packet
-        and packet.get("framework_page_sha256") == text_sha256(page.text)
+        and framework_matches
         and packet.get("template_binding")
         == page_template_binding(page.fields.get("Page type", ""))
     )
@@ -161,6 +184,25 @@ def page_author_completion_valid(project_dir: Path, slide_id: str, version: str)
         == packet.get("template_structure_contract_sha256")
         and packet_matches
     )
+    if base_valid and isinstance(packet.get("design_policy_manifest"), dict):
+        try:
+            current_page = next(
+                item
+                for item in page_entries((project_dir / "framework.md").read_text(encoding="utf-8"))
+                if item.slide_id == slide_id
+            )
+        except (OSError, StopIteration):
+            return False
+        decision = current_design_decision(project_dir, current_page, version)
+        canonical_decision_path = design_decision_path(project_dir, slide_id, version).resolve()
+        decision_path = Path(str(result.get("design_decision_path", ""))).resolve()
+        base_valid = bool(
+            decision
+            and decision_path == canonical_decision_path
+            and decision_path.is_file()
+            and result.get("design_decision_sha256") == sha256(decision_path)
+            and result.get("design_decision_fingerprint") == decision.get("decision_fingerprint")
+        )
     if not base_valid:
         return False
 
@@ -435,6 +477,8 @@ def ensure_authoring_packet(text: str, project_dir: Path, page: PageEntry) -> di
         raise ValueError(f"{page.slide_id} has no authorable template binding")
     contract_json = json.dumps(contract, ensure_ascii=False, indent=2)
     template_json = json.dumps(template_binding, ensure_ascii=False, indent=2)
+    policy = design_policy_manifest() if current_design_decision(project_dir, page, "A") else None
+    policy_json = json.dumps(policy, ensure_ascii=False, indent=2) if policy else "Not applicable (legacy workflow)"
     packet_text = (
         f"# Locked Page SVG Authoring Packet｜{page.slide_id}\n\n"
         "Use this exact packet for every requested candidate. Version-specific output paths and revision notes are "
@@ -450,6 +494,11 @@ def ensure_authoring_packet(text: str, project_dir: Path, page: PageEntry) -> di
         + buffer.getvalue().strip()
         + "\n\n## Bound structured template\n\n```json\n"
         + template_json
+        + "\n```\n"
+        + "\n\n## Persisted design-policy snapshot\n\nThe candidate-specific Design Decision is supplied "
+        "separately by the controller and is the Embedded PPT Master SVG Producer's implementation brief. After context "
+        "compaction, recover it from the directive path/hash; never reconstruct it from conversation memory.\n\n```json\n"
+        + policy_json
         + "\n```\n"
         + "\n\n## Machine-enforced visible copy\n\n```json\n"
         + contract_json
@@ -469,6 +518,13 @@ def ensure_authoring_packet(text: str, project_dir: Path, page: PageEntry) -> di
         "template_structure_contract_sha256": template_binding["structure_contract_sha256"],
         "created_at": now(),
     }
+    if policy:
+        payload["design_owner"] = DESIGN_OWNER
+        payload["design_module_version"] = DESIGN_MODULE_VERSION
+        payload["design_producer"] = "ppt-master-svg-producer"
+        payload["design_policy_manifest"] = policy
+        payload["design_policy_fingerprint"] = policy["fingerprint"]
+        payload["framework_design_fingerprint"] = design_page_fingerprint(page)
     write_json(receipt_path_value, payload)
     return payload
 

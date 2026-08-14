@@ -7,6 +7,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 import zipfile
 from pathlib import Path
 from xml.etree import ElementTree as ET
@@ -31,9 +32,16 @@ from workflow_controller import (  # noqa: E402
     candidate_errors,
     directive,
     directive_payload,
+    ensure_design_context,
     ensure_authoring_packet,
+    ensure_preview_single,
     migrate_workflow,
+    page_visible_copy_contract,
+    page_author_completion_valid,
     receipt_path,
+    record_design_decision,
+    record_page_author_result,
+    record_visual_qa,
     sha256,
     single_presentation_valid,
     text_sha256,
@@ -419,6 +427,159 @@ def protected_framework() -> str:
 
 
 class LightweightWorkflowTests(unittest.TestCase):
+    def test_workflow_4_design_recovery_packet_survives_context_loss(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project = Path(tmp)
+            framework_path = setup_locked(project)
+            text = framework_path.read_text(encoding="utf-8").replace(
+                "- Workflow version: 3.8", "- Workflow version: 4.0"
+            )
+            framework_path.write_text(text, encoding="utf-8")
+            action, pages = directive(text, project)
+            self.assertEqual(action, "PREPARE_PAGE_DESIGN")
+            context = ensure_design_context(text, project, pages[0], "A")
+            payload = directive_payload(text, project, CONTROLLER)
+            self.assertEqual(payload["action"], "PLAN_PAGE_DESIGN")
+            self.assertEqual(
+                payload["route"],
+                "$ey-deck-design / Embedded PPT Master Design Lead",
+            )
+            self.assertEqual(payload["design_owner"], "embedded-ppt-master-design")
+            self.assertEqual(payload["design_policy_fingerprint"], context["design_policy_manifest"]["fingerprint"])
+            self.assertTrue(Path(payload["design_context_path"]).is_file())
+            record_design_decision(project, pages[0], "A", json.dumps({
+                "status": "COMPLETE",
+                "route": "ppt-master-design-lead",
+                "decision": {
+                    "communication_job": "Move leadership from evidence to action",
+                    "reading_mode": "presentation",
+                    "primary_claim": "Evidence supports action",
+                    "composition_family": "metric-and-trajectory",
+                    "focal_mechanism": "one dominant evidence trajectory",
+                    "information_model": "claim-and-evidence",
+                    "data_encoding": "none; approved content has no quantitative series",
+                    "typography_hierarchy": "hero claim, supporting evidence, source detail",
+                    "ey_gesture": "directional beam",
+                    "density": "low",
+                    "rationale": "Make the conclusion the first read and evidence the second",
+                    "avoid": ["equal card grid"],
+                },
+            }))
+            self.assertEqual(directive(text, project)[0], "PREPARE_SVG_A")
+            ensure_authoring_packet(text, project, pages[0])
+            recovered = directive_payload(text, project, CONTROLLER)
+            self.assertEqual(recovered["action"], "GENERATE_SVG_A")
+            self.assertEqual(
+                recovered["route"],
+                "$ey-deck-design / Embedded PPT Master SVG Producer",
+            )
+            self.assertEqual(recovered["design_owner"], "embedded-ppt-master-design")
+            self.assertEqual(recovered["design_module_version"], "1.0")
+            self.assertTrue(Path(recovered["design_decision_path"]).is_file())
+            recovered_context = json.loads(Path(recovered["design_context_path"]).read_text())
+            self.assertEqual(recovered_context["design_owner"], "embedded-ppt-master-design")
+            self.assertEqual(recovered_context["design_roles"]["lead"], "ppt-master-design-lead")
+            self.assertIn(
+                "references/ppt-master-design.md",
+                {
+                    Path(item["path"]).as_posix().split("/ey-deck-design/")[-1]
+                    for item in recovered_context["design_policy_manifest"]["files"]
+                },
+            )
+            self.assertIn("deck_design_memory", recovered_context)
+            artifact = project / "svg_working" / "S01" / "A.svg"
+            artifact.parent.mkdir(parents=True, exist_ok=True)
+            artifact.write_text(svg(), encoding="utf-8")
+            record_page_author_result(text, project, json.dumps({
+                "status": "COMPLETE",
+                "route": "page-svg-authoring",
+                "artifact_path": str(artifact.resolve()),
+            }))
+            self.assertEqual(directive(text, project)[0], "PREPARE_VISUAL_QA")
+            with mock.patch.dict(os.environ, {"EY_PREVIEW_RENDERER": str(FAKE_RENDERER)}):
+                ensure_preview_single(
+                    project,
+                    "S01",
+                    "A",
+                    copy_contract=page_visible_copy_contract(project, "S01"),
+                    prevalidated_source_hash=sha256(artifact),
+                )
+            self.assertEqual(directive(text, project)[0], "REVIEW_VISUAL_QA")
+            qa_directive = directive_payload(text, project, CONTROLLER)
+            self.assertEqual(
+                qa_directive["route"],
+                "$ey-deck-design / Embedded PPT Master / Independent Visual QA",
+            )
+            self.assertEqual(qa_directive["qa_scope"], "single-candidate-only")
+            blocked_qa = record_visual_qa(project, pages[0], "A", json.dumps({
+                "status": "BLOCKED",
+                "route": "independent-visual-qa",
+                "scope": "single-candidate-only",
+                "composition_fidelity": "BLOCKED",
+                "focal_hierarchy": "PASS",
+                "data_story": "PASS",
+                "brand_expression": "PASS",
+                "issue_codes": ["composition-fidelity"],
+            }))
+            self.assertEqual(
+                blocked_qa["issues"],
+                ["Rendered candidate does not faithfully realize its persisted composition decision."],
+            )
+            repair_payload = directive_payload(text, project, CONTROLLER)
+            self.assertEqual(repair_payload["action"], "REPAIR_VISUAL_QA")
+            self.assertIn("repair-visual-qa", repair_payload["commands"]["run"])
+            Path(repair_payload["visual_qa_receipt"]).unlink()
+            record_visual_qa(project, pages[0], "A", json.dumps({
+                "status": "PASS",
+                "route": "independent-visual-qa",
+                "scope": "single-candidate-only",
+                "composition_fidelity": "PASS",
+                "focal_hierarchy": "PASS",
+                "data_story": "PASS",
+                "brand_expression": "PASS",
+                "issue_codes": [],
+            }))
+            self.assertEqual(directive(text, project)[0], "PREPARE_PAGE_DESIGN")
+            awaiting = text.replace("- Status: Content locked", "- Status: Awaiting SVG decision")
+            framework_path.write_text(awaiting, encoding="utf-8")
+            self.assertTrue(page_author_completion_valid(project, "S01", "A"))
+
+    def test_visual_qa_rejects_ab_composition_comparison(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project = Path(tmp)
+            framework_path = setup_locked(project)
+            page = page_entries(framework_path.read_text(encoding="utf-8"))[0]
+            with self.assertRaisesRegex(ValueError, "unsupported fields"):
+                record_visual_qa(project, page, "A", json.dumps({
+                    "status": "PASS",
+                    "route": "independent-visual-qa",
+                    "scope": "single-candidate-only",
+                    "composition_fidelity": "PASS",
+                    "focal_hierarchy": "PASS",
+                    "data_story": "PASS",
+                    "brand_expression": "PASS",
+                    "issue_codes": [],
+                    "ab_distinction": "PASS",
+                }))
+
+    def test_visual_qa_rejects_cross_candidate_issue_text(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project = Path(tmp)
+            framework_path = setup_locked(project)
+            page = page_entries(framework_path.read_text(encoding="utf-8"))[0]
+            with self.assertRaisesRegex(ValueError, "unsupported fields"):
+                record_visual_qa(project, page, "A", json.dumps({
+                    "status": "BLOCKED",
+                    "route": "independent-visual-qa",
+                    "scope": "single-candidate-only",
+                    "composition_fidelity": "BLOCKED",
+                    "focal_hierarchy": "PASS",
+                    "data_story": "PASS",
+                    "brand_expression": "PASS",
+                    "issue_codes": ["composition-fidelity"],
+                    "issues": ["Candidate A is compositionally too similar to candidate B."],
+                }))
+
     def test_initial_authoring_mode_mapping(self) -> None:
         self.assertEqual(initial_authoring_mode("Simplified", "Standard content"), "Simplified")
         self.assertEqual(initial_authoring_mode("Standard", "Cover"), "Simplified")

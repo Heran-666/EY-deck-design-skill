@@ -30,17 +30,22 @@ Use project mode only to initialize new pages. Treat each page's effective `Auth
 
 For `Simplified`:
 
-1. Generate and preflight only internal version `A`.
-2. Render and inspect one preview.
-3. Show the preview without exposing an unnecessary option label.
-4. Require explicit user confirmation of A or a targeted revision request.
+1. Persist A's Design Decision.
+2. Generate and preflight only internal version `A`.
+3. Run independent single-candidate Visual QA.
+4. Show the preview without exposing an unnecessary option label.
+5. Require explicit user confirmation of A or a targeted revision request.
 
 For `Standard`:
 
-1. Generate and preflight A and B independently from the same packet.
-2. Render and inspect both previews at equal scale.
-3. Show A and B together.
-4. Require explicit selection of A or B, or a targeted revision request.
+1. Persist a candidate-specific Design Decision for A, then for B.
+2. Generate and preflight A and B from the same locked content packet.
+3. Run independent single-candidate Visual QA for each; never compare their distinctness in QA.
+4. Show A and B together at equal scale.
+5. Require explicit selection of A or B, or a targeted revision request.
+
+Different A/B composition families remain useful creative guidance only.
+Identical candidates or weak difference evidence are non-blocking advisories.
 
 Set the page to `Awaiting SVG decision` after its required initial presentation. On confirmation or selection, copy the confirmed version to the canonical SVG, record the page mode and presentation evidence in the SVG decision receipt, and set `Confirmed version`.
 

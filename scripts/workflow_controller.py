@@ -16,6 +16,7 @@ from framework_lib import PageEntry, h2_section, line_fields, page_entries, repl
 from preview_renderer import (  # noqa: F401
     PreviewError,
     ensure_preview_pair,
+    ensure_preview_single,
     preview_paths,
     preview_runtime_errors,
     preview_runtime_path,
@@ -37,6 +38,7 @@ from workflow_authoring import *  # noqa: F401,F403
 from workflow_content import *  # noqa: F401,F403
 from workflow_directives import *  # noqa: F401,F403
 from workflow_doctor import export_runtime_binding, preview_failure_issue, run_doctor  # noqa: F401
+from workflow_design import *  # noqa: F401,F403
 from workflow_export import *  # noqa: F401,F403
 from workflow_handoff import *  # noqa: F401,F403
 from workflow_io import *  # noqa: F401,F403

@@ -5,10 +5,24 @@ Use this internal contract only when the controller emits `GENERATE_SVG_A`,
 mode, one packet path/hash, and one exact artifact path. Generate only the
 requested version; do not infer that B is required for a `Simplified` page.
 
-Read the complete packet once. Preserve every approved word, number, source,
-emphasis, semantic relationship, and fixed constraint. Choose the composition,
-geometry, hierarchy, typography, wrapping, grouping, spacing, and visual
-treatment needed to communicate the approved meaning.
+Read the complete packet and candidate-specific persisted Design Decision once.
+Preserve every approved word, number, source, emphasis, semantic relationship,
+and fixed constraint. Implement the committed composition family, focal
+mechanism, data encoding, EY gesture, density, and avoid list. Own construction,
+geometry, typography, wrapping, grouping, spacing, and fit; do not silently
+replace the design thesis. Return BLOCKED when the decision is incompatible
+with approved meaning or the bound template.
+
+For every normal Content page, the Embedded PPT Master Design Lead has already used
+[composition-and-data-visual-language.md](composition-and-data-visual-language.md)
+to select one suitable composition family and one signature EY gesture. The SVG
+Producer realizes that recorded choice. Make the approved focal claim, question, or evidence the
+clear first read. Do not default to a full-width bordered insight banner,
+equal-width text columns, or a repeated card/panel grid. When approved numeric
+content expresses a trend, ranking, gap, part-to-whole, range, or threshold,
+encode that relationship as a truthful editable chart or data mark rather than
+rendering every value as an isolated line of text. Keep a reference table only
+when exact multi-field lookup is the page's approved job.
 
 Read the packet's bound structured-template prototype and use it as the literal
 starting SVG. Keep the root `data-pptx-master*` and `data-pptx-layout*`
@@ -66,15 +80,17 @@ external URLs, `@import`, `xml-stylesheet`, `foreignObject`, or runtime asset
 placeholders. An inert `class` used only as metadata is not a CSS dependency,
 but prefer stable `id` and `data-*` attributes for authoring semantics.
 
-For B on a `Standard` page, start independently from the same packet. Do not repair or polish A.
-Compare only after drafting to confirm the same approved meaning and at least
-one material design difference. For a revision, change only the recorded
+For B on a `Standard` page, implement B's own persisted Design Decision from the
+same locked packet; do not repair or polish A. A different family or focal
+mechanism is useful creative guidance, not a blocking requirement. For a revision, change only the recorded
 targets from the supplied base. If the resulting revision is byte-identical to
 its base, report it normally; the controller records a non-blocking advisory.
 
 Perform one normal authoring check for exact-copy bindings, typography-scale
 and content-frame fit, legibility, clipping, overlap, missing content, canvas,
-self-containment, and CSS-free export readiness. Fix detected issues once, then
+self-containment, CSS-free export readiness, one clear first read, truthful data
+geometry, and compliance with the chosen composition family and EY visual
+gesture. Fix detected issues once, then
 return exactly one terminal JSON object:
 
 ```json

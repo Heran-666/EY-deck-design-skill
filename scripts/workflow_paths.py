@@ -34,6 +34,18 @@ def authoring_packet_paths(project_dir: Path, slide_id: str) -> tuple[Path, Path
     return root / f"{slide_id}-authoring.md", root / f"{slide_id}-authoring.json"
 
 
+def design_context_path(project_dir: Path, slide_id: str, version: str) -> Path:
+    return project_dir / "working" / "packets" / f"{slide_id}-{version}-design-context.json"
+
+
+def design_decision_path(project_dir: Path, slide_id: str, version: str) -> Path:
+    return receipt_path(project_dir, slide_id, f"{version}-design-decision")
+
+
+def visual_qa_path(project_dir: Path, slide_id: str, version: str) -> Path:
+    return receipt_path(project_dir, slide_id, f"{version}-visual-qa")
+
+
 def revision_active_path(project_dir: Path, slide_id: str) -> Path:
     return receipt_path(project_dir, slide_id, "revision-active")
 

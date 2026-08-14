@@ -50,7 +50,7 @@ Use this structure for each locked page:
   - “<exact substring>”｜<关键重点 | 次级重点 | 对比重点 | 普通加粗>
 
 #### S03-B2｜<table block title>
-- Table purpose（Build-only）: <what the comparison must communicate>
+- Table purpose（Build-only）: <what exact multi-field lookup or comparison the table must support>
 
 | <exact header> | <exact header> |
 |---|---|
@@ -59,7 +59,7 @@ Use this structure for each locked page:
 - Table note: <optional exact copy>
 
 #### S03-B3｜<chart block title>
-- Chart purpose（Build-only）: <what the chart must communicate>
+- Chart purpose（Build-only）: <the relationship and audience-facing conclusion the chart must make visible>
 - Unit: <exact visible unit>
 - Period: <optional exact period>
 
@@ -85,6 +85,13 @@ Use this structure for each locked page:
 The page heading after `## <Slide ID>｜` must equal the exact `Title:` field. `Visual Direction Page type` must equal the matching `framework.md` Page type; the controller enforces both identities before content lock.
 
 Do not add a wireframe, coordinates, measurements, element table, spatial zones, named composition, or specific layout. Text, table, and chart blocks are content forms; combine them only when each has a distinct argumentative role. Protected pages live only in `framework.md` and `svg_output/`; do not add them to provisional or canonical `content.md`.
+
+Choose a table block only when the audience must inspect exact values across
+multiple fields. Choose a chart block when approved values support a trend,
+ranking, gap, part-to-whole, range, threshold, or another quantitative
+relationship that should be understood visually. Do not duplicate the same
+complete dataset as both a table and a chart on one page unless each has a
+separate approved argumentative role.
 
 `Agenda` is the one page-type-specific exception to the general content forms.
 Its `On-slide content` contains `Title` only, followed by one or more sequential
