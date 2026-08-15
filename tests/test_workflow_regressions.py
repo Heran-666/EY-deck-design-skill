@@ -113,27 +113,26 @@ class ControllerArchitectureTests(unittest.TestCase):
             "init",
             "materialize-protected",
             "next",
-            "page-author-result",
-            "prepare-design",
-            "prepare-authoring",
-            "prepare-visual-qa",
+            "ppt-master-result",
+            "prepare-ppt-master",
             "prepare-export",
             "present-ab",
             "present-single",
             "present-review",
             "present-revision",
             "repair-candidate",
-            "repair-visual-qa",
-            "record-design-decision",
             "request-revision",
             "resume-handoff",
             "resume-page-author",
             "set-output-filename",
             "update-page",
             "validate-review",
-            "visual-qa-result",
         }
         self.assertEqual(set(workflow_cli.COMMAND_HANDLERS), expected)
+
+    def test_unreachable_outer_ab_conflict_state_is_removed(self) -> None:
+        source = (SCRIPTS / "workflow_directives.py").read_text(encoding="utf-8")
+        self.assertNotIn("RESOLVE_AB_CONFLICT", source)
 
 
 def annotated_svg(contract: dict, *, extra: str = "") -> str:
@@ -362,7 +361,7 @@ class PagePreflightReuseTests(unittest.TestCase):
             }
             result = {
                 "status": "COMPLETE",
-                "route": "page-svg-authoring",
+                "route": "embedded-ppt-master-stage1",
                 "slide_id": "S01",
                 "authoring_mode": "Standard",
                 "version": "A",
@@ -372,8 +371,8 @@ class PagePreflightReuseTests(unittest.TestCase):
                 "packet_sha256": packet["packet_sha256"],
                 "visible_copy_contract_sha256": "copy-hash",
                 "template_structure_contract_sha256": "template-hash",
-                "preflight_gate": {
-                    "schema": controller.PAGE_PREFLIGHT_GATE_SCHEMA,
+                "acceptance_gate": {
+                    "schema": controller.STAGE1_ACCEPTANCE_SCHEMA,
                     "status": "PASS",
                     "artifact_sha256": artifact_sha256,
                     "visible_copy_contract_sha256": "copy-hash",
@@ -398,6 +397,19 @@ class PagePreflightReuseTests(unittest.TestCase):
                 self.assertTrue(
                     controller.page_author_completion_valid(project, "S01", "A")
                 )
+
+            result["acceptance_gate"]["artifact_sha256"] = "tampered"
+            with mock.patch.object(
+                authoring, "page_author_result_path", return_value=receipt
+            ), mock.patch.object(
+                authoring, "selected_working_path", return_value=artifact
+            ), mock.patch.object(
+                authoring, "current_authoring_packet", return_value=packet
+            ), mock.patch.object(authoring, "read_json", return_value=result):
+                self.assertFalse(
+                    controller.page_author_completion_valid(project, "S01", "A")
+                )
+            result["acceptance_gate"]["artifact_sha256"] = artifact_sha256
 
             artifact.write_text(
                 '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720"><rect/></svg>',
@@ -644,12 +656,12 @@ class PreviewRegressionTests(unittest.TestCase):
         issue = preview_failure_issue(RuntimeError("Chromium executable is missing"))
         self.assertEqual("PREVIEW_BROWSER_UNAVAILABLE", issue["code"])
 
-    def test_visible_copy_error_has_source_repair_scope(self) -> None:
+    def test_visible_copy_error_has_design_repair_scope(self) -> None:
         issue = preview_failure_issue(
             RuntimeError("visible-copy gate failed: S01-title outside the preview canvas")
         )
         self.assertEqual("PREVIEW_VISIBLE_COPY_BLOCKED", issue["code"])
-        self.assertEqual("source-svg", issue["repair_scope"])
+        self.assertEqual("design", issue["repair_scope"])
 
 
 class RecoveryRegressionTests(unittest.TestCase):
@@ -661,7 +673,6 @@ class RecoveryRegressionTests(unittest.TestCase):
 - Page type: Interpretation
 - Narrative role: Explain
 - Next connection: End
-- Review mode: Page-by-page
 - Status: SVG confirmed
 - Confirmed version: A
 - Confirmed decisions: Approved
@@ -702,7 +713,7 @@ class DocumentationRegressionTests(unittest.TestCase):
             "which specific claim, evidence, question, conclusion, or implication",
             section,
         )
-        self.assertIn("Do not display `Review mode` or a separate `Protected status`", section)
+        self.assertIn("Do not display a separate `Protected status`", section)
 
     def test_local_markdown_links_resolve_from_their_document_directory(self) -> None:
         skill_root = Path(__file__).resolve().parents[1]

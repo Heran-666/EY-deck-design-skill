@@ -1,8 +1,7 @@
 # EY composition, data, and visual language
 
-Use this Embedded PPT Master design reference after page content and semantic
-Visual Direction are locked. It supplies a repertoire for the bounded Design
-Lead and SVG Producer actions; it is not a content schema, wireframe,
+Use this reference inside Embedded PPT Master Stage 1 after page content and
+semantic Visual Direction are locked. It is not a content schema, wireframe,
 coordinate plan, or set of additional PowerPoint Layouts. Keep concrete
 composition choices out of `content.md` and preserve the bound
 structured-template prototype.
@@ -197,6 +196,6 @@ do not place an icon above every heading as decoration.
 
 For a Standard page, a different suitable composition family or focal
 mechanism can make A/B choice more useful. This is creative guidance only. It
-is not a deterministic gate, and Independent Visual QA must not compare the
-candidates or block either one for similarity. Both candidates preserve the
+is not a deterministic gate, and internal visual QA must not block either
+candidate for similarity. Both candidates preserve the
 same approved meaning, exact visible copy, template contract, and data truth.

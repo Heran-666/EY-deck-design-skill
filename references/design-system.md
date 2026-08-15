@@ -1,6 +1,6 @@
 # EY page design principles
 
-This reference supplies EY policy to the Embedded PPT Master Design Lead and implementation constraints to its SVG Producer. The Design Lead owns concept and composition; the producer owns faithful construction and fit; Independent Visual QA owns the separate rendered review. Do not expand this into a wireframe, coordinate plan, construction manual, or compatibility specification.
+This reference supplies EY visual and typography policy to Embedded PPT Master Stage 1. PPT Master owns concept, composition, SVG construction, rendered visual QA, and internal repair. Do not expand content-facing Visual Direction into a wireframe, coordinate plan, or construction manual.
 
 ## Canvas and visual language
 
@@ -35,7 +35,7 @@ large unused right or lower zone around short 8 pt copy. Prefer, in order:
 4. add only a semantic device that explains a relationship, sequence,
    comparison, evidence status, or takeaway.
 
-Never add decorative filler or invent copy. The Stage 1 preflight rejects a
+Never add decorative filler or invent copy. Stage 1 acceptance rejects a
 normal Content-page 8 pt text block with four or fewer rendered lines unless
 the block carries an explicit `data-density-justification="dense-table"` or
 `data-density-justification="compact-matrix"` on itself or an ancestor. Use
@@ -81,12 +81,12 @@ For a `Simplified` page, produce one confident complete A solution. Do not lower
 For a `Standard` page, produce two complete interpretations from the same locked packet:
 
 - A: one confident complete solution.
-- B: another complete solution from its own persisted Design Decision, not a repair of A.
+- B: another complete solution from the same locked content, not a repair of A.
 
 Both preserve the same approved meaning and canvas. A different composition
 family or focal mechanism can improve the usefulness of the choice, but this
 remains advisory. B may report material differences; identical A/B bytes or
-insufficient difference evidence do not block authoring, Independent Visual
-QA, comparison, or user selection. In either mode, the controller owns the
+insufficient difference evidence do not block production, comparison, or user
+selection. In either mode, the controller owns the
 manifest, presentation, user decision, revisions, and handoff. See
 [authoring-modes.md](authoring-modes.md).

@@ -17,7 +17,10 @@ Record the answer as project-level `Requested authoring mode`. Materialize the e
 | `Standard` | every other normal page | `Standard` |
 | either | `Protected placeholder` | `Not applicable` |
 
-Use exact `Page type` values. Do not infer structural pages from titles. Treat closing, Q&A, appendix, and other unlisted page types as normal content pages unless the user explicitly changes their page mode.
+Use exact `Page type` values. Do not infer structural pages from titles. Only
+`Cover`, `Agenda`, `Section divider`, and `Protected placeholder` have special
+mode behavior; any other precise non-empty page type is valid and is treated as
+a normal content page unless the user explicitly changes its page mode.
 
 Apply this mapping to every deliverable type. Cover, Agenda, and Section divider
 pages always generate only A, regardless of the requested project mode. Agenda
@@ -30,17 +33,16 @@ Use project mode only to initialize new pages. Treat each page's effective `Auth
 
 For `Simplified`:
 
-1. Persist A's Design Decision.
-2. Generate and preflight only internal version `A`.
-3. Run independent single-candidate Visual QA.
-4. Show the preview without exposing an unnecessary option label.
-5. Require explicit user confirmation of A or a targeted revision request.
+1. Ask Embedded PPT Master to design, author, and internally review only version `A`.
+2. Accept A through the controller's locked-copy and artifact boundary.
+3. Show the preview without exposing an unnecessary option label.
+4. Require explicit user confirmation of A or a targeted revision request.
 
 For `Standard`:
 
-1. Persist a candidate-specific Design Decision for A, then for B.
-2. Generate and preflight A and B from the same locked content packet.
-3. Run independent single-candidate Visual QA for each; never compare their distinctness in QA.
+1. Ask Embedded PPT Master to produce complete A and B candidates from the same locked packet.
+2. Let PPT Master perform design, SVG construction, visual QA, and internal repair for each.
+3. Accept both through the same controller interface boundary.
 4. Show A and B together at equal scale.
 5. Require explicit selection of A or B, or a targeted revision request.
 
@@ -50,12 +52,12 @@ Identical candidates or weak difference evidence are non-blocking advisories.
 Set the page to `Awaiting SVG decision` after its required initial presentation. On confirmation or selection, copy the confirmed version to the canonical SVG, record the page mode and presentation evidence in the SVG decision receipt, and set `Confirmed version`.
 
 Process pages strictly by Slide ID. The controller never groups later pages with
-the first unfinished page, even when `Review mode` is `Batch`. Show and confirm
-the current page in its effective mode before advancing.
+the first unfinished page. Show and confirm the current page in its effective
+mode before advancing.
 
 ## Shared revision and QA rules
 
-For either active mode, generate every targeted revision from its controller-bound Base. Show Base and Rn together at equal scale. Allow the user to retain that displayed Base, confirm that displayed Rn, or request another targeted revision based on Rn. Accept no version outside the current request-bound pair, and reuse the unchanged hash-bound preflight, preview, and paired-presentation evidence when the Base is retained. Do not treat a revision comparison as a second creative option.
+For either active mode, generate every targeted revision from its controller-bound Base. Show Base and Rn together at equal scale. Allow the user to retain that displayed Base, confirm that displayed Rn, or request another targeted revision based on Rn. Accept no version outside the current request-bound pair, and reuse the unchanged hash-bound acceptance, preview, and paired-presentation evidence when the Base is retained. Do not treat a revision comparison as a second creative option.
 
 Keep the common quality baseline identical across modes: exact visible copy, data-copy bindings, typography scale, canvas and visibility, clipping and overlap, self-containment, rendered preview integrity, canonical hashes, confirmed export compatibility, PPTX package validity, and terminal-result integrity. Skip only B generation, A/B difference evidence, and A/B comparison for `Simplified` pages.
 

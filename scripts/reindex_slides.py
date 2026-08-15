@@ -166,6 +166,15 @@ def refresh_nested_receipt_hashes(
             if artifact.is_file():
                 payload["artifact_path"] = str(artifact.resolve())
                 payload["artifact_sha256"] = sha256(artifact)
+        acceptance = payload.get("acceptance_gate")
+        if isinstance(acceptance, dict):
+            acceptance["artifact_sha256"] = payload.get("artifact_sha256")
+            acceptance["visible_copy_contract_sha256"] = payload.get(
+                "visible_copy_contract_sha256"
+            )
+            acceptance["template_structure_contract_sha256"] = payload.get(
+                "template_structure_contract_sha256"
+            )
         write_json(path, payload)
 
     for path in receipts.glob("S*-protected.json"):

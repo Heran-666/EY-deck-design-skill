@@ -400,7 +400,7 @@ href="data:image/png;base64,AAAA"/>
                 """# Presentation Framework
 
 ## Current position
-- Framework version: 2.6
+- Framework version: 2.7
 - Workflow version: 3.8
 - Storyline version: 1.0
 - Output filename: EY-confirmed-export.pptx
@@ -428,7 +428,6 @@ href="data:image/png;base64,AAAA"/>
 - Narrative role: Open
 - Content scope: Title
 - Next connection: S02
-- Review mode: Page-by-page
 - Authoring mode: Simplified
 - Status: SVG confirmed
 - Confirmed decisions: None
@@ -441,7 +440,6 @@ href="data:image/png;base64,AAAA"/>
 - Narrative role: Explain
 - Content scope: Content
 - Next connection: None
-- Review mode: Page-by-page
 - Authoring mode: Standard
 - Status: SVG confirmed
 - Confirmed decisions: None
@@ -574,7 +572,7 @@ href="data:image/png;base64,AAAA"/>
                 """# Presentation Framework
 
 ## Current position
-- Framework version: 2.6
+- Framework version: 2.7
 - Workflow version: 3.9
 - Storyline version: 1.0
 - Output filename: Agenda-contract-integration.pptx
@@ -602,7 +600,6 @@ href="data:image/png;base64,AAAA"/>
 - Narrative role: Open
 - Content scope: Title
 - Next connection: S02
-- Review mode: Page-by-page
 - Authoring mode: Simplified
 - Status: SVG confirmed
 - Confirmed decisions: None
@@ -615,7 +612,6 @@ href="data:image/png;base64,AAAA"/>
 - Narrative role: Establish navigation
 - Content scope: Seven chapter labels
 - Next connection: None
-- Review mode: Page-by-page
 - Authoring mode: Simplified
 - Status: SVG confirmed
 - Confirmed decisions: None

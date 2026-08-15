@@ -59,7 +59,6 @@ PROHIBITED_PAGE_FIELDS = (
     "Confirmed version",
     "Final SVG",
     "Review status",
-    "Review mode",
     "Authoring mode",
     "Page objective",
     "Audience move",

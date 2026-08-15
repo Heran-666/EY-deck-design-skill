@@ -38,7 +38,6 @@ from workflow_authoring import *  # noqa: F401,F403
 from workflow_content import *  # noqa: F401,F403
 from workflow_directives import *  # noqa: F401,F403
 from workflow_doctor import export_runtime_binding, preview_failure_issue, run_doctor  # noqa: F401
-from workflow_design import *  # noqa: F401,F403
 from workflow_export import *  # noqa: F401,F403
 from workflow_handoff import *  # noqa: F401,F403
 from workflow_io import *  # noqa: F401,F403

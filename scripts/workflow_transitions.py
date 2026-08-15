@@ -18,18 +18,13 @@ from workflow_authoring import (
     current_authoring_packet,
     page_author_completion_valid,
     parse_terminal_json,
+    revision_presentation_path,
 )
 from workflow_content import content_section
 from workflow_copy_contract import visible_copy_errors
 from workflow_directives import directive
 from workflow_doctor import export_runtime_binding, run_doctor
-from workflow_design import (
-    DESIGN_MODULE_VERSION,
-    DESIGN_OWNER,
-    current_design_decision,
-    design_page_fingerprint,
-)
-from workflow_handoff import current_export, current_handoff_result
+from workflow_handoff import current_export, current_handoff_result, recorded_export
 from workflow_io import atomic_write, now, read_json, sha256, text_sha256, write_json
 from workflow_paths import (
     archive_items,
@@ -44,7 +39,7 @@ from workflow_spec import (
     LEGACY_MANAGED_START,
     MANAGED_END,
     MANAGED_START,
-    PAGE_PREFLIGHT_GATE_SCHEMA,
+    STAGE1_ACCEPTANCE_SCHEMA,
     WORKFLOW_VERSION,
 )
 from workflow_state import current_group, update_page
@@ -52,19 +47,29 @@ from workflow_templates import template_candidate_errors
 
 
 def record_handoff_result(text: str, project_dir: Path, raw: str) -> None:
-    action, _pages = directive(text, project_dir)
-    if action != "RUN_CONFIRMED_EXPORT":
-        raise ValueError(f"handoff result blocked: current action is {action}")
     incoming = parse_terminal_json(raw)
-    export = current_export(text, project_dir)
+    action, _pages = directive(text, project_dir)
+    allow_recorded_environment_block = (
+        action == "PREPARE_PPT_MASTER_EXPORT"
+        and incoming.get("status") == "BLOCKED"
+        and incoming.get("route") == "embedded-ppt-master-stage2"
+        and incoming.get("repair_scope") == "environment"
+    )
+    if action != "RUN_PPT_MASTER_EXPORT" and not allow_recorded_environment_block:
+        raise ValueError(f"handoff result blocked: current action is {action}")
+    export = (
+        current_export(text, project_dir)
+        if action == "RUN_PPT_MASTER_EXPORT"
+        else recorded_export(text, project_dir)
+    )
     manifest = read_json(Path(export["manifest_path"]))
-    preflight_errors = validate_terminal_result(manifest, incoming)
-    if preflight_errors:
-        raise ValueError("terminal-result preflight failed: " + "; ".join(preflight_errors))
+    result_errors = validate_terminal_result(manifest, incoming)
+    if result_errors:
+        raise ValueError("terminal-result validation failed: " + "; ".join(result_errors))
     status = str(incoming["status"])
     payload: dict[str, object] = {
         "status": status,
-        "route": "confirmed-svg-export",
+        "route": "embedded-ppt-master-stage2",
         "terminal_result": incoming,
         "svg_set_fingerprint": export["svg_set_fingerprint"],
         "export_manifest": export["manifest_path"],
@@ -86,30 +91,44 @@ def record_handoff_result(text: str, project_dir: Path, raw: str) -> None:
 
 def record_page_author_result(text: str, project_dir: Path, raw: str) -> None:
     action, selected = directive(text, project_dir)
-    if action not in {"GENERATE_SVG_A", "GENERATE_SVG_B", "GENERATE_SVG_REVISION"} or len(selected) != 1:
-        raise ValueError(f"page authoring result blocked: current action is {action}")
+    if action not in {"RUN_PPT_MASTER_A", "RUN_PPT_MASTER_B", "RUN_PPT_MASTER_REVISION"} or len(selected) != 1:
+        raise ValueError(f"PPT Master Stage 1 result blocked: current action is {action}")
     page = selected[0]
     version = author_version_for_action(action, project_dir, page)
     packet = current_authoring_packet(project_dir, page.slide_id)
     packet_page_matches = bool(
-        packet
-        and (
-            packet.get("framework_design_fingerprint") == design_page_fingerprint(page)
-            if isinstance(packet.get("design_policy_manifest"), dict)
-            else packet.get("framework_page_sha256") == text_sha256(page.text)
-        )
+        packet and packet.get("framework_page_sha256") == text_sha256(page.text)
     )
     if not packet or not packet_page_matches:
         raise ValueError("run controller next to materialize the current hash-bound page packet first")
     result = parse_terminal_json(raw)
-    if result.get("route") != "page-svg-authoring":
-        raise ValueError("page authoring terminal result route must be page-svg-authoring")
+    if result.get("route") != "embedded-ppt-master-stage1":
+        raise ValueError("PPT Master Stage 1 terminal result route must be embedded-ppt-master-stage1")
     status = result.get("status")
     if status not in {"COMPLETE", "BLOCKED"}:
-        raise ValueError("page authoring terminal result status must be COMPLETE or BLOCKED")
+        raise ValueError("PPT Master Stage 1 terminal result status must be COMPLETE or BLOCKED")
+    allowed = (
+        {"status", "route", "artifact_path", "material_differences"}
+        if status == "COMPLETE"
+        else {
+            "status",
+            "route",
+            "stage",
+            "reason",
+            "repair_scope",
+            "resume_from",
+            "slide_ids",
+        }
+    )
+    unexpected = sorted(set(result) - allowed)
+    if unexpected:
+        raise ValueError(
+            "PPT Master Stage 1 terminal result has unsupported fields: "
+            + ", ".join(unexpected)
+        )
     payload: dict[str, object] = {
         "status": status,
-        "route": "page-svg-authoring",
+        "route": "embedded-ppt-master-stage1",
         "terminal_result": result,
         "slide_id": page.slide_id,
         "authoring_mode": page.fields.get("Authoring mode"),
@@ -119,32 +138,18 @@ def record_page_author_result(text: str, project_dir: Path, raw: str) -> None:
         "recorded_at": now(),
         "active": status == "BLOCKED",
     }
-    decision = current_design_decision(project_dir, page, version)
-    if isinstance(packet.get("design_policy_manifest"), dict):
-        if decision is None:
-            raise ValueError("page authoring requires the current persisted Design Decision")
-        decision_path = receipt_path(project_dir, page.slide_id, f"{version}-design-decision")
-        payload.update({
-            "design_owner": DESIGN_OWNER,
-            "design_module_version": DESIGN_MODULE_VERSION,
-            "design_producer": "ppt-master-svg-producer",
-            "design_decision_path": str(decision_path.resolve()),
-            "design_decision_sha256": sha256(decision_path),
-            "design_decision_fingerprint": decision["decision_fingerprint"],
-            "design_policy_fingerprint": packet["design_policy_fingerprint"],
-        })
     if status == "COMPLETE":
         artifact = Path(str(result.get("artifact_path", ""))).expanduser().resolve()
         expected = selected_working_path(project_dir, page.slide_id, version).resolve()
         if artifact != expected:
-            raise ValueError(f"page authoring artifact must be the requested path: {expected}")
+            raise ValueError(f"PPT Master Stage 1 artifact must be the requested path: {expected}")
         contract = packet.get("visible_copy_contract")
         problems = candidate_errors(artifact)
         problems.extend(template_candidate_errors(artifact, packet.get("template_binding")))
         if isinstance(contract, dict):
             problems.extend(visible_copy_errors(artifact, contract))
         else:
-            problems.append("authoring packet has no valid visible-copy contract")
+            problems.append("Stage 1 packet has no valid visible-copy contract")
         if problems:
             raise ValueError("; ".join(problems))
         if version == "B":
@@ -174,8 +179,8 @@ def record_page_author_result(text: str, project_dir: Path, raw: str) -> None:
         payload["template_structure_contract_sha256"] = packet[
             "template_structure_contract_sha256"
         ]
-        payload["preflight_gate"] = {
-            "schema": PAGE_PREFLIGHT_GATE_SCHEMA,
+        payload["acceptance_gate"] = {
+            "schema": STAGE1_ACCEPTANCE_SCHEMA,
             "status": "PASS",
             "artifact_sha256": artifact_sha256,
             "visible_copy_contract_sha256": packet["visible_copy_contract_sha256"],
@@ -194,8 +199,8 @@ def record_page_author_result(text: str, project_dir: Path, raw: str) -> None:
             raise ValueError(
                 "page BLOCKED requires non-empty string fields and this slide_id only"
             )
-        if result.get("repair_scope") not in {"source-svg", "user-decision", "environment"}:
-            raise ValueError("page BLOCKED repair_scope must be source-svg, user-decision, or environment")
+        if result.get("repair_scope") not in {"design", "content", "environment"}:
+            raise ValueError("PPT Master Stage 1 BLOCKED repair_scope must be design, content, or environment")
         payload.update(required)
         payload["slide_ids"] = slide_ids
     write_json(page_author_result_path(project_dir, page.slide_id, version), payload)
@@ -210,7 +215,7 @@ def resume_page_author(
 ) -> str:
     action, selected = directive(text, project_dir)
     if action != "RESOLVE_PAGE_AUTHOR_BLOCK" or [page.slide_id for page in selected] != [slide_id]:
-        raise ValueError(f"page authoring resume blocked: current action is {action}")
+        raise ValueError(f"PPT Master Stage 1 resume blocked: current action is {action}")
     result = active_page_author_block(project_dir, slide_id) or {}
     result_path = page_author_result_path(project_dir, slide_id, str(result.get("version", "")))
     if result.get("repair_scope") == "environment":
@@ -221,8 +226,9 @@ def resume_page_author(
             selected_working_path(project_dir, slide_id, str(result.get("version", ""))),
         ])
         return text
-    if scope not in {"design", "content"} or not note:
-        raise ValueError("source/user recovery requires --scope design|content and --note")
+    expected_scope = result.get("repair_scope")
+    if scope != expected_scope or scope not in {"design", "content"} or not note:
+        raise ValueError(f"PPT Master recovery requires --scope {expected_scope} and --note")
     receipts_dir = project_dir / "working" / "receipts"
     page_receipts = list(receipts_dir.glob(f"{slide_id}-*.json"))
     if scope == "design":
@@ -231,7 +237,6 @@ def resume_page_author(
         project_dir / "svg_working" / slide_id,
         project_dir / "svg_output" / f"{slide_id}.svg",
         *authoring_packet_paths(project_dir, slide_id),
-        *list((project_dir / "working" / "packets").glob(f"{slide_id}-*-design-context.json")),
         *page_receipts,
     ])
     target_state = "Content locked" if scope == "design" else "Content reviewing"
@@ -265,14 +270,17 @@ def repair_candidate(
     group = current_group(text)
     if slide_id not in {item.slide_id for item in group}:
         raise ValueError(f"{slide_id} is not in the active page group")
-    allowed_versions = {"A"} if page.fields.get("Authoring mode") == "Simplified" else {"A", "B"}
+    revision = active_revision(project_dir, slide_id)
+    allowed_versions = (
+        {str(revision.get("revision_id"))}
+        if revision
+        else ({"A"} if page.fields.get("Authoring mode") == "Simplified" else {"A", "B"})
+    )
     if version not in allowed_versions:
-        allowed = "A" if allowed_versions == {"A"} else "A or B"
+        allowed = ", ".join(sorted(allowed_versions))
         raise ValueError(f"candidate repair version must be {allowed} for this page mode")
     if not note.strip():
         raise ValueError("candidate repair requires a non-empty defect note")
-    if active_revision(project_dir, slide_id):
-        raise ValueError(f"{slide_id} already has an active user revision")
     if not page_author_completion_valid(project_dir, slide_id, version):
         raise ValueError(f"{slide_id} {version} has no valid candidate to repair")
 
@@ -282,19 +290,25 @@ def repair_candidate(
         page_author_result_path(project_dir, slide_id, version),
         preview_png,
         preview_receipt,
-        receipt_path(project_dir, slide_id, f"{version}-visual-qa"),
-        receipt_path(
-            project_dir,
-            slide_id,
-            "single-presentation"
-            if page.fields.get("Authoring mode") == "Simplified"
-            else "ab-presentation",
+        (
+            revision_presentation_path(project_dir, slide_id, version)
+            if revision
+            else receipt_path(
+                project_dir,
+                slide_id,
+                "single-presentation"
+                if page.fields.get("Authoring mode") == "Simplified"
+                else "ab-presentation",
+            )
         ),
     ])
     text = update_page(
         text,
         slide_id,
-        {"Status": "Content locked", "Confirmed version": "Pending"},
+        {
+            "Status": "Awaiting SVG decision" if revision else "Content locked",
+            "Confirmed version": "Pending",
+        },
     )
     write_json(receipt_path(project_dir, slide_id, f"{version}-candidate-repair"), {
         "slide_id": slide_id,
@@ -345,7 +359,6 @@ def resume_handoff(text: str, project_dir: Path, pages: list[str], note: str | N
                 project_dir / "svg_working" / slide_id,
                 canonical,
                 *authoring_packet_paths(project_dir, slide_id),
-                *list((project_dir / "working" / "packets").glob(f"{slide_id}-*-design-context.json")),
                 *page_receipts,
             ])
             target_state = "Content reviewing" if scope == "user-decision" else "Content locked"
@@ -371,9 +384,8 @@ def managed_agents_block(controller: Path, skill_root: Path) -> str:
 
 Read `{skill_root / 'SKILL.md'}` once. On entry, re-entry, post-compaction, or uncertain state, run
 `python3 "{controller}" next --project-dir . --format json`; follow only its action,
-`command_when`, and the condition-matching command data. Treat emitted design-context,
-design-policy, Design Decision, deck-memory, preview, and receipt paths/hashes as the recovery
-authority; never reconstruct design rules from conversation memory. A successful controller command already returns the next directive. Never edit
+`command_when`, and the condition-matching command data. Treat emitted locked-content packets,
+candidate paths, previews, manifests, and receipt hashes as the recovery authority. A successful controller command already returns the next directive. Never edit
 workflow state manually or create a PPTX here. Record Page SVG and isolated Stage 2 terminal JSON
 with the controller command before continuing.
 {MANAGED_END}'''
@@ -424,7 +436,6 @@ def reopen_pages(
             project_dir / "svg_working" / slide_id,
             project_dir / "svg_output" / f"{slide_id}.svg",
             *authoring_packet_paths(project_dir, slide_id),
-            *list((project_dir / "working" / "packets").glob(f"{slide_id}-*-design-context.json")),
             *page_receipts,
         ])
         target_state = "Content locked" if scope == "design" else "Content reviewing"

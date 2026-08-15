@@ -25,7 +25,7 @@ from workflow_preview_evidence import ab_presentation_valid, single_presentation
 from workflow_protected import protected_canonical_evidence_valid
 from workflow_spec import (
     ACTION_EVENT,
-    PAGE_PREFLIGHT_GATE_SCHEMA,
+    STAGE1_ACCEPTANCE_SCHEMA,
     PAGE_STATES,
     TERMINAL_STATES,
 )
@@ -80,7 +80,7 @@ def artifact_errors(text: str, project_dir: Path) -> list[str]:
                 versions = ("A",) if page.fields.get("Authoring mode") == "Simplified" else ("A", "B")
                 for version in versions:
                     if not page_author_completion_valid(project_dir, page.slide_id, version):
-                        errors.append(f"{page.slide_id} {version} has no valid COMPLETE authoring result")
+                        errors.append(f"{page.slide_id} {version} has no valid COMPLETE PPT Master Stage 1 result")
                 if page.fields.get("Authoring mode") == "Simplified":
                     single_errors, _ = validate_single(project_dir, page.slide_id)
                     errors.extend(single_errors)
@@ -128,7 +128,7 @@ def artifact_errors(text: str, project_dir: Path) -> list[str]:
                 and not migrated_decision
                 and not page_author_completion_valid(project_dir, page.slide_id, confirmed)
             ):
-                errors.append(f"{page.slide_id} confirmed SVG has no valid COMPLETE authoring result")
+                errors.append(f"{page.slide_id} confirmed SVG has no valid COMPLETE PPT Master Stage 1 result")
             try:
                 selected_path = selected_working_path(project_dir, page.slide_id, confirmed or "")
             except ValueError as exc:
@@ -163,8 +163,8 @@ def artifact_errors(text: str, project_dir: Path) -> list[str]:
                     if selected_path is not None and selected_path.is_file():
                         if decision_receipt.get("confirmed_sha256") != sha256(selected_path):
                             errors.append(f"{page.slide_id} confirmed working SVG changed after decision")
-                    if decision_receipt.get("source_preflight_gate") != PAGE_PREFLIGHT_GATE_SCHEMA:
-                        # Legacy canonical evidence predates reusable preflight
+                    if decision_receipt.get("source_acceptance_gate") != STAGE1_ACCEPTANCE_SCHEMA:
+                        # Legacy canonical evidence predates reusable Stage 1 acceptance
                         # receipts and therefore retains the former deep audit.
                         errors.extend(candidate_errors(final_path))
                 except ValueError as exc:

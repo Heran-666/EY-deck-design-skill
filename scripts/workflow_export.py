@@ -10,7 +10,7 @@ from pathlib import Path
 
 from framework_lib import page_entries
 from workflow_io import read_json, sha256, text_sha256, write_json
-from workflow_paths import export_root
+from workflow_paths import export_preparation_path, export_root
 from workflow_runtime import stage2_runtime_path, validate_stage2_runtime
 from workflow_templates import (
     STRUCTURED_EXPORT_SCHEMA,
@@ -309,7 +309,9 @@ def prepare_export_workspace(
         },
     }
     write_json(manifest_path, manifest)
-    return prepared_payload(plan, sha256(manifest_path))
+    prepared = prepared_payload(plan, sha256(manifest_path))
+    write_json(export_preparation_path(project_dir), prepared)
+    return prepared
 
 
 def inspect_export_workspace(
@@ -364,7 +366,7 @@ def inspect_export_workspace(
         or exporter.get("runner_path") != str(EXPORT_RUNNER.resolve())
         or exporter.get("runner_sha256") != sha256(EXPORT_RUNNER)
     ):
-        errors.append("EY confirmed-export runner binding is missing or stale")
+        errors.append("Embedded PPT Master Stage 2 runner binding is missing or stale")
     terminal = manifest.get("terminal_result_contract")
     terminal_fields = terminal if isinstance(terminal, dict) else {}
     validator = Path(str(terminal_fields.get("validator_path", "")))

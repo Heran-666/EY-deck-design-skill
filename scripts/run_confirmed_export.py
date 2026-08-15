@@ -46,7 +46,7 @@ def blocked(
 ) -> dict[str, object]:
     return {
         "status": "BLOCKED",
-        "route": "confirmed-svg-export",
+        "route": "embedded-ppt-master-stage2",
         "stage": stage,
         "slide_ids": slide_ids,
         "reason": reason,
@@ -380,7 +380,7 @@ def execute(manifest_path: Path, expected_manifest_sha256: str) -> dict[str, obj
         manifest,
         {
             "status": "COMPLETE",
-            "route": "confirmed-svg-export",
+            "route": "embedded-ppt-master-stage2",
             "artifact_path": str(output),
         },
     )
@@ -396,7 +396,7 @@ def main() -> int:
     except (KeyError, OSError, ValueError, json.JSONDecodeError) as exc:
         result = {
             "status": "BLOCKED",
-            "route": "confirmed-svg-export",
+            "route": "embedded-ppt-master-stage2",
             "stage": "handoff",
             "slide_ids": ["unknown"],
             "reason": str(exc),

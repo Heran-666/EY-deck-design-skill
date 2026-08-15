@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Hash-bound page-authoring packets, receipts, and comparison evidence."""
+"""Hash-bound Stage 1 candidate packets, receipts, and comparison evidence."""
 
 from __future__ import annotations
 
@@ -13,17 +13,9 @@ from framework_lib import PageEntry, h2_section, line_fields, page_entries
 from svg_boundary import candidate_errors, svg_canvas
 from workflow_content import content_section
 from workflow_copy_contract import visible_copy_contract, visible_copy_errors
-from workflow_design import (
-    DESIGN_MODULE_VERSION,
-    DESIGN_OWNER,
-    current_design_decision,
-    design_page_fingerprint,
-    design_policy_manifest,
-)
 from workflow_io import atomic_write, now, read_json, sha256, text_sha256, write_json
 from workflow_paths import (
     authoring_packet_paths,
-    design_decision_path,
     page_author_result_path,
     receipt_path,
     revision_active_path,
@@ -31,7 +23,7 @@ from workflow_paths import (
     working_paths,
 )
 from workflow_preview_evidence import presentation_preview_errors
-from workflow_spec import PAGE_PREFLIGHT_GATE_SCHEMA
+from workflow_spec import STAGE1_ACCEPTANCE_SCHEMA
 from workflow_templates import page_template_binding, template_candidate_errors
 
 
@@ -100,25 +92,13 @@ def current_authoring_packet(project_dir: Path, slide_id: str) -> dict | None:
         or payload.get("visible_copy_contract") != contract
     ):
         return None
-    policy = payload.get("design_policy_manifest")
-    if isinstance(policy, dict):
-        try:
-            if policy != design_policy_manifest():
-                return None
-        except (OSError, ValueError):
-            return None
     return payload
 
 
 def authoring_packet_valid(project_dir: Path, page: PageEntry) -> bool:
     packet = current_authoring_packet(project_dir, page.slide_id)
     framework_matches = bool(
-        packet
-        and (
-            packet.get("framework_design_fingerprint") == design_page_fingerprint(page)
-            if isinstance(packet.get("design_policy_manifest"), dict)
-            else packet.get("framework_page_sha256") == text_sha256(page.text)
-        )
+        packet and packet.get("framework_page_sha256") == text_sha256(page.text)
     )
     return bool(
         packet
@@ -171,7 +151,7 @@ def page_author_completion_valid(project_dir: Path, slide_id: str, version: str)
     artifact_sha256 = sha256(artifact)
     base_valid = (
         result.get("status") == "COMPLETE"
-        and result.get("route") == "page-svg-authoring"
+        and result.get("route") == "embedded-ppt-master-stage1"
         and result.get("slide_id") == slide_id
         and result.get("version") == version
         and packet is not None
@@ -184,42 +164,23 @@ def page_author_completion_valid(project_dir: Path, slide_id: str, version: str)
         == packet.get("template_structure_contract_sha256")
         and packet_matches
     )
-    if base_valid and isinstance(packet.get("design_policy_manifest"), dict):
-        try:
-            current_page = next(
-                item
-                for item in page_entries((project_dir / "framework.md").read_text(encoding="utf-8"))
-                if item.slide_id == slide_id
-            )
-        except (OSError, StopIteration):
-            return False
-        decision = current_design_decision(project_dir, current_page, version)
-        canonical_decision_path = design_decision_path(project_dir, slide_id, version).resolve()
-        decision_path = Path(str(result.get("design_decision_path", ""))).resolve()
-        base_valid = bool(
-            decision
-            and decision_path == canonical_decision_path
-            and decision_path.is_file()
-            and result.get("design_decision_sha256") == sha256(decision_path)
-            and result.get("design_decision_fingerprint") == decision.get("decision_fingerprint")
-        )
     if not base_valid:
         return False
 
-    preflight = result.get("preflight_gate")
-    if isinstance(preflight, dict) and (
-        preflight.get("schema") == PAGE_PREFLIGHT_GATE_SCHEMA
-        and preflight.get("status") == "PASS"
-        and preflight.get("artifact_sha256") == artifact_sha256
-        and preflight.get("visible_copy_contract_sha256")
-        == packet.get("visible_copy_contract_sha256")
-        and preflight.get("template_structure_contract_sha256")
-        == packet.get("template_structure_contract_sha256")
-    ):
-        return True
+    acceptance = result.get("acceptance_gate")
+    if isinstance(acceptance, dict):
+        return bool(
+            acceptance.get("schema") == STAGE1_ACCEPTANCE_SCHEMA
+            and acceptance.get("status") == "PASS"
+            and acceptance.get("artifact_sha256") == artifact_sha256
+            and acceptance.get("visible_copy_contract_sha256")
+            == packet.get("visible_copy_contract_sha256")
+            and acceptance.get("template_structure_contract_sha256")
+            == packet.get("template_structure_contract_sha256")
+        )
 
     # Backward-compatible fallback for receipts created before reusable
-    # page-preflight evidence existed. New receipts take the hash-only path.
+    # Stage 1 acceptance evidence existed. New receipts take the hash-only path.
     return (
         not candidate_errors(artifact)
         and not visible_copy_errors(artifact, packet["visible_copy_contract"])
@@ -237,7 +198,18 @@ def active_page_author_block(project_dir: Path, slide_id: str) -> dict | None:
             result = read_json(path)
         except ValueError:
             continue
-        if result.get("status") == "BLOCKED" and result.get("active") is True:
+        required = ("stage", "reason", "resume_from")
+        if (
+            result.get("status") == "BLOCKED"
+            and result.get("active") is True
+            and result.get("route") == "embedded-ppt-master-stage1"
+            and result.get("repair_scope") in {"design", "content", "environment"}
+            and all(
+                isinstance(result.get(key), str) and result.get(key).strip()
+                for key in required
+            )
+            and result.get("slide_ids") == [slide_id]
+        ):
             candidates.append(result)
     if not candidates:
         return None
@@ -270,7 +242,7 @@ def validate_ab(project_dir: Path, slide_id: str) -> tuple[list[str], dict | Non
         if contract is not None and path.is_file():
             errors.extend(visible_copy_errors(path, contract))
         if len(errors) == before:
-            errors.append(f"{slide_id} {version} has no valid hash-bound preflight receipt")
+            errors.append(f"{slide_id} {version} has no valid hash-bound Stage 1 acceptance receipt")
     if errors:
         return errors, None
     a_hash, b_hash = sha256(a_path), sha256(b_path)
@@ -318,7 +290,7 @@ def validate_single(project_dir: Path, slide_id: str) -> tuple[list[str], dict |
         if contract is not None and a_path.is_file():
             errors.extend(visible_copy_errors(a_path, contract))
         if len(errors) == before:
-            errors.append(f"{slide_id} A has no valid hash-bound preflight receipt")
+            errors.append(f"{slide_id} A has no valid hash-bound Stage 1 acceptance receipt")
     if errors:
         return errors, None
     return errors, {"slide_id": slide_id, "a_sha256": sha256(a_path)}
@@ -350,7 +322,7 @@ def validate_revision(project_dir: Path, slide_id: str, request: dict) -> list[s
         if path.is_file():
             errors.extend(visible_copy_errors(path, contract))
         if len(errors) == before:
-            errors.append(f"{slide_id} {version} has no valid hash-bound preflight receipt")
+            errors.append(f"{slide_id} {version} has no valid hash-bound Stage 1 acceptance receipt")
     if errors:
         return errors
     if request.get("base_sha256") != sha256(base_path):
@@ -477,12 +449,11 @@ def ensure_authoring_packet(text: str, project_dir: Path, page: PageEntry) -> di
         raise ValueError(f"{page.slide_id} has no authorable template binding")
     contract_json = json.dumps(contract, ensure_ascii=False, indent=2)
     template_json = json.dumps(template_binding, ensure_ascii=False, indent=2)
-    policy = design_policy_manifest() if current_design_decision(project_dir, page, "A") else None
-    policy_json = json.dumps(policy, ensure_ascii=False, indent=2) if policy else "Not applicable (legacy workflow)"
     packet_text = (
-        f"# Locked Page SVG Authoring Packet｜{page.slide_id}\n\n"
-        "Use this exact packet for every requested candidate. Version-specific output paths and revision notes are "
-        "controller directives, not page-content memory. Every page-authored visible SVG text run must be bound "
+        f"# Locked Embedded PPT Master Stage 1 Packet｜{page.slide_id}\n\n"
+        "Use this exact packet for every requested candidate. Embedded PPT Master owns design, SVG production, "
+        "rendered visual QA, and internal repair. Version-specific output paths and revision notes are controller "
+        "directives, not page-content memory. Every page-authored visible SVG text run must be bound "
         "to exactly one approved item below with `data-copy-id`; inherited text marked "
         "`data-copy-scope=\"template-fixed\"` belongs to the template and must remain exact. "
         "Build-only text must never be visible. Text may be split into nested tspans inside one bound element or group. "
@@ -494,11 +465,6 @@ def ensure_authoring_packet(text: str, project_dir: Path, page: PageEntry) -> di
         + buffer.getvalue().strip()
         + "\n\n## Bound structured template\n\n```json\n"
         + template_json
-        + "\n```\n"
-        + "\n\n## Persisted design-policy snapshot\n\nThe candidate-specific Design Decision is supplied "
-        "separately by the controller and is the Embedded PPT Master SVG Producer's implementation brief. After context "
-        "compaction, recover it from the directive path/hash; never reconstruct it from conversation memory.\n\n```json\n"
-        + policy_json
         + "\n```\n"
         + "\n\n## Machine-enforced visible copy\n\n```json\n"
         + contract_json
@@ -518,23 +484,16 @@ def ensure_authoring_packet(text: str, project_dir: Path, page: PageEntry) -> di
         "template_structure_contract_sha256": template_binding["structure_contract_sha256"],
         "created_at": now(),
     }
-    if policy:
-        payload["design_owner"] = DESIGN_OWNER
-        payload["design_module_version"] = DESIGN_MODULE_VERSION
-        payload["design_producer"] = "ppt-master-svg-producer"
-        payload["design_policy_manifest"] = policy
-        payload["design_policy_fingerprint"] = policy["fingerprint"]
-        payload["framework_design_fingerprint"] = design_page_fingerprint(page)
     write_json(receipt_path_value, payload)
     return payload
 
 
 def author_version_for_action(action: str, project_dir: Path, page: PageEntry) -> str:
-    if action == "GENERATE_SVG_A":
+    if action == "RUN_PPT_MASTER_A":
         return "A"
-    if action == "GENERATE_SVG_B":
+    if action == "RUN_PPT_MASTER_B":
         return "B"
-    if action == "GENERATE_SVG_REVISION":
+    if action == "RUN_PPT_MASTER_REVISION":
         request = active_revision(project_dir, page.slide_id) or {}
         return str(request.get("revision_id", ""))
     raise ValueError(f"{action} is not a page-authoring action")

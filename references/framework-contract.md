@@ -2,7 +2,7 @@
 
 ## 1. Boundary and creation gate
 
-Create `framework.md` only after explicit approval of the complete Storyline. It owns durable project meaning, project-specific hard rules, the requested project authoring mode, Storyline intent and adjacency, each effective page authoring mode, review mode, page state, effective cross-page decisions, and unresolved items.
+Create `framework.md` only after explicit approval of the complete Storyline. It owns durable project meaning, project-specific hard rules, the requested project authoring mode, Storyline intent and adjacency, each effective page authoring mode, page state, effective cross-page decisions, and unresolved items.
 
 It must not contain generic workflow policy, exact approved slide copy/data, Visual Directions, standard artifact paths, receipts, review transcripts, rejected alternatives, or cached controller outputs. Those belong respectively to the Skill/controller, `content.md`, working evidence, or temporary conversation/intake notes.
 
@@ -15,8 +15,8 @@ Before approval, use optional `working/intake-summary.md`. After approval, merge
 
 ## Current position
 
-- Framework version: 2.6
-- Workflow version: 4.0
+- Framework version: 2.7
+- Workflow version: 4.1
 - Storyline version: 1.0
 - Output filename: <user-requested or deterministic plain filename ending in .pptx>
 
@@ -46,7 +46,6 @@ Before approval, use optional `working/intake-summary.md`. After approval, merge
 - Narrative role: <why this page exists>
 - Content scope: <compact scope, not final copy>
 - Next connection: <connection or None>
-- Review mode: <Page-by-page | Batch>
 - Authoring mode: <Simplified | Standard | Not applicable>
 - Status: <allowed state>
 - Confirmed decisions: <only durable decisions not already evident in content.md; or None>
@@ -81,13 +80,13 @@ Use only:
 5. `SVG confirmed`
 6. `Protected placeholder`
 
-The controller derives the workflow stage, Stage 1 subflow, active page, next action, artifact readiness, and paths. Stage 1 always selects the first non-terminal Slide ID and completes that page before moving forward; page type and `Review mode` never reorder production. Do not store derived state. `Reopened` is an event, not a state. Content-scope reopening returns to `Content reviewing`; design-scope reopening retains approved content and returns to `Content locked`.
+The controller derives the workflow stage, Stage 1 subflow, active page, next action, artifact readiness, and paths. Stage 1 always selects the first non-terminal Slide ID and completes that page before moving forward. Do not store derived state. `Reopened` is an event, not a state. Content-scope reopening returns to `Content reviewing`; design-scope reopening retains approved content and returns to `Content locked`.
 
 `Open items` must be `None` before content can lock. Keep `Narrative role`, `Next connection`, `Confirmed decisions`, and `Open items` within 500 characters; keep `Content scope` within 700 characters. Store a substantive `Next connection` only for a content page followed immediately by another content page; name the specific claim, evidence, question, conclusion, or implication that creates the transition. Use `None` for structural or protected pages, the last page, and any page followed by a Cover, Agenda, Section divider or chapter page, Ending or closing page, or Protected placeholder. Do not store the inverse relation. Replace superseded decisions instead of appending history.
 
 ## 4. Targeted loading
 
-For content review, controller `next` emits Project context, project-specific hard rules, the active Storyline entry, and compact adjacent context. Before SVG production it materializes a candidate-specific design-context packet containing the Embedded PPT Master design-module identity, the approved `content.md` section, policy manifest and fingerprint, durable design principles, adjacent-page context, and deck design memory. The Embedded PPT Master Design Lead's persisted Design Decision is a hash-bound receipt. Its SVG Producer reuses one page authoring packet and Layout while receiving the current candidate's decision path/hash. `next --format json` returns all paths and hashes needed to recover after context compaction without relying on conversation memory.
+For content review, controller `next` emits Project context, project-specific hard rules, the active Storyline entry, and compact adjacent context. Before Stage 1 it materializes one hash-bound packet containing the approved `content.md` section, visible-copy contract, page mode, adjacent-page context, project constraints, and bound template. Embedded PPT Master owns all design reasoning, SVG construction, and visual QA inside that packet boundary. `next --format json` returns the packet, requested artifact, preview, manifest, and receipt paths and hashes needed to recover after context compaction.
 
 Do not load the complete Storyline during ordinary page work.
 

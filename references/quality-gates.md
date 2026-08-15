@@ -6,17 +6,16 @@ Use this policy whenever the controller or export runner reports a failure.
 
 | Gate | Retain here | Exclude from this gate |
 |---|---|---|
-| Page preflight (`page-author-result`) | path and artifact identity; XML/root/canvas; self-containment and CSS-free boundary; exact visible-copy bindings; fixed typography scale; bound template root, fixed atoms, definitions, and placeholder contract | candidate count; A/B distinction; rendered bounds; user decision; deep native-PPTX compatibility; package checks |
-| Independent Visual QA | one candidate's rendered composition fidelity, focal hierarchy, data story, brand expression, and Design Decision fidelity | editing the SVG; comparing A/B; judging whether candidate compositions differ; user selection |
-| Browser preview | network isolation; font-ready rendering; exact DOM copy; computed visibility; non-empty and on-canvas bounds; equal-size PNGs; renderer/PNG/hash evidence | repeated XML/CSS/typography parsing when a current preflight receipt matches; subjective design judgment; native-PPTX compatibility |
-| Initial or revision presentation | mode-required single or A/B preview evidence; equal canonical canvas when comparing; targeted revision integrity; user-decision evidence; A/B hash and material-difference observations only for Standard pages | repeated page-preflight checks; content reapproval; Stage 2 compatibility |
+| Stage 1 acceptance (`ppt-master-result`) | requested path and artifact identity; XML/root/canvas; self-containment and CSS-free boundary; exact visible-copy bindings; fixed typography scale; bound template root, fixed atoms, definitions, and placeholder contract | PPT Master's internal design reasoning or visual QA; candidate count; A/B distinction; user decision; deep native-PPTX compatibility |
+| Browser preview | network isolation; font-ready rendering; exact DOM copy; computed visibility; non-empty and on-canvas bounds; equal-size PNGs; renderer/PNG/hash evidence | repeated XML/CSS/typography parsing when a current Stage 1 acceptance receipt matches; subjective design judgment; native-PPTX compatibility |
+| Initial or revision presentation | mode-required single or A/B preview evidence; equal canonical canvas when comparing; targeted revision integrity; user-decision evidence; A/B hash and material-difference observations only for Standard pages | repeated Stage 1 acceptance checks; content reapproval; Stage 2 compatibility |
 | Canonical handoff | exactly one confirmed SVG per page; page order; terminal states; confirmed/canonical/presentation hashes and receipts | design review; preview regeneration; candidate re-evaluation; deep SVG compatibility |
 | Confirmed SVG export | staged hashes and runtime; pre-normalization topology detection; isolated deterministic normalization; exact-copy and topology rechecks; typography; converter-critical geometry, paint, reference, image, text-frame, and metadata compatibility | semantic design or copy re-review; another user decision after a proven identity-preserving repair; valid contextual colors/fonts; canonical-spelling and portability advice; optional grouping/animation hints as blockers |
 | PPTX postflight and handoff | readable package; slide count; relationships; transition/animation OOXML; exported typography; required output; terminal-result integrity | upstream authoring, preview, candidate-decision, or semantic-design checks |
 
-Treat one current page-preflight receipt as sufficient evidence only when its
+Treat one current Stage 1 acceptance receipt as sufficient evidence only when its
 schema, artifact hash, packet hash, visible-copy-contract hash, and structured-template-contract hash match. If any
-bound value changes, rerun page preflight. Never reuse it across the confirmed
+bound value changes, rerun Stage 1 acceptance. Never reuse it across the confirmed
 export boundary.
 
 ## Hard blockers
@@ -44,12 +43,12 @@ normalization only when source bytes remain untouched, visible text remains
 exact, and the normalization receipt records the removed-attribute count and
 new working hash.
 
-Use `source-svg` only for a defect in the named SVG bytes, `user-decision` only for unresolved meaning or approval, and `environment` for missing/changing runtimes, validators, permissions, or dependencies.
+For Stage 1, use `design` for a candidate PPT Master must redesign, `content` for locked meaning that requires user approval, and `environment` for unavailable runtimes or permissions. Stage 2 retains `source-svg`, `user-decision`, and `environment` because it reports technical failures against confirmed inputs.
 
-For content-frame fit, use `source-svg` when the approved copy is sufficient
-and the remedy is 10 pt type, a smaller/recomposed container, or a semantic
-visual device. Use `user-decision` only when the page's approved argument is
-materially incomplete and must be reopened; never let page authoring pad copy.
+For Stage 1 content-frame fit, use `design` when the approved copy is sufficient
+and PPT Master can repair typography, container geometry, or composition. Use
+`content` only when the approved argument is materially incomplete and must be
+reopened; never let visual production pad copy.
 
 ## Non-blocking findings
 
@@ -66,11 +65,11 @@ Never reopen content or design solely for:
 Report these as `advisory` or `inherited`. `passed-with-warnings` still means the quality gate passed.
 Identical A/B artifacts or insufficient A/B difference evidence must still proceed to the
 equal-scale browser comparison and explicit user selection; they do not trigger
-`RESOLVE_AB_CONFLICT` or candidate repair by themselves. A revision identical to its bound
+candidate repair by itself. A revision identical to its bound
 base must likewise proceed to the equal-scale Base/Rn comparison and explicit user
 confirmation, with the identity recorded as an advisory.
 
-Keep A/B distinction and difference evidence advisory for `Standard` pages; it never blocks authoring, Independent Visual QA, comparison, or selection. Independent Visual QA reviews one candidate only. A `Simplified` page must still pass the same A preflight, browser visibility, explicit confirmation, canonical, export, and PPTX gates; skip only B and comparison-specific evidence.
+Keep A/B distinction and difference evidence advisory for `Standard` pages; it never blocks PPT Master production, comparison, or selection. A `Simplified` page must still pass the same A acceptance, browser visibility, explicit confirmation, canonical, export, and PPTX gates; skip only B and comparison-specific evidence.
 
 ## Interpretation safeguards
 

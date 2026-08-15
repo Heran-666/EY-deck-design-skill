@@ -53,7 +53,7 @@ def derived_phase(text: str) -> str:
     pages = page_entries(text)
     if unresolved(pages):
         return "Stage 1 — Sequential page loop"
-    return "Stage 2 — EY confirmed SVG export"
+    return "Stage 2 — Embedded PPT Master export"
 
 
 def phase_pages(pages: list[PageEntry], phase: str) -> list[PageEntry]:
@@ -68,7 +68,6 @@ def current_group(text: str) -> list[PageEntry]:
     remaining = unresolved(phase_pages(pages, phase))
     if not remaining:
         return []
-    # Page order is the production authority. Review-mode metadata may still
-    # guide how the user discusses content, but it never lets a later slide
-    # overtake or batch with the first unfinished slide.
+    # Page order is the production authority; a later slide never overtakes or
+    # batches with the first unfinished slide.
     return [remaining[0]]

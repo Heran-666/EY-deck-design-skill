@@ -40,12 +40,6 @@ from workflow_content import (
     review_receipt_path,
 )
 from workflow_directives import directive, directive_payload, print_directive
-from workflow_design import (
-    design_workflow_enabled,
-    ensure_design_context,
-    record_design_decision,
-    record_visual_qa,
-)
 from workflow_doctor import preview_failure_issue
 from workflow_export import prepare_export_workspace, validate_output_filename
 from workflow_handoff import output_filename
@@ -56,7 +50,6 @@ from workflow_paths import (
     receipt_path,
     revision_active_path,
     selected_working_path,
-    visual_qa_path,
     working_paths,
 )
 from workflow_preview_evidence import (
@@ -65,7 +58,7 @@ from workflow_preview_evidence import (
     single_presentation_valid,
 )
 from workflow_protected import materialize_protected_pages
-from workflow_spec import PAGE_PREFLIGHT_GATE_SCHEMA, PREPARE_AUTHORING_ACTIONS, WORKFLOW_VERSION
+from workflow_spec import STAGE1_ACCEPTANCE_SCHEMA, PREPARE_PPT_MASTER_ACTIONS, WORKFLOW_VERSION
 from workflow_state import update_page, update_page_title
 from workflow_transitions import (
     doctor_receipt_valid,
@@ -92,9 +85,8 @@ class CommandContext:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser()
     sub = parser.add_subparsers(dest='command', required=True)
-    for name in ('bootstrap', 'doctor', 'init', 'next', 'audit', 'prepare-design', 'record-design-decision', 'prepare-authoring', 'prepare-visual-qa', 'visual-qa-result', 'repair-visual-qa', 'prepare-export', 'validate-review', 'present-review', 'present-single', 'present-ab', 'repair-candidate', 'request-revision', 'present-revision', 'advance', 'update-page', 'set-output-filename', 'migrate', 'materialize-protected', 'page-author-result', 'resume-page-author', 'handoff-result', 'resume-handoff'):
+    for name in ('bootstrap', 'doctor', 'init', 'next', 'audit', 'prepare-ppt-master', 'prepare-export', 'validate-review', 'present-review', 'present-single', 'present-ab', 'repair-candidate', 'request-revision', 'present-revision', 'advance', 'update-page', 'set-output-filename', 'migrate', 'materialize-protected', 'ppt-master-result', 'resume-page-author', 'handoff-result', 'resume-handoff'):
         command = sub.add_parser(name)
-        command.add_argument('legacy_framework', nargs='?', type=Path, help=argparse.SUPPRESS)
         command.add_argument('--framework', dest='framework_option', type=Path)
         command.add_argument('--project-dir', type=Path, required=True)
         if name in {'bootstrap', 'doctor'}:
@@ -114,26 +106,19 @@ def build_parser() -> argparse.ArgumentParser:
             command.add_argument('--note', required=True)
         if name == 'repair-candidate':
             command.add_argument('--page', required=True)
-            command.add_argument('--version', choices=('A', 'B'), required=True)
+            command.add_argument('--version', required=True)
             command.add_argument('--note', required=True)
         if name == 'update-page':
             command.add_argument('--page', required=True)
             command.add_argument('--confirmed-decisions')
             command.add_argument('--open-items')
-            command.add_argument('--review-mode', choices=('Page-by-page', 'Batch'))
             command.add_argument('--authoring-mode', choices=('Simplified', 'Standard'))
             command.add_argument('--title')
         if name == 'set-output-filename':
             command.add_argument('--filename', required=True)
-        if name == 'prepare-authoring':
+        if name == 'prepare-ppt-master':
             command.add_argument('--page', required=True)
-        if name in {'prepare-design', 'prepare-visual-qa', 'repair-visual-qa'}:
-            command.add_argument('--page', required=True)
-        if name in {'record-design-decision', 'visual-qa-result'}:
-            source = command.add_mutually_exclusive_group(required=True)
-            source.add_argument('--result-json')
-            source.add_argument('--result-file', type=Path)
-        if name == 'page-author-result':
+        if name == 'ppt-master-result':
             source = command.add_mutually_exclusive_group(required=True)
             source.add_argument('--result-json')
             source.add_argument('--result-file', type=Path)
@@ -189,10 +174,6 @@ def handle_reopen(context: CommandContext) -> int:
 
 def handle_repair_candidate(context: CommandContext) -> int:
     args, project_dir, framework, text, controller = _unpack(context)
-    current_action, _selected = directive(text, project_dir)
-    if design_workflow_enabled(text) and current_action == 'REPAIR_VISUAL_QA':
-        print('Candidate repair blocked: use the emitted repair-visual-qa command for a Visual QA block')
-        return 1
     try:
         text = repair_candidate(text, project_dir, args.page, args.version, args.note)
         atomic_write(framework, text)
@@ -200,26 +181,6 @@ def handle_repair_candidate(context: CommandContext) -> int:
         print(f'Candidate repair blocked: {exc}')
         return 1
     print(f'Reopened {args.page} {args.version} for same-slot candidate repair.')
-    print_directive(text, project_dir, controller)
-    return 0
-
-
-def handle_repair_visual_qa(context: CommandContext) -> int:
-    args, project_dir, framework, text, controller = _unpack(context)
-    try:
-        action, page, version = _directive_version(text, project_dir)
-        if action != 'REPAIR_VISUAL_QA' or page.slide_id != args.page:
-            raise ValueError(f'current action is {action}')
-        qa = read_json(visual_qa_path(project_dir, page.slide_id, version))
-        issues = qa.get('issues')
-        if qa.get('status') != 'BLOCKED' or not isinstance(issues, list) or not issues:
-            raise ValueError('current Visual QA receipt has no controller-defined blocking issues')
-        text = repair_candidate(text, project_dir, page.slide_id, version, '; '.join(issues))
-        atomic_write(framework, text)
-    except (OSError, ValueError) as exc:
-        print(f'Visual QA repair blocked: {exc}')
-        return 1
-    print(f'Reopened {page.slide_id} {version} from controller-defined Visual QA issues.')
     print_directive(text, project_dir, controller)
     return 0
 
@@ -277,100 +238,24 @@ def handle_next(context: CommandContext) -> int:
     return 0
 
 
-def handle_prepare_authoring(context: CommandContext) -> int:
+def handle_prepare_ppt_master(context: CommandContext) -> int:
     args, project_dir, framework, text, controller = _unpack(context)
     action, selected = directive(text, project_dir)
-    if action not in PREPARE_AUTHORING_ACTIONS or [page.slide_id for page in selected] != [args.page]:
-        print(f'Authoring preparation blocked: current action is {action}')
+    if action not in PREPARE_PPT_MASTER_ACTIONS or [page.slide_id for page in selected] != [args.page]:
+        print(f'PPT Master preparation blocked: current action is {action}')
         return 1
     try:
-        generate_action = action.replace('PREPARE_', 'GENERATE_', 1)
-        version = author_version_for_action(generate_action, project_dir, selected[0])
+        run_action = PREPARE_PPT_MASTER_ACTIONS[action]
+        version = author_version_for_action(run_action, project_dir, selected[0])
         selected_working_path(project_dir, args.page, version).parent.mkdir(
             parents=True,
             exist_ok=True,
         )
         ensure_authoring_packet(text, project_dir, selected[0])
     except (OSError, ValueError) as exc:
-        print(f'Authoring preparation failed: {exc}')
+        print(f'PPT Master preparation failed: {exc}')
         return 1
-    print(f'Authoring packet prepared for {args.page}.')
-    print_directive(text, project_dir, controller)
-    return 0
-
-
-def _directive_version(text: str, project_dir: Path) -> tuple[str, PageEntry, str]:
-    payload = directive_payload(text, project_dir, Path(__file__).resolve())
-    pages = page_entries(text)
-    page = next(item for item in pages if item.slide_id == payload['pages'][0])
-    return str(payload['action']), page, str(payload.get('version', ''))
-
-
-def handle_prepare_design(context: CommandContext) -> int:
-    args, project_dir, framework, text, controller = _unpack(context)
-    try:
-        action, page, version = _directive_version(text, project_dir)
-        if action != 'PREPARE_PAGE_DESIGN' or page.slide_id != args.page:
-            raise ValueError(f'current action is {action}')
-        ensure_design_context(text, project_dir, page, version)
-    except (OSError, ValueError) as exc:
-        print(f'Design preparation blocked: {exc}')
-        return 1
-    print(f'Hash-bound design context prepared for {page.slide_id} {version}.')
-    print_directive(text, project_dir, controller)
-    return 0
-
-
-def handle_record_design_decision(context: CommandContext) -> int:
-    args, project_dir, framework, text, controller = _unpack(context)
-    try:
-        action, page, version = _directive_version(text, project_dir)
-        if action != 'PLAN_PAGE_DESIGN':
-            raise ValueError(f'current action is {action}')
-        raw = args.result_json if args.result_json is not None else args.result_file.read_text(encoding='utf-8')
-        record_design_decision(project_dir, page, version, raw)
-    except (OSError, ValueError) as exc:
-        print(f'Design decision rejected: {exc}')
-        return 1
-    print(f'Persisted Design Decision recorded for {page.slide_id} {version}.')
-    print_directive(text, project_dir, controller)
-    return 0
-
-
-def handle_prepare_visual_qa(context: CommandContext) -> int:
-    args, project_dir, framework, text, controller = _unpack(context)
-    try:
-        action, page, version = _directive_version(text, project_dir)
-        if action != 'PREPARE_VISUAL_QA' or page.slide_id != args.page:
-            raise ValueError(f'current action is {action}')
-        artifact = selected_working_path(project_dir, page.slide_id, version)
-        ensure_preview_single(
-            project_dir,
-            page.slide_id,
-            version,
-            copy_contract=page_visible_copy_contract(project_dir, page.slide_id),
-            prevalidated_source_hash=sha256(artifact),
-        )
-    except (OSError, PreviewError, ValueError) as exc:
-        print(f'Visual QA preview preparation blocked: {exc}')
-        return 1
-    print(f'Rendered single-candidate Visual QA preview for {page.slide_id} {version}.')
-    print_directive(text, project_dir, controller)
-    return 0
-
-
-def handle_visual_qa_result(context: CommandContext) -> int:
-    args, project_dir, framework, text, controller = _unpack(context)
-    try:
-        action, page, version = _directive_version(text, project_dir)
-        if action != 'REVIEW_VISUAL_QA':
-            raise ValueError(f'current action is {action}')
-        raw = args.result_json if args.result_json is not None else args.result_file.read_text(encoding='utf-8')
-        record_visual_qa(project_dir, page, version, raw)
-    except (OSError, ValueError) as exc:
-        print(f'Visual QA result rejected: {exc}')
-        return 1
-    print(f'Independent Visual QA result recorded for {page.slide_id} {version}.')
+    print(f'Locked Stage 1 packet prepared for Embedded PPT Master: {args.page}.')
     print_directive(text, project_dir, controller)
     return 0
 
@@ -388,7 +273,7 @@ def print_preview_blocks(
 def handle_prepare_export(context: CommandContext) -> int:
     args, project_dir, framework, text, controller = _unpack(context)
     action, selected = directive(text, project_dir)
-    if action != 'PREPARE_CONFIRMED_EXPORT':
+    if action != 'PREPARE_PPT_MASTER_EXPORT':
         print(f'Export preparation blocked: current action is {action}')
         return 1
     try:
@@ -418,15 +303,15 @@ def handle_validate_review(context: CommandContext) -> int:
     return 0
 
 
-def handle_page_author_result(context: CommandContext) -> int:
+def handle_ppt_master_result(context: CommandContext) -> int:
     args, project_dir, framework, text, controller = _unpack(context)
     try:
         raw_result = args.result_json if args.result_json is not None else args.result_file.read_text(encoding='utf-8')
         record_page_author_result(text, project_dir, raw_result)
     except (OSError, ValueError) as exc:
-        print(f'Page authoring result rejected: {exc}')
+        print(f'Embedded PPT Master Stage 1 result rejected: {exc}')
         return 1
-    print('Embedded PPT Master SVG Producer terminal result recorded.')
+    print('Embedded PPT Master Stage 1 terminal result recorded.')
     print_directive(text, project_dir, controller)
     return 0
 
@@ -437,9 +322,9 @@ def handle_resume_page_author(context: CommandContext) -> int:
         text = resume_page_author(text, project_dir, args.page, args.scope, args.note)
         atomic_write(framework, text)
     except (OSError, ValueError) as exc:
-        print(f'Page authoring recovery blocked: {exc}')
+        print(f'PPT Master Stage 1 recovery blocked: {exc}')
         return 1
-    print('Page authoring recovery state applied.')
+    print('PPT Master Stage 1 recovery state applied.')
     print_directive(text, project_dir, controller)
     return 0
 
@@ -452,7 +337,7 @@ def handle_handoff_result(context: CommandContext) -> int:
     except (OSError, ValueError) as exc:
         print(f'Handoff result rejected: {exc}')
         return 1
-    print('EY confirmed SVG export terminal result recorded.')
+    print('Embedded PPT Master Stage 2 terminal result recorded.')
     print_directive(text, project_dir, controller)
     return 0
 
@@ -538,10 +423,15 @@ def handle_present_single(context: CommandContext) -> int:
             )
         except (OSError, PreviewError, ValueError) as exc:
             issue: dict[str, object] = preview_failure_issue(exc)
-            issue.update({
-                'slide_id': page.slide_id,
-                'retry_command': command_line(controller, 'present-single', project_dir),
-            })
+            issue['slide_id'] = page.slide_id
+            if issue.get('repair_scope') == 'design':
+                issue['repair_command'] = command_line(
+                    controller, 'repair-candidate', project_dir,
+                    '--page', page.slide_id, '--version', 'A',
+                    '--note', '<PREVIEW_DEFECT>',
+                )
+            else:
+                issue['retry_command'] = command_line(controller, 'present-single', project_dir)
             if issue.get('code') == 'PREVIEW_BROWSER_SANDBOX_BLOCKED':
                 issue['approval_prefix'] = ['python3', str(controller)]
             print('Single-option presentation blocked: ' + json.dumps(
@@ -565,16 +455,11 @@ def handle_present_single(context: CommandContext) -> int:
         print(f'## {page.slide_id}｜Single design confirmation\n')
         print(f'![{page.slide_id} PNG preview](<{a_png}>)\n')
         print(f'Original SVG: [A.svg](<{a_path}>)\n')
-        if design_workflow_enabled(text):
-            print(
-                'Independent Visual QA has already passed for this exact rendered candidate. '
-                'Ask the user to confirm it or request a targeted revision.\n'
-            )
-        else:
-            print(
-                'Before sending this preview to the user, inspect it. If it has a defect, run '
-                'repair-candidate for A. Otherwise ask the user to confirm it or request a targeted revision.\n'
-            )
+        print(
+            'Embedded PPT Master reports this candidate ready after its internal visual QA. '
+            'Inspect the exact preview before sending it; if a visible defect remains, run '
+            'repair-candidate for A. Otherwise ask the user to confirm it or request a targeted revision.\n'
+        )
     return 0
 
 
@@ -598,7 +483,18 @@ def handle_present_ab(context: CommandContext) -> int:
             previews = ensure_preview_pair(project_dir, page.slide_id, ('A', 'B'), copy_contract=page_visible_copy_contract(project_dir, page.slide_id), prevalidated_source_hashes={'A': str((manifest or {}).get('a_sha256', '')), 'B': str((manifest or {}).get('b_sha256', ''))})
         except (OSError, PreviewError, ValueError) as exc:
             issue: dict[str, object] = preview_failure_issue(exc)
-            issue.update({'slide_id': page.slide_id, 'retry_command': command_line(controller, 'present-ab', project_dir)})
+            issue['slide_id'] = page.slide_id
+            if issue.get('repair_scope') == 'design':
+                issue['repair_commands'] = {
+                    version: command_line(
+                        controller, 'repair-candidate', project_dir,
+                        '--page', page.slide_id, '--version', version,
+                        '--note', '<PREVIEW_DEFECT>',
+                    )
+                    for version in ('A', 'B')
+                }
+            else:
+                issue['retry_command'] = command_line(controller, 'present-ab', project_dir)
             if issue.get('code') == 'PREVIEW_BROWSER_SANDBOX_BLOCKED':
                 issue['approval_prefix'] = ['python3', str(controller)]
             print('A/B presentation blocked: ' + json.dumps(issue, ensure_ascii=False, sort_keys=True))
@@ -633,21 +529,13 @@ def handle_present_ab(context: CommandContext) -> int:
             print('\nAdvisories:')
             for advisory in advisories:
                 print(f'- {advisory}')
-        if design_workflow_enabled(text):
-            print(
-                '\nIndependent single-candidate Visual QA has already passed for both exact previews; '
-                'it did not compare their compositional distinctness. Send both standalone preview blocks '
-                'in the same message, never place local preview images inside a Markdown table, then ask '
-                'the user to choose A or B or request a targeted revision.\n'
-            )
-        else:
-            print(
-                '\nBefore sending this comparison to the user, inspect both candidates. If either '
-                'has a defect, run repair-candidate for that same A/B slot and do not create Rn. '
-                'Otherwise send both standalone preview blocks in the same message, never place local '
-                'preview images inside a Markdown table, then ask the user to choose A or B or request '
-                'a targeted revision.\n'
-            )
+        print(
+            '\nEmbedded PPT Master reports both candidates ready after its internal visual QA. '
+            'Inspect the exact previews before sending them; if either has a visible defect, run '
+            'repair-candidate for that same A/B slot and do not create Rn. Otherwise send both standalone '
+            'preview blocks in the same message, never place local preview images inside a Markdown table, '
+            'then ask the user to choose A or B or request a targeted revision.\n'
+        )
     return 0
 
 
@@ -727,7 +615,15 @@ def handle_present_revision(context: CommandContext) -> int:
         previews = ensure_preview_pair(project_dir, page.slide_id, (base_version, revision_id), copy_contract=page_visible_copy_contract(project_dir, page.slide_id), prevalidated_source_hashes={base_version: sha256(base_path), revision_id: sha256(revision_path)})
     except (OSError, PreviewError, ValueError) as exc:
         issue: dict[str, object] = preview_failure_issue(exc)
-        issue.update({'slide_id': page.slide_id, 'versions': [base_version, revision_id], 'retry_command': command_line(controller, 'present-revision', project_dir)})
+        issue.update({'slide_id': page.slide_id, 'versions': [base_version, revision_id]})
+        if issue.get('repair_scope') == 'design':
+            issue['repair_command'] = command_line(
+                controller, 'repair-candidate', project_dir,
+                '--page', page.slide_id, '--version', revision_id,
+                '--note', '<PREVIEW_DEFECT>',
+            )
+        else:
+            issue['retry_command'] = command_line(controller, 'present-revision', project_dir)
         if issue.get('code') == 'PREVIEW_BROWSER_SANDBOX_BLOCKED':
             issue['approval_prefix'] = ['python3', str(controller)]
         print('Revision presentation blocked: ' + json.dumps(issue, ensure_ascii=False, sort_keys=True))
@@ -774,9 +670,6 @@ def handle_update_page(context: CommandContext) -> int:
     if semantic_update and state not in {'Not started', 'Content reviewing'}:
         print('Update blocked: reopen content before changing title, decisions, or open items')
         return 1
-    if args.review_mode is not None and state != 'Not started':
-        print('Update blocked: Review mode may change only before page review starts')
-        return 1
     if args.authoring_mode is not None:
         if state not in {'Not started', 'Content reviewing', 'Content locked'}:
             print('Update blocked: reopen design before changing Authoring mode')
@@ -793,8 +686,6 @@ def handle_update_page(context: CommandContext) -> int:
         updates['Confirmed decisions'] = args.confirmed_decisions
     if args.open_items is not None:
         updates['Open items'] = args.open_items
-    if args.review_mode is not None:
-        updates['Review mode'] = args.review_mode
     if args.authoring_mode is not None:
         updates['Authoring mode'] = args.authoring_mode
     if not updates and (not args.title):
@@ -940,7 +831,7 @@ def handle_advance(context: CommandContext) -> int:
                     presentation_file = revision_presentation_path(project_dir, slide_id, revision_id)
                 confirmed_path = selected_working_path(project_dir, slide_id, selections[slide_id])
                 if not page_author_completion_valid(project_dir, slide_id, selections[slide_id]):
-                    raise ValueError(f'{slide_id} confirmed SVG has no valid hash-bound preflight receipt')
+                    raise ValueError(f'{slide_id} confirmed SVG has no valid hash-bound Stage 1 acceptance receipt')
                 if not presentation_file.is_file():
                     raise ValueError(f'{slide_id} has no presentation receipt')
                 final_path = project_dir / 'svg_output' / f'{slide_id}.svg'
@@ -954,7 +845,7 @@ def handle_advance(context: CommandContext) -> int:
                     'presentation_receipt': str(presentation_file.relative_to(project_dir)),
                     'presentation_receipt_sha256': sha256(presentation_file),
                     'canonical_sha256': sha256(final_path),
-                    'source_preflight_gate': PAGE_PREFLIGHT_GATE_SCHEMA,
+                    'source_acceptance_gate': STAGE1_ACCEPTANCE_SCHEMA,
                     'accepted_at': now(),
                 })
                 text = update_page(text, slide_id, {
@@ -986,15 +877,10 @@ COMMAND_HANDLERS = {
     "init": handle_init,
     "audit": handle_audit_command,
     "next": handle_next,
-    "prepare-design": handle_prepare_design,
-    "record-design-decision": handle_record_design_decision,
-    "prepare-authoring": handle_prepare_authoring,
-    "prepare-visual-qa": handle_prepare_visual_qa,
-    "visual-qa-result": handle_visual_qa_result,
-    "repair-visual-qa": handle_repair_visual_qa,
+    "prepare-ppt-master": handle_prepare_ppt_master,
     "prepare-export": handle_prepare_export,
     "validate-review": handle_validate_review,
-    "page-author-result": handle_page_author_result,
+    "ppt-master-result": handle_ppt_master_result,
     "resume-page-author": handle_resume_page_author,
     "handoff-result": handle_handoff_result,
     "resume-handoff": handle_resume_handoff,
@@ -1014,7 +900,7 @@ def main(controller_path: Path | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args()
     project_dir = args.project_dir.resolve()
-    framework_arg = args.framework_option or args.legacy_framework or Path("framework.md")
+    framework_arg = args.framework_option or Path("framework.md")
     framework = (
         framework_arg if framework_arg.is_absolute() else project_dir / framework_arg
     ).resolve()

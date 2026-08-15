@@ -20,6 +20,13 @@ Review the user's objective, audience, source material, delivery setting, reques
 
 Classify by the audience outcome, not by the user's casual use of words such as “deck,” “presentation,” or “sharing.” Treat hybrids by their dominant purpose. Mention a secondary type only when it materially changes the Storyline.
 
+Before drafting the Storyline, the minimum usable intake is the objective,
+audience, desired audience change, source boundary, and any hard delivery
+constraint. Ask only for missing items that would change the sequence or make a
+claim unsupported; optional context may remain `None`. Also obtain any input
+that the selected type policy marks as required, such as `why now` and the
+intended ending for a Sharing deck.
+
 ## 2. Confirm the type
 
 Give one concise preliminary judgment after reviewing the background:
@@ -87,7 +94,7 @@ Format `Content Summary` as a short bullet list, normally two to four bullets. E
 
 Show a substantive `Next connection` only when the current page is a content page and the immediately following page is also a content page. Explain which specific claim, evidence, question, conclusion, or implication on the current page creates the need for the following page; do not merely write “leads to the next page.” Display `Not applicable` when the current page is structural or protected, has no following page, or the next page is a Cover, Agenda, Section divider/chapter page, Ending/closing page, or Protected placeholder.
 
-Do not display `Review mode` or a separate `Protected status`. `Review mode` remains internal workflow metadata, while `Page type: Protected placeholder` is sufficient to identify a protected page in the Storyline.
+Do not display a separate `Protected status`; `Page type: Protected placeholder` is sufficient to identify a protected page in the Storyline.
 
 Use this page block unless a compact table can preserve the bullet hierarchy and all fields without ambiguity:
 

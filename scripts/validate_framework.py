@@ -44,7 +44,6 @@ PAGE_FIELDS = (
     "Narrative role",
     "Content scope",
     "Next connection",
-    "Review mode",
     "Authoring mode",
     "Status",
     "Confirmed decisions",
@@ -189,6 +188,12 @@ def validate(framework: Path, project_dir: Path | None) -> list[str]:
     substantive_ids: list[str] = []
     for page in pages:
         errors.extend(required_fields(page.text, PAGE_FIELDS, page.slide_id))
+        unexpected_page = set(page.fields) - set(PAGE_FIELDS)
+        if unexpected_page:
+            errors.append(
+                f"{page.slide_id} has unsupported fields: "
+                + ", ".join(sorted(unexpected_page))
+            )
         if len(page.text) > 2600:
             errors.append(f"{page.slide_id} entry exceeds 2600 characters")
         state = page.fields.get("Status", "")
@@ -264,9 +269,6 @@ def validate(framework: Path, project_dir: Path | None) -> list[str]:
                     f"{page.slide_id} Protected placeholder Content scope needs an exact insertion "
                     "instruction that prohibits AI generation, rewriting, or supplementation"
                 )
-        if page.fields.get("Review mode") not in {"Page-by-page", "Batch"}:
-            errors.append(f"{page.slide_id} Review mode must be Page-by-page or Batch")
-
     current_workflow = current_values.get("Workflow version")
     if current_workflow in {"3.9", WORKFLOW_VERSION} and not cover_ids:
         errors.append("Every current Storyline requires one opening Cover at S01")
@@ -324,11 +326,10 @@ def validate(framework: Path, project_dir: Path | None) -> list[str]:
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("legacy_framework", nargs="?", type=Path, help=argparse.SUPPRESS)
     parser.add_argument("--framework", dest="framework_option", type=Path)
     parser.add_argument("--project-dir", type=Path)
     args = parser.parse_args()
-    framework = args.framework_option or args.legacy_framework
+    framework = args.framework_option
     if framework is None and args.project_dir:
         framework = args.project_dir / "framework.md"
     framework = framework or Path("framework.md")

@@ -3,7 +3,7 @@
 EY Deck Design bundles `ey-gradient-dark-v1` as a current PPT Master structured
 template profile. The controller chooses the Layout from the exact
 `framework.md` Page type and binds its prototype path, prototype hash, profile
-fingerprint, and placeholder-contract hash into every page-authoring packet.
+fingerprint, and placeholder-contract hash into every Stage 1 packet.
 
 | Page type | PowerPoint Master | PowerPoint Layout | Editable slots (`x y w h`, SVG px) |
 |---|---|---|---|
@@ -18,7 +18,7 @@ the current item count across the two columns; use four-left/three-right for
 seven items. Each card contains only its number and one agenda-item label; do
 not add a subtitle, description, or supporting-detail line. Agenda numbers are
 not fixed Layout atoms: the visible-copy contract derives zero-padded numbers
-from approved item order and page authoring exports each number and label as a
+from approved item order and Embedded PPT Master exports each number and label as a
 separate editable text box. The content Layout
 reserves the lower band beginning at `y=650`; page-specific
 content must not enter it. The template owns the background, frame, glow, EY
@@ -31,7 +31,7 @@ vector-outline two-line fixed lockup `Shape the future` / `with confidence`
 below its EY mark; do not retype or restyle it. The Cover Layout also owns the exact fixed tagline
 `The better the question. The better the answer. The better the world works.`
 at `x=51`, baseline `y=679`; it is not part of page-authored visible copy and
-must not be changed or deleted. Page authoring owns only the visible content
+must not be changed or deleted. Embedded PPT Master owns only the visible content
 inside the bound placeholders. The content-region placeholder uses PPT Master's
 `object` proxy binding so the authored composition remains editable while the
 Layout retains a single reusable content zone.
@@ -41,7 +41,7 @@ divider title placeholders. The normal content title remains `32` SVG px / 24
 pt. Other visible text uses the fixed scale in `design-system.md`.
 
 The fixed ending page is not a Storyline page and never enters content review,
-page authoring, A/B comparison, or revision. Preserve the user-supplied ending
+Stage 1 production, A/B comparison, or revision. Preserve the user-supplied ending
 template exactly, including all visible text, fields, spacing, background, and
 brand treatment; never clean, mask, parameterize, or overlay any part of it.
 Preserve its embedded full-slide PNG bytes during PPTX export; resizing or JPEG

@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Callable
 
 from framework_lib import h2_section, line_fields, page_entries, replace_field
-from workflow_io import atomic_write, now, sha256, text_sha256, write_json
+from workflow_io import atomic_write, now, read_json, sha256, text_sha256, write_json
 from workflow_paths import (
     archive_items,
     page_author_result_path,
@@ -170,6 +170,7 @@ def migrate_workflow(
         and line_fields(h2_section(text, "Project context")).get("Requested authoring mode")
         in {"Simplified", "Standard"}
         and all("Authoring mode" in page.fields for page in page_entries(text))
+        and all("Review mode" not in page.fields for page in page_entries(text))
         and all("Confirmed version" in page.fields for page in page_entries(text))
         and all("Previous connection" not in page.fields for page in page_entries(text))
         and text == original_text
@@ -256,7 +257,13 @@ def migrate_workflow(
     }
     for page in page_entries(text):
         section = page.text
-        for field in ("Content section", "SVG candidates", "Final SVG", "Previous connection"):
+        for field in (
+            "Content section",
+            "SVG candidates",
+            "Final SVG",
+            "Previous connection",
+            "Review mode",
+        ):
             section = re.sub(rf"^- {re.escape(field)}:.*\n", "", section, flags=re.MULTILINE)
         if "Confirmed version" not in page.fields and "Selected version" in page.fields:
             section = re.sub(
@@ -281,7 +288,7 @@ def migrate_workflow(
                 section = replace_field(section, "Authoring mode", mode)
             else:
                 section = re.sub(
-                    r"(^- Review mode:.*$)",
+                    r"(^- Next connection:.*$)",
                     rf"\1\n- Authoring mode: {mode}",
                     section,
                     count=1,
@@ -307,6 +314,26 @@ def migrate_workflow(
     if migrated_content != content:
         atomic_write(content_path, migrated_content)
         content = migrated_content
+
+    receipts_root = project_dir / "working" / "receipts"
+    obsolete_authoring_receipts: list[Path] = []
+    if receipts_root.is_dir():
+        for path in receipts_root.glob("S*-*-authoring.json"):
+            try:
+                receipt = read_json(path)
+            except ValueError:
+                obsolete_authoring_receipts.append(path)
+                continue
+            if (
+                receipt.get("status") == "BLOCKED"
+                or receipt.get("route") != "embedded-ppt-master-stage1"
+            ):
+                obsolete_authoring_receipts.append(path)
+    archive_items(
+        project_dir,
+        "workflow-4.1-stage1-boundary",
+        obsolete_authoring_receipts,
+    )
 
     for original_page in page_entries(text):
         page = next(item for item in page_entries(text) if item.slide_id == original_page.slide_id)
@@ -336,7 +363,7 @@ def migrate_workflow(
                     continue
                 write_json(author_receipt, {
                     "status": "COMPLETE",
-                    "route": "page-svg-authoring",
+                    "route": "embedded-ppt-master-stage1",
                     "slide_id": page.slide_id,
                     "authoring_mode": page.fields.get("Authoring mode"),
                     "version": version,
@@ -379,6 +406,9 @@ def migrate_workflow(
         project_dir / "working" / "continuity-scan.md",
         project_dir / "working" / "receipts" / "body-checkpoint.json",
         *list((project_dir / "working" / "receipts").glob("*-svg-qa.json")),
+        *list((project_dir / "working" / "receipts").glob("*-design-decision.json")),
+        *list((project_dir / "working" / "receipts").glob("*-visual-qa.json")),
+        *list((project_dir / "working" / "packets").glob("*-design-context.json")),
     ])
     if original_position.get("PPTX status") in {"Authorized", "Reconstructed", "QA passed", "Stale"}:
         archive_items(project_dir, "workflow-migration", [

@@ -1,7 +1,7 @@
 interface:
   display_name: "EY Deck Design"
-  short_description: "Lead EY deck design and editable PPTX export"
-  default_prompt: "Use $ey-deck-design to build an approved Storyline, let its embedded PPT Master design and author each page, then export one editable PPTX."
+  short_description: "Control EY deck content and PPT Master delivery"
+  default_prompt: "Use $ey-deck-design to approve the Storyline and exact content, then delegate Stage 1 SVG production and Stage 2 editable-PPTX export to its embedded PPT Master."
 
 policy:
   allow_implicit_invocation: false

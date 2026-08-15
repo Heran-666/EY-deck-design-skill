@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Environment preflight for preview rendering and EY's bundled Stage 2 export."""
+"""Environment preflight for preview rendering and Embedded PPT Master Stage 2."""
 
 from __future__ import annotations
 
@@ -46,7 +46,7 @@ def preview_failure_issue(exc: Exception) -> dict[str, str]:
         return _issue(
             "PREVIEW_VISIBLE_COPY_BLOCKED",
             f"Approved visible copy did not survive the rendered preview. Details: {detail}",
-            repair_scope="source-svg",
+            repair_scope="design",
         )
     return _issue(
         "PREVIEW_BROWSER_UNAVAILABLE",
@@ -105,7 +105,7 @@ def run_doctor(
     try:
         binding = export_runtime_binding()
         if not Path(binding["runner_path"]).is_file():
-            raise ValueError("EY confirmed-export runner is missing")
+            raise ValueError("Embedded PPT Master Stage 2 runner is missing")
         checks["ey_export_runtime"] = binding
     except (OSError, ValueError) as exc:
         errors.append(_issue("EXPORT_RUNTIME_INVALID", str(exc)))

@@ -4,13 +4,10 @@
 from __future__ import annotations
 
 
-FRAMEWORK_VERSION = "2.6"
-WORKFLOW_VERSION = "4.0"
-READABLE_WORKFLOW_VERSIONS = {"3.8", "3.9", WORKFLOW_VERSION}
-PAGE_PREFLIGHT_GATE_SCHEMA = "ey-deck.page-preflight.v2"
-DESIGN_CONTEXT_SCHEMA = "ey-deck.design-context.v2"
-DESIGN_DECISION_SCHEMA = "ey-deck.design-decision.v2"
-VISUAL_QA_SCHEMA = "ey-deck.visual-qa.v2"
+FRAMEWORK_VERSION = "2.7"
+WORKFLOW_VERSION = "4.1"
+READABLE_WORKFLOW_VERSIONS = {"3.8", "3.9", "4.0", WORKFLOW_VERSION}
+STAGE1_ACCEPTANCE_SCHEMA = "ey-deck.stage1-acceptance.v1"
 
 REQUESTED_AUTHORING_MODES = {"Simplified", "Standard"}
 PAGE_AUTHORING_MODES = {"Simplified", "Standard", "Not applicable"}
@@ -39,20 +36,15 @@ MANAGED_END = "<!-- EY-DECK-DESIGN-WORKFLOW:END -->"
 LEGACY_MANAGED_START = "<!-- EY-PROPOSAL-WORKFLOW:START -->"
 LEGACY_MANAGED_END = "<!-- EY-PROPOSAL-WORKFLOW:END -->"
 
-EY_PAGE_AUTHORING_INSTRUCTION = (
-    "Act only as Embedded PPT Master's SVG Producer inside EY Deck Design. Create one complete candidate from "
-    "the exact hash-bound locked page packet and its bound structured-template prototype at the supplied paths. "
-    "Implement the supplied persisted Design Decision faithfully; do not silently redesign it. If the decision "
-    "cannot be implemented without changing approved meaning or violating the template, return BLOCKED. "
-    "Preserve the prototype's root Master/Layout identity, fixed atoms, and placeholder contract. "
-    "Apply the bundled PPT Master design contract plus EY composition, data-to-visual, and visual-language repertoire: "
-    "honor the committed reading mode and information-model branch, choose one suitable composition family and one "
-    "signature EY gesture, and encode approved quantitative relationships as truthful "
-    "editable visuals instead of defaulting to bordered insight banners, equal text columns, or card grids. "
-    "Own page-local geometry, construction, fit, and normal SVG quality while leaving concept and composition authority "
-    "with the persisted Design Decision; bind every page-authored visible text run to the packet's exact "
-    "data-copy-id while preserving inherited template-fixed text exactly, emit only inline SVG attributes/styles with no <style> or class dependency, and "
-    "do not initialize a project or enter PPTX export."
+PPT_MASTER_STAGE1_INSTRUCTION = (
+    "Act only as EY Deck Design's embedded PPT Master Stage 1 engine. From the exact hash-bound locked page packet, "
+    "design, author, render, review, and internally repair one complete SVG candidate at the requested path. "
+    "Own all subjective design decisions, page composition, information visualization, SVG construction, and visual QA. "
+    "Do not expose or require the outer controller to record your internal design reasoning. Preserve approved meaning, "
+    "copy, data, sources, template-fixed atoms, and the bound Master/Layout contract exactly. Bind every page-authored "
+    "visible text run to the packet's data-copy-id, keep the SVG self-contained and export-compatible, and return COMPLETE "
+    "only after the candidate is ready for user display. Return BLOCKED only for content, design, or environment failure; "
+    "do not initialize a project, change workflow state, ask the user a question, or enter Stage 2."
 )
 
 B_OPTION_KERNEL = (
@@ -63,10 +55,10 @@ B_OPTION_KERNEL = (
     "fixed constraints, and the same canvas."
 )
 
-PREPARE_AUTHORING_ACTIONS = {
-    "PREPARE_SVG_A": "GENERATE_SVG_A",
-    "PREPARE_SVG_B": "GENERATE_SVG_B",
-    "PREPARE_SVG_REVISION": "GENERATE_SVG_REVISION",
+PREPARE_PPT_MASTER_ACTIONS = {
+    "PREPARE_PPT_MASTER_A": "RUN_PPT_MASTER_A",
+    "PREPARE_PPT_MASTER_B": "RUN_PPT_MASTER_B",
+    "PREPARE_PPT_MASTER_REVISION": "RUN_PPT_MASTER_REVISION",
 }
 
 

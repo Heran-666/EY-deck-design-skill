@@ -27,8 +27,8 @@ def validate_terminal_result(manifest: dict, result: dict) -> list[str]:
     if len(slide_ids) != len(ordered) or any(not _nonempty_string(item) for item in slide_ids):
         return ["export manifest ordered slides have invalid Slide IDs"]
 
-    if result.get("route") != "confirmed-svg-export":
-        errors.append("route must be confirmed-svg-export")
+    if result.get("route") != "embedded-ppt-master-stage2":
+        errors.append("route must be embedded-ppt-master-stage2")
     status = result.get("status")
     if status not in {"COMPLETE", "BLOCKED"}:
         errors.append("status must be COMPLETE or BLOCKED")

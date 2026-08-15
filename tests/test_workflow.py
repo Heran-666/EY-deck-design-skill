@@ -32,16 +32,13 @@ from workflow_controller import (  # noqa: E402
     candidate_errors,
     directive,
     directive_payload,
-    ensure_design_context,
     ensure_authoring_packet,
     ensure_preview_single,
     migrate_workflow,
     page_visible_copy_contract,
     page_author_completion_valid,
     receipt_path,
-    record_design_decision,
     record_page_author_result,
-    record_visual_qa,
     sha256,
     single_presentation_valid,
     text_sha256,
@@ -59,7 +56,7 @@ def framework(status: str = "Content locked", version: str = "3.8", slide_id: st
 
 ## Current position
 
-- Framework version: 2.6
+- Framework version: 2.7
 - Workflow version: {version}
 - Storyline version: 1.0
 - Output filename: Test deck.pptx
@@ -90,7 +87,6 @@ def framework(status: str = "Content locked", version: str = "3.8", slide_id: st
 - Narrative role: Explain the recommendation
 - Content scope: Evidence and action
 - Next connection: None
-- Review mode: Page-by-page
 - Authoring mode: Standard
 - Status: {status}
 - Confirmed decisions: None
@@ -219,14 +215,14 @@ def setup_ab(project: Path) -> None:
     for version, artifact in (("A", a), ("B", b)):
         terminal_result = {
             "status": "COMPLETE",
-            "route": "page-svg-authoring",
+            "route": "embedded-ppt-master-stage1",
             "artifact_path": str(artifact.resolve()),
         }
         if version == "B":
             terminal_result["material_differences"] = ["Different emphasis treatment"]
         write_json(receipt_path(project, "S01", f"{version}-authoring"), {
             "status": "COMPLETE",
-            "route": "page-svg-authoring",
+            "route": "embedded-ppt-master-stage1",
             "slide_id": "S01",
             "authoring_mode": "Standard",
             "version": version,
@@ -236,8 +232,8 @@ def setup_ab(project: Path) -> None:
             "packet_sha256": packet["packet_sha256"],
             "visible_copy_contract_sha256": packet["visible_copy_contract_sha256"],
             "template_structure_contract_sha256": packet["template_structure_contract_sha256"],
-            "preflight_gate": {
-                "schema": "ey-deck.page-preflight.v2",
+            "acceptance_gate": {
+                "schema": "ey-deck.stage1-acceptance.v1",
                 "status": "PASS",
                 "artifact_sha256": sha256(artifact),
                 "visible_copy_contract_sha256": packet["visible_copy_contract_sha256"],
@@ -273,7 +269,7 @@ def setup_presented_revision(
         receipt_path(project, "S01", "revision-active").read_text(encoding="utf-8")
     )
     revision_id = str(active["revision_id"])
-    prepared = run(project, "prepare-authoring", "--page", "S01")
+    prepared = run(project, "prepare-ppt-master", "--page", "S01")
     assert prepared.returncode == 0, prepared.stdout + prepared.stderr
     revision = project / "svg_working" / "S01" / f"{revision_id}.svg"
     revision.write_text(
@@ -282,11 +278,11 @@ def setup_presented_revision(
     )
     completed = run(
         project,
-        "page-author-result",
+        "ppt-master-result",
         "--result-json",
         json.dumps({
             "status": "COMPLETE",
-            "route": "page-svg-authoring",
+            "route": "embedded-ppt-master-stage1",
             "artifact_path": str(revision.resolve()),
         }),
     )
@@ -298,13 +294,9 @@ def setup_presented_revision(
     return revision_id
 
 
-def setup_batch_ab(project: Path) -> None:
-    first = framework("Content locked").replace(
-        "- Review mode: Page-by-page", "- Review mode: Batch"
-    )
-    second = framework("Content locked", slide_id="S02").replace(
-        "- Review mode: Page-by-page", "- Review mode: Batch"
-    )
+def setup_sequential_ab(project: Path) -> None:
+    first = framework("Content locked")
+    second = framework("Content locked", slide_id="S02")
     second = second[second.index("### S02｜") :]
     framework_text = first.rstrip() + "\n\n" + second
     (project / "framework.md").write_text(framework_text, encoding="utf-8")
@@ -336,14 +328,14 @@ def setup_batch_ab(project: Path) -> None:
         for version, artifact in (("A", a), ("B", b)):
             terminal_result = {
                 "status": "COMPLETE",
-                "route": "page-svg-authoring",
+                "route": "embedded-ppt-master-stage1",
                 "artifact_path": str(artifact.resolve()),
             }
             if version == "B":
                 terminal_result["material_differences"] = ["Different emphasis treatment"]
             write_json(receipt_path(project, slide_id, f"{version}-authoring"), {
                 "status": "COMPLETE",
-                "route": "page-svg-authoring",
+                "route": "embedded-ppt-master-stage1",
                 "slide_id": slide_id,
                 "authoring_mode": "Standard",
                 "version": version,
@@ -353,8 +345,8 @@ def setup_batch_ab(project: Path) -> None:
                 "packet_sha256": packet["packet_sha256"],
                 "visible_copy_contract_sha256": packet["visible_copy_contract_sha256"],
                 "template_structure_contract_sha256": packet["template_structure_contract_sha256"],
-                "preflight_gate": {
-                    "schema": "ey-deck.page-preflight.v2",
+                "acceptance_gate": {
+                    "schema": "ey-deck.stage1-acceptance.v1",
                     "status": "PASS",
                     "artifact_sha256": sha256(artifact),
                     "visible_copy_contract_sha256": packet["visible_copy_contract_sha256"],
@@ -366,7 +358,7 @@ def setup_batch_ab(project: Path) -> None:
 
 
 def prepare_authoring(project: Path, slide_id: str = "S01") -> subprocess.CompletedProcess[str]:
-    return run(project, "prepare-authoring", "--page", slide_id)
+    return run(project, "prepare-ppt-master", "--page", slide_id)
 
 
 def prepare_export(project: Path) -> subprocess.CompletedProcess[str]:
@@ -383,7 +375,7 @@ def run(project: Path, *args: str) -> subprocess.CompletedProcess[str]:
     env["EY_BUNDLED_PYTHON"] = str(FAKE_BUNDLED_PYTHON)
     env["EY_BUNDLE_VERSION"] = "test-bundle"
     return subprocess.run(
-        [sys.executable, str(CONTROLLER), *args, "framework.md", "--project-dir", str(project)],
+        [sys.executable, str(CONTROLLER), *args, "--project-dir", str(project)],
         cwd=project,
         env=env,
         text=True,
@@ -427,158 +419,36 @@ def protected_framework() -> str:
 
 
 class LightweightWorkflowTests(unittest.TestCase):
-    def test_workflow_4_design_recovery_packet_survives_context_loss(self) -> None:
+    def test_workflow_41_exposes_one_ppt_master_stage1_boundary(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             project = Path(tmp)
             framework_path = setup_locked(project)
             text = framework_path.read_text(encoding="utf-8").replace(
-                "- Workflow version: 3.8", "- Workflow version: 4.0"
+                "- Workflow version: 3.8", "- Workflow version: 4.1"
             )
             framework_path.write_text(text, encoding="utf-8")
             action, pages = directive(text, project)
-            self.assertEqual(action, "PREPARE_PAGE_DESIGN")
-            context = ensure_design_context(text, project, pages[0], "A")
-            payload = directive_payload(text, project, CONTROLLER)
-            self.assertEqual(payload["action"], "PLAN_PAGE_DESIGN")
-            self.assertEqual(
-                payload["route"],
-                "$ey-deck-design / Embedded PPT Master Design Lead",
-            )
-            self.assertEqual(payload["design_owner"], "embedded-ppt-master-design")
-            self.assertEqual(payload["design_policy_fingerprint"], context["design_policy_manifest"]["fingerprint"])
-            self.assertTrue(Path(payload["design_context_path"]).is_file())
-            record_design_decision(project, pages[0], "A", json.dumps({
-                "status": "COMPLETE",
-                "route": "ppt-master-design-lead",
-                "decision": {
-                    "communication_job": "Move leadership from evidence to action",
-                    "reading_mode": "presentation",
-                    "primary_claim": "Evidence supports action",
-                    "composition_family": "metric-and-trajectory",
-                    "focal_mechanism": "one dominant evidence trajectory",
-                    "information_model": "claim-and-evidence",
-                    "data_encoding": "none; approved content has no quantitative series",
-                    "typography_hierarchy": "hero claim, supporting evidence, source detail",
-                    "ey_gesture": "directional beam",
-                    "density": "low",
-                    "rationale": "Make the conclusion the first read and evidence the second",
-                    "avoid": ["equal card grid"],
-                },
-            }))
-            self.assertEqual(directive(text, project)[0], "PREPARE_SVG_A")
+            self.assertEqual(action, "PREPARE_PPT_MASTER_A")
             ensure_authoring_packet(text, project, pages[0])
             recovered = directive_payload(text, project, CONTROLLER)
-            self.assertEqual(recovered["action"], "GENERATE_SVG_A")
+            self.assertEqual(recovered["action"], "RUN_PPT_MASTER_A")
             self.assertEqual(
                 recovered["route"],
-                "$ey-deck-design / Embedded PPT Master SVG Producer",
+                "$ey-deck-design / Embedded PPT Master / Stage 1",
             )
-            self.assertEqual(recovered["design_owner"], "embedded-ppt-master-design")
-            self.assertEqual(recovered["design_module_version"], "1.0")
-            self.assertTrue(Path(recovered["design_decision_path"]).is_file())
-            recovered_context = json.loads(Path(recovered["design_context_path"]).read_text())
-            self.assertEqual(recovered_context["design_owner"], "embedded-ppt-master-design")
-            self.assertEqual(recovered_context["design_roles"]["lead"], "ppt-master-design-lead")
-            self.assertIn(
-                "references/ppt-master-design.md",
-                {
-                    Path(item["path"]).as_posix().split("/ey-deck-design/")[-1]
-                    for item in recovered_context["design_policy_manifest"]["files"]
-                },
-            )
-            self.assertIn("deck_design_memory", recovered_context)
+            self.assertTrue(Path(recovered["stage1_contract"]).is_file())
+            self.assertNotIn("design_decision", recovered)
+            self.assertNotIn("visual_qa_receipt", recovered)
             artifact = project / "svg_working" / "S01" / "A.svg"
             artifact.parent.mkdir(parents=True, exist_ok=True)
             artifact.write_text(svg(), encoding="utf-8")
             record_page_author_result(text, project, json.dumps({
                 "status": "COMPLETE",
-                "route": "page-svg-authoring",
+                "route": "embedded-ppt-master-stage1",
                 "artifact_path": str(artifact.resolve()),
             }))
-            self.assertEqual(directive(text, project)[0], "PREPARE_VISUAL_QA")
-            with mock.patch.dict(os.environ, {"EY_PREVIEW_RENDERER": str(FAKE_RENDERER)}):
-                ensure_preview_single(
-                    project,
-                    "S01",
-                    "A",
-                    copy_contract=page_visible_copy_contract(project, "S01"),
-                    prevalidated_source_hash=sha256(artifact),
-                )
-            self.assertEqual(directive(text, project)[0], "REVIEW_VISUAL_QA")
-            qa_directive = directive_payload(text, project, CONTROLLER)
-            self.assertEqual(
-                qa_directive["route"],
-                "$ey-deck-design / Embedded PPT Master / Independent Visual QA",
-            )
-            self.assertEqual(qa_directive["qa_scope"], "single-candidate-only")
-            blocked_qa = record_visual_qa(project, pages[0], "A", json.dumps({
-                "status": "BLOCKED",
-                "route": "independent-visual-qa",
-                "scope": "single-candidate-only",
-                "composition_fidelity": "BLOCKED",
-                "focal_hierarchy": "PASS",
-                "data_story": "PASS",
-                "brand_expression": "PASS",
-                "issue_codes": ["composition-fidelity"],
-            }))
-            self.assertEqual(
-                blocked_qa["issues"],
-                ["Rendered candidate does not faithfully realize its persisted composition decision."],
-            )
-            repair_payload = directive_payload(text, project, CONTROLLER)
-            self.assertEqual(repair_payload["action"], "REPAIR_VISUAL_QA")
-            self.assertIn("repair-visual-qa", repair_payload["commands"]["run"])
-            Path(repair_payload["visual_qa_receipt"]).unlink()
-            record_visual_qa(project, pages[0], "A", json.dumps({
-                "status": "PASS",
-                "route": "independent-visual-qa",
-                "scope": "single-candidate-only",
-                "composition_fidelity": "PASS",
-                "focal_hierarchy": "PASS",
-                "data_story": "PASS",
-                "brand_expression": "PASS",
-                "issue_codes": [],
-            }))
-            self.assertEqual(directive(text, project)[0], "PREPARE_PAGE_DESIGN")
-            awaiting = text.replace("- Status: Content locked", "- Status: Awaiting SVG decision")
-            framework_path.write_text(awaiting, encoding="utf-8")
             self.assertTrue(page_author_completion_valid(project, "S01", "A"))
-
-    def test_visual_qa_rejects_ab_composition_comparison(self) -> None:
-        with tempfile.TemporaryDirectory() as tmp:
-            project = Path(tmp)
-            framework_path = setup_locked(project)
-            page = page_entries(framework_path.read_text(encoding="utf-8"))[0]
-            with self.assertRaisesRegex(ValueError, "unsupported fields"):
-                record_visual_qa(project, page, "A", json.dumps({
-                    "status": "PASS",
-                    "route": "independent-visual-qa",
-                    "scope": "single-candidate-only",
-                    "composition_fidelity": "PASS",
-                    "focal_hierarchy": "PASS",
-                    "data_story": "PASS",
-                    "brand_expression": "PASS",
-                    "issue_codes": [],
-                    "ab_distinction": "PASS",
-                }))
-
-    def test_visual_qa_rejects_cross_candidate_issue_text(self) -> None:
-        with tempfile.TemporaryDirectory() as tmp:
-            project = Path(tmp)
-            framework_path = setup_locked(project)
-            page = page_entries(framework_path.read_text(encoding="utf-8"))[0]
-            with self.assertRaisesRegex(ValueError, "unsupported fields"):
-                record_visual_qa(project, page, "A", json.dumps({
-                    "status": "BLOCKED",
-                    "route": "independent-visual-qa",
-                    "scope": "single-candidate-only",
-                    "composition_fidelity": "BLOCKED",
-                    "focal_hierarchy": "PASS",
-                    "data_story": "PASS",
-                    "brand_expression": "PASS",
-                    "issue_codes": ["composition-fidelity"],
-                    "issues": ["Candidate A is compositionally too similar to candidate B."],
-                }))
+            self.assertEqual(directive(text, project)[0], "RUN_PPT_MASTER_B")
 
     def test_initial_authoring_mode_mapping(self) -> None:
         self.assertEqual(initial_authoring_mode("Simplified", "Standard content"), "Simplified")
@@ -647,17 +517,14 @@ class LightweightWorkflowTests(unittest.TestCase):
             self.assertEqual(action, "PRESENT_PAGE_REVIEW")
             self.assertEqual([page.slide_id for page in pages], ["S02"])
 
-    def test_mixed_batch_metadata_does_not_override_slide_order(self) -> None:
+    def test_mixed_authoring_modes_do_not_override_slide_order(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             project = Path(tmp)
             first = (
                 framework("Awaiting SVG decision")
-                .replace("- Review mode: Page-by-page", "- Review mode: Batch")
                 .replace("- Authoring mode: Standard", "- Authoring mode: Simplified")
             )
-            second = framework(
-                "Awaiting SVG decision", slide_id="S02"
-            ).replace("- Review mode: Page-by-page", "- Review mode: Batch")
+            second = framework("Awaiting SVG decision", slide_id="S02")
             second = second[second.index("### S02｜") :]
             text = first.rstrip() + "\n\n" + second
 
@@ -691,12 +558,10 @@ class LightweightWorkflowTests(unittest.TestCase):
             project = Path(tmp)
             first = (
                 framework("Awaiting SVG decision")
-                .replace("- Review mode: Page-by-page", "- Review mode: Batch")
                 .replace("- Authoring mode: Standard", "- Authoring mode: Simplified")
             )
             second = (
                 framework("Awaiting SVG decision", slide_id="S02")
-                .replace("- Review mode: Page-by-page", "- Review mode: Batch")
                 .replace("- Authoring mode: Standard", "- Authoring mode: Simplified")
             )
             second = second[second.index("### S02｜") :]
@@ -729,11 +594,11 @@ class LightweightWorkflowTests(unittest.TestCase):
             a_path.write_text(svg(), encoding="utf-8")
             completed = run(
                 project,
-                "page-author-result",
+                "ppt-master-result",
                 "--result-json",
                 json.dumps({
                     "status": "COMPLETE",
-                    "route": "page-svg-authoring",
+                    "route": "embedded-ppt-master-stage1",
                     "artifact_path": str(a_path.resolve()),
                 }),
             )
@@ -894,6 +759,42 @@ class LightweightWorkflowTests(unittest.TestCase):
             )
             self.assertEqual(low_level.returncode, 0, low_level.stdout + low_level.stderr)
 
+    def test_removed_legacy_framework_positional_argument_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project = Path(tmp)
+            (project / "framework.md").write_text(framework("Not started"), encoding="utf-8")
+            result = run(project, "next", "framework.md")
+            self.assertEqual(result.returncode, 2)
+            self.assertIn("unrecognized arguments: framework.md", result.stderr)
+
+            validator = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPTS / "validate_framework.py"),
+                    str(project / "framework.md"),
+                ],
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            self.assertEqual(validator.returncode, 2)
+            self.assertIn("unrecognized arguments", validator.stderr)
+
+    def test_removed_review_mode_cli_option_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project = Path(tmp)
+            (project / "framework.md").write_text(framework("Not started"), encoding="utf-8")
+            result = run(
+                project,
+                "update-page",
+                "--page",
+                "S01",
+                "--review-mode",
+                "Batch",
+            )
+            self.assertEqual(result.returncode, 2)
+            self.assertIn("unrecognized arguments: --review-mode Batch", result.stderr)
+
     def test_doctor_bound_preview_runtime_ignores_later_discovery_override(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             project = Path(tmp)
@@ -949,7 +850,7 @@ class LightweightWorkflowTests(unittest.TestCase):
             project = Path(tmp)
             framework_path = setup_locked(project)
             action, pages = directive(framework_path.read_text(encoding="utf-8"), project)
-            self.assertEqual(action, "PREPARE_SVG_A")
+            self.assertEqual(action, "PREPARE_PPT_MASTER_A")
             self.assertEqual([page.slide_id for page in pages], ["S01"])
 
     def test_next_is_read_only_and_prepare_materializes_authoring_packet(self) -> None:
@@ -959,16 +860,16 @@ class LightweightWorkflowTests(unittest.TestCase):
             result = run(project, "next", "--format", "json")
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             payload = json.loads(result.stdout)
-            self.assertEqual(payload["action"], "PREPARE_SVG_A")
+            self.assertEqual(payload["action"], "PREPARE_PPT_MASTER_A")
             self.assertEqual(payload["pages"], ["S01"])
-            self.assertIn("prepare-authoring", payload["commands"]["run"])
+            self.assertIn("prepare-ppt-master", payload["commands"]["run"])
             self.assertFalse((project / "working" / "packets" / "S01-authoring.md").exists())
             prepared = prepare_authoring(project)
             self.assertEqual(prepared.returncode, 0, prepared.stdout + prepared.stderr)
             self.assertTrue((project / "svg_working" / "S01").is_dir())
             payload = json.loads(run(project, "next", "--format", "json").stdout)
-            self.assertEqual(payload["action"], "GENERATE_SVG_A")
-            self.assertIn("page-author-result", payload["commands"]["record_result"])
+            self.assertEqual(payload["action"], "RUN_PPT_MASTER_A")
+            self.assertIn("ppt-master-result", payload["commands"]["record_result"])
             packet = Path(payload["packet_path"])
             self.assertTrue(packet.is_file())
             self.assertEqual(payload["packet_sha256"], sha256(packet))
@@ -1065,11 +966,11 @@ class LightweightWorkflowTests(unittest.TestCase):
             self.assertEqual(prepare_authoring(project).returncode, 0)
             blocked = run(
                 project,
-                "page-author-result",
+                "ppt-master-result",
                 "--result-json",
                 json.dumps({
                     "status": "BLOCKED",
-                    "route": "page-svg-authoring",
+                    "route": "embedded-ppt-master-stage1",
                     "stage": "authoring",
                     "slide_ids": ["S01"],
                     "reason": "renderer unavailable",
@@ -1081,7 +982,7 @@ class LightweightWorkflowTests(unittest.TestCase):
             self.assertIn("RESOLVE_PAGE_AUTHOR_BLOCK", blocked.stdout)
             resumed = run(project, "resume-page-author", "--page", "S01")
             self.assertEqual(resumed.returncode, 0, resumed.stdout + resumed.stderr)
-            self.assertIn("GENERATE_SVG_A", resumed.stdout)
+            self.assertIn("RUN_PPT_MASTER_A", resumed.stdout)
 
     def test_page_author_complete_results_flow_into_controller_manifest(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -1094,25 +995,25 @@ class LightweightWorkflowTests(unittest.TestCase):
             a.write_text(svg("#FFE600"), encoding="utf-8")
             recorded_a = run(
                 project,
-                "page-author-result",
+                "ppt-master-result",
                 "--result-json",
                 json.dumps({
                     "status": "COMPLETE",
-                    "route": "page-svg-authoring",
+                    "route": "embedded-ppt-master-stage1",
                     "artifact_path": str(a.resolve()),
                 }),
             )
             self.assertEqual(recorded_a.returncode, 0, recorded_a.stdout + recorded_a.stderr)
-            self.assertIn("GENERATE_SVG_B", recorded_a.stdout)
+            self.assertIn("RUN_PPT_MASTER_B", recorded_a.stdout)
             b = root / "B.svg"
             b.write_text(svg("#188CE5"), encoding="utf-8")
             recorded_b = run(
                 project,
-                "page-author-result",
+                "ppt-master-result",
                 "--result-json",
                 json.dumps({
                     "status": "COMPLETE",
-                    "route": "page-svg-authoring",
+                    "route": "embedded-ppt-master-stage1",
                     "artifact_path": str(b.resolve()),
                     "material_differences": ["Different emphasis color and hierarchy"],
                 }),
@@ -1132,11 +1033,11 @@ class LightweightWorkflowTests(unittest.TestCase):
             a.write_text(svg("#FFE600"), encoding="utf-8")
             self.assertEqual(run(
                 project,
-                "page-author-result",
+                "ppt-master-result",
                 "--result-json",
                 json.dumps({
                     "status": "COMPLETE",
-                    "route": "page-svg-authoring",
+                    "route": "embedded-ppt-master-stage1",
                     "artifact_path": str(a.resolve()),
                 }),
             ).returncode, 0)
@@ -1144,11 +1045,11 @@ class LightweightWorkflowTests(unittest.TestCase):
             b.write_text(svg("#188CE5"), encoding="utf-8")
             recorded = run(
                 project,
-                "page-author-result",
+                "ppt-master-result",
                 "--result-json",
                 json.dumps({
                     "status": "COMPLETE",
-                    "route": "page-svg-authoring",
+                    "route": "embedded-ppt-master-stage1",
                     "artifact_path": str(b.resolve()),
                 }),
             )
@@ -1169,6 +1070,27 @@ class LightweightWorkflowTests(unittest.TestCase):
             self.assertEqual(candidate_errors(path), [])
             path.write_text(svg(extra='<image href="https://example.com/a.png"/>'), encoding="utf-8")
             self.assertTrue(any("not self-contained" in item for item in candidate_errors(path)))
+
+    def test_ppt_master_stage1_result_rejects_internal_design_fields(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project = Path(tmp)
+            setup_locked(project)
+            self.assertEqual(prepare_authoring(project).returncode, 0)
+            artifact = project / "svg_working" / "S01" / "A.svg"
+            artifact.write_text(svg(), encoding="utf-8")
+            recorded = run(
+                project,
+                "ppt-master-result",
+                "--result-json",
+                json.dumps({
+                    "status": "COMPLETE",
+                    "route": "embedded-ppt-master-stage1",
+                    "artifact_path": str(artifact.resolve()),
+                    "design_decision": {"composition": "not an outer contract"},
+                }),
+            )
+            self.assertNotEqual(recorded.returncode, 0)
+            self.assertIn("unsupported fields", recorded.stdout)
 
     def test_present_and_select_promotes_immediately(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -1258,17 +1180,17 @@ class LightweightWorkflowTests(unittest.TestCase):
 
             next_result = run(project, "next", "--format", "json")
             self.assertEqual(next_result.returncode, 0, next_result.stdout + next_result.stderr)
-            self.assertEqual(json.loads(next_result.stdout)["action"], "GENERATE_SVG_B")
+            self.assertEqual(json.loads(next_result.stdout)["action"], "RUN_PPT_MASTER_B")
 
             b_path = project / "svg_working" / "S01" / "B.svg"
             b_path.write_text(svg("#35A36F"), encoding="utf-8")
             completed = run(
                 project,
-                "page-author-result",
+                "ppt-master-result",
                 "--result-json",
                 json.dumps({
                     "status": "COMPLETE",
-                    "route": "page-svg-authoring",
+                    "route": "embedded-ppt-master-stage1",
                     "artifact_path": str(b_path.resolve()),
                     "material_differences": ["Repaired B keeps a distinct emphasis treatment"],
                 }),
@@ -1281,10 +1203,10 @@ class LightweightWorkflowTests(unittest.TestCase):
             self.assertFalse(list((project / "svg_working" / "S01").glob("R*.svg")))
             self.assertFalse(list((project / "working" / "receipts").glob("S01-R*.json")))
 
-    def test_later_batch_page_cannot_be_repaired_before_current_page_finishes(self) -> None:
+    def test_later_page_cannot_be_repaired_before_current_page_finishes(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             project = Path(tmp)
-            setup_batch_ab(project)
+            setup_sequential_ab(project)
             presented = run(project, "present-ab")
             self.assertEqual(presented.returncode, 0, presented.stdout + presented.stderr)
 
@@ -1377,17 +1299,17 @@ class LightweightWorkflowTests(unittest.TestCase):
                 "Make the evidence relationship clearer",
             )
             self.assertEqual(requested.returncode, 0, requested.stdout + requested.stderr)
-            prepared = run(project, "prepare-authoring", "--page", "S01")
+            prepared = run(project, "prepare-ppt-master", "--page", "S01")
             self.assertEqual(prepared.returncode, 0, prepared.stdout + prepared.stderr)
             revision = project / "svg_working" / "S01" / "R1.svg"
             revision.write_text(svg("#FFFACC", '<circle cx="700" cy="300" r="80" fill="#FFE600"/>'), encoding="utf-8")
             completed = run(
                 project,
-                "page-author-result",
+                "ppt-master-result",
                 "--result-json",
                 json.dumps({
                     "status": "COMPLETE",
-                    "route": "page-svg-authoring",
+                    "route": "embedded-ppt-master-stage1",
                     "artifact_path": str(revision.resolve()),
                 }),
             )
@@ -1455,6 +1377,28 @@ class LightweightWorkflowTests(unittest.TestCase):
                 f"working/receipts/S01-{revision_id}-presentation.json",
             )
 
+    def test_pre_display_revision_defect_reauthors_same_revision_slot(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project = Path(tmp)
+            revision_id = setup_presented_revision(project)
+            repaired = run(
+                project,
+                "repair-candidate",
+                "--page",
+                "S01",
+                "--version",
+                revision_id,
+                "--note",
+                "Rendered revision clips the source line",
+            )
+            self.assertEqual(repaired.returncode, 0, repaired.stdout + repaired.stderr)
+            self.assertFalse((project / "svg_working" / "S01" / f"{revision_id}.svg").exists())
+            self.assertFalse(receipt_path(project, "S01", f"{revision_id}-authoring").exists())
+            self.assertEqual(
+                json.loads(run(project, "next", "--format", "json").stdout)["action"],
+                "RUN_PPT_MASTER_REVISION",
+            )
+
     def test_revision_confirmation_rejects_version_outside_displayed_pair(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             project = Path(tmp)
@@ -1519,11 +1463,11 @@ class LightweightWorkflowTests(unittest.TestCase):
             revision.write_text(svg("#D9D9D9"), encoding="utf-8")
             completed = run(
                 project,
-                "page-author-result",
+                "ppt-master-result",
                 "--result-json",
                 json.dumps({
                     "status": "COMPLETE",
-                    "route": "page-svg-authoring",
+                    "route": "embedded-ppt-master-stage1",
                     "artifact_path": str(revision.resolve()),
                 }),
             )
@@ -1574,11 +1518,11 @@ class LightweightWorkflowTests(unittest.TestCase):
             a_path.write_text(svg(), encoding="utf-8")
             completed = run(
                 project,
-                "page-author-result",
+                "ppt-master-result",
                 "--result-json",
                 json.dumps({
                     "status": "COMPLETE",
-                    "route": "page-svg-authoring",
+                    "route": "embedded-ppt-master-stage1",
                     "artifact_path": str(a_path.resolve()),
                 }),
             )
@@ -1600,11 +1544,11 @@ class LightweightWorkflowTests(unittest.TestCase):
             revision.write_text(svg("#D9D9D9"), encoding="utf-8")
             completed = run(
                 project,
-                "page-author-result",
+                "ppt-master-result",
                 "--result-json",
                 json.dumps({
                     "status": "COMPLETE",
-                    "route": "page-svg-authoring",
+                    "route": "embedded-ppt-master-stage1",
                     "artifact_path": str(revision.resolve()),
                 }),
             )
@@ -1736,7 +1680,7 @@ class LightweightWorkflowTests(unittest.TestCase):
                 "--result-json",
                 json.dumps({
                     "status": "COMPLETE",
-                    "route": "confirmed-svg-export",
+                    "route": "embedded-ppt-master-stage2",
                     "artifact_path": str(pptx.resolve()),
                 }),
             )
@@ -1763,7 +1707,7 @@ class LightweightWorkflowTests(unittest.TestCase):
                 "--result-json",
                 json.dumps({
                     "status": "COMPLETE",
-                    "route": "confirmed-svg-export",
+                    "route": "embedded-ppt-master-stage2",
                     "artifact_path": str(wrong.resolve()),
                 }),
             )
@@ -1778,15 +1722,15 @@ class LightweightWorkflowTests(unittest.TestCase):
             result = run(project, "next", "--format", "json")
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             payload = json.loads(result.stdout)
-            self.assertEqual(payload["action"], "PREPARE_CONFIRMED_EXPORT")
+            self.assertEqual(payload["action"], "PREPARE_PPT_MASTER_EXPORT")
             self.assertIn("prepare-export", payload["commands"]["run"])
             prepared = prepare_export(project)
             self.assertEqual(prepared.returncode, 0, prepared.stdout + prepared.stderr)
             result = run(project, "next", "--format", "json")
             payload = json.loads(result.stdout)
-            self.assertEqual(payload["action"], "RUN_CONFIRMED_EXPORT")
-            self.assertEqual(payload["route"], "$ey-deck-design / Confirmed SVG Export")
-            self.assertIn("bundled deterministic", payload["executor"])
+            self.assertEqual(payload["action"], "RUN_PPT_MASTER_EXPORT")
+            self.assertEqual(payload["route"], "$ey-deck-design / Embedded PPT Master / Stage 2")
+            self.assertIn("Embedded PPT Master Stage 2", payload["executor"])
             self.assertTrue(Path(payload["export_manifest"]).is_file())
             self.assertEqual(
                 payload["runner_command"][0],
@@ -1819,7 +1763,7 @@ class LightweightWorkflowTests(unittest.TestCase):
                     "--result-json",
                     json.dumps({
                         "status": "BLOCKED",
-                        "route": "confirmed-svg-export",
+                        "route": "embedded-ppt-master-stage2",
                         "stage": "export",
                         "slide_ids": [],
                         "reason": "runtime unavailable",
@@ -1846,7 +1790,7 @@ class LightweightWorkflowTests(unittest.TestCase):
                 "--result-json",
                 json.dumps({
                     "status": "BLOCKED",
-                    "route": "confirmed-svg-export",
+                    "route": "embedded-ppt-master-stage2",
                     "stage": "export",
                     "slide_ids": ["S01"],
                     "reason": "output directory unavailable",
@@ -1860,6 +1804,35 @@ class LightweightWorkflowTests(unittest.TestCase):
             self.assertEqual(resumed.returncode, 0, resumed.stdout + resumed.stderr)
             self.assertIn("STAGE_1_COMPLETE", resumed.stdout)
             self.assertTrue((project / "svg_output" / "S01.svg").is_file())
+
+    def test_environment_handoff_block_is_recorded_after_bound_runtime_breaks(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project = Path(tmp)
+            (project / "framework.md").write_text(protected_framework(), encoding="utf-8")
+            self.assertEqual(run(project, "materialize-protected").returncode, 0)
+            self.assertEqual(prepare_export(project).returncode, 0)
+            runtime_path = project / "working" / "receipts" / "stage2-runtime.json"
+            runtime = json.loads(runtime_path.read_text(encoding="utf-8"))
+            runtime["bundled_python"] = str(project / "missing-python")
+            write_json(runtime_path, runtime)
+            next_payload = json.loads(run(project, "next", "--format", "json").stdout)
+            self.assertEqual(next_payload["action"], "PREPARE_PPT_MASTER_EXPORT")
+            blocked = run(
+                project,
+                "handoff-result",
+                "--result-json",
+                json.dumps({
+                    "status": "BLOCKED",
+                    "route": "embedded-ppt-master-stage2",
+                    "stage": "runtime validation",
+                    "slide_ids": ["S01"],
+                    "reason": "bound Python disappeared during export",
+                    "repair_scope": "environment",
+                    "resume_from": "restore the bound runtime and retry",
+                }),
+            )
+            self.assertEqual(blocked.returncode, 0, blocked.stdout + blocked.stderr)
+            self.assertIn("RESOLVE_HANDOFF_BLOCK", blocked.stdout)
 
     def test_source_svg_handoff_reopens_normal_page_without_open_items(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -1884,7 +1857,7 @@ class LightweightWorkflowTests(unittest.TestCase):
                 "--result-json",
                 json.dumps({
                     "status": "BLOCKED",
-                    "route": "confirmed-svg-export",
+                    "route": "embedded-ppt-master-stage2",
                     "stage": "svg-gate",
                     "slide_ids": ["S01"],
                     "reason": "confirmed source requires a technical SVG replacement",
@@ -1905,7 +1878,7 @@ class LightweightWorkflowTests(unittest.TestCase):
             updated = (project / "framework.md").read_text(encoding="utf-8")
             self.assertIn("- Status: Content locked", updated)
             self.assertIn("- Open items: None", updated)
-            self.assertIn("PREPARE_SVG_A", resumed.stdout)
+            self.assertIn("PREPARE_PPT_MASTER_A", resumed.stdout)
 
     def test_source_svg_handoff_block_reopens_only_changed_protected_page(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -1922,7 +1895,7 @@ class LightweightWorkflowTests(unittest.TestCase):
                 "--result-json",
                 json.dumps({
                     "status": "BLOCKED",
-                    "route": "confirmed-svg-export",
+                    "route": "embedded-ppt-master-stage2",
                     "stage": "svg-gate",
                     "slide_ids": ["S01"],
                     "reason": "confirmed source requires replacement",
@@ -1946,7 +1919,7 @@ class LightweightWorkflowTests(unittest.TestCase):
             project = Path(tmp)
             (project / "content.md").write_text(content(), encoding="utf-8")
             old = framework("Content locked", "2.7").replace(
-                "- Framework version: 2.6", "- Framework version: 2.2"
+                "- Framework version: 2.7", "- Framework version: 2.2"
             ).replace(
                 "- Storyline version: 1.0",
                 "- Storyline version: 1.0\n"
@@ -1960,7 +1933,7 @@ class LightweightWorkflowTests(unittest.TestCase):
                 "- Status: Content locked", "- Status: SVG selected"
             ).replace("- Confirmed version: Pending", "- Confirmed version: A")
             migrated = migrate_workflow(old, project)
-            self.assertIn("- Framework version: 2.6", migrated)
+            self.assertIn("- Framework version: 2.7", migrated)
             self.assertIn("- Workflow version: 3.8", migrated)
             self.assertNotIn("- Last checkpoint:", migrated)
             self.assertNotIn("- Final PPTX owner:", migrated)
@@ -1974,18 +1947,53 @@ class LightweightWorkflowTests(unittest.TestCase):
             project = Path(tmp)
             old = (
                 framework("Not started")
-                .replace("- Framework version: 2.6", "- Framework version: 2.5")
+                .replace("- Framework version: 2.7", "- Framework version: 2.6")
                 .replace("- Workflow version: 3.8", "- Workflow version: 3.7")
                 .replace("- Requested authoring mode: Standard\n", "")
                 .replace("- Page type: Standard content", "- Page type: Cover")
                 .replace("- Authoring mode: Standard\n", "")
+                .replace("- Next connection: None", "- Next connection: None\n- Review mode: Batch")
                 .replace("- Confirmed version:", "- Selected version:")
             )
+            path = project / "framework.md"
+            path.write_text(old, encoding="utf-8")
+            self.assertTrue(
+                any("unsupported fields: Review mode" in item for item in validate_framework(path, None))
+            )
             migrated = migrate_workflow(old, project)
+            self.assertNotIn("- Review mode:", migrated)
             self.assertIn("- Requested authoring mode: Standard", migrated)
             self.assertIn("- Authoring mode: Simplified", migrated)
             self.assertIn("- Confirmed version: Pending", migrated)
             self.assertNotIn("- Selected version:", migrated)
+
+    def test_migration_archives_legacy_active_authoring_block(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project = Path(tmp)
+            (project / "content.md").write_text(content(), encoding="utf-8")
+            legacy_receipt = receipt_path(project, "S01", "A-authoring")
+            write_json(legacy_receipt, {
+                "status": "BLOCKED",
+                "route": "page-svg-authoring",
+                "slide_id": "S01",
+                "version": "A",
+                "stage": "preview",
+                "reason": "legacy block",
+                "repair_scope": "source-svg",
+                "resume_from": "retry",
+                "slide_ids": ["S01"],
+                "active": True,
+            })
+            migrated = migrate_workflow(framework("Content locked", "4.0"), project)
+            (project / "framework.md").write_text(migrated, encoding="utf-8")
+            self.assertFalse(legacy_receipt.exists())
+            archived = list(
+                (project / "working" / "archive" / "workflow-4.1-stage1-boundary").rglob(
+                    "S01-A-authoring.json"
+                )
+            )
+            self.assertEqual(len(archived), 1)
+            self.assertNotEqual(directive(migrated, project)[0], "RESOLVE_PAGE_AUTHOR_BLOCK")
 
     def test_migration_preserves_valid_legacy_confirmed_page(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -1999,7 +2007,7 @@ class LightweightWorkflowTests(unittest.TestCase):
             final_path.write_text(svg(), encoding="utf-8")
             old = (
                 framework("SVG confirmed")
-                .replace("- Framework version: 2.6", "- Framework version: 2.5")
+                .replace("- Framework version: 2.7", "- Framework version: 2.6")
                 .replace("- Workflow version: 3.8", "- Workflow version: 3.7")
                 .replace("- Requested authoring mode: Standard\n", "")
                 .replace("- Authoring mode: Standard\n", "")
@@ -2097,7 +2105,7 @@ class LightweightWorkflowTests(unittest.TestCase):
         }
         errors = validate_terminal_result(manifest, {
             "status": "BLOCKED",
-            "route": "confirmed-svg-export",
+            "route": "embedded-ppt-master-stage2",
             "stage": "export",
             "reason": "missing dependency",
             "repair_scope": "environment",
@@ -2130,7 +2138,7 @@ class LightweightWorkflowTests(unittest.TestCase):
             })
             write_json(receipt_path(project, "S03", "A-authoring"), {
                 "status": "COMPLETE",
-                "route": "page-svg-authoring",
+                "route": "embedded-ppt-master-stage1",
                 "slide_id": "S03",
                 "authoring_mode": "Standard",
                 "version": "A",
@@ -2140,8 +2148,8 @@ class LightweightWorkflowTests(unittest.TestCase):
                 "packet_sha256": packet["packet_sha256"],
                 "visible_copy_contract_sha256": packet["visible_copy_contract_sha256"],
                 "template_structure_contract_sha256": packet["template_structure_contract_sha256"],
-                "preflight_gate": {
-                    "schema": "ey-deck.page-preflight.v2",
+                "acceptance_gate": {
+                    "schema": "ey-deck.stage1-acceptance.v1",
                     "status": "PASS",
                     "artifact_sha256": sha256(working_svg),
                     "visible_copy_contract_sha256": packet["visible_copy_contract_sha256"],
@@ -2150,7 +2158,7 @@ class LightweightWorkflowTests(unittest.TestCase):
                 "active": False,
                 "terminal_result": {
                     "status": "COMPLETE",
-                    "route": "page-svg-authoring",
+                    "route": "embedded-ppt-master-stage1",
                     "artifact_path": str(working_svg.resolve()),
                 },
             })
