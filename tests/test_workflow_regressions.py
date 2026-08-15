@@ -58,11 +58,9 @@ CONTENT = r"""## S01｜Approved title
 
 ### Visual Direction（Build-only）
 - Page type: Interpretation
-- Visual focus: Never render this direction.
-- Information hierarchy: Never render this hierarchy.
-- Relationship to preserve: Never render this relationship.
-- Fixed constraints: Never render this constraint.
-- Avoid: Never render this warning.
+- Visual priority: Never render this priority.
+- Semantic relationship: Never render this relationship.
+- Guardrails: Never render this warning.
 
 ### Sources
 - On-slide source: Approved source.
@@ -82,11 +80,9 @@ AGENDA_CONTENT = """## S02｜目录
 
 ### Visual Direction（Build-only）
 - Page type: Agenda
-- Visual focus: 三个章节名称
-- Information hierarchy: 标题后依次阅读三个章节名称
-- Relationship to preserve: 三个章节按汇报顺序并列展开
-- Fixed constraints: 保留批准的章节名称与顺序
-- Avoid: 不得加入章节说明或摘要
+- Visual priority: 标题后依次阅读三个章节名称
+- Semantic relationship: 三个章节按汇报顺序并列展开
+- Guardrails: 保留批准的名称与顺序；不得加入说明或摘要
 
 ### Sources
 - On-slide source: None
@@ -463,44 +459,44 @@ class StructuredTemplateContractTests(unittest.TestCase):
         self.assertIn('data-ey-fixed-ending="true"', prototype.read_text(encoding="utf-8"))
         self.assertEqual(template_candidate_errors(prototype, ending), [])
 
+    def test_content_proxy_is_an_open_borderless_canvas_carrier(self) -> None:
+        content_binding = page_template_binding("Standard content")
+        self.assertIsNotNone(content_binding)
+        assert content_binding is not None
+        root = ET.parse(Path(content_binding["prototype_path"])).getroot()
+        region = next(
+            element for element in root.iter() if element.get("id") == "content-region"
+        )
+        self.assertEqual(region.get("data-pptx-binding"), "proxy")
+        carrier = list(region)
+        self.assertEqual(len(carrier), 1)
+        self.assertEqual(carrier[0].get("fill"), "#000000")
+        self.assertEqual(carrier[0].get("stroke"), "none")
+        self.assertIsNone(carrier[0].get("rx"))
 
-class ContentFitPolicyTests(unittest.TestCase):
-    def _svg(self, *, font_size: str, lines: int, justification: str = "") -> str:
-        density = (
-            f' data-density-justification="{justification}"' if justification else ""
-        )
-        tspans = "".join(
-            f'<tspan x="80" y="{180 + index * 20}">Body line {index + 1}</tspan>'
-            for index in range(lines)
-        )
+
+class TypographyBoundaryTests(unittest.TestCase):
+    def _svg(self, font_size: str) -> str:
         return (
-            '<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" '
-            'viewBox="0 0 1280 720" data-pptx-layout="content">'
-            f'<text data-copy-id="S01-B1-detail" x="80" y="180" '
-            f'font-size="{font_size}"{density}>{tspans}</text></svg>'
+            '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720">'
+            '<text data-copy-id="S01-B1-detail" x="80" y="180" '
+            f'font-size="{font_size}">Short body</text></svg>'
         )
 
-    def test_short_8pt_body_is_rejected(self) -> None:
+    def test_short_8pt_copy_is_allowed(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
-            path = Path(tmp) / "short.svg"
-            path.write_text(self._svg(font_size="10.6667", lines=4), encoding="utf-8")
-            self.assertTrue(any("content-fit policy" in error for error in candidate_errors(path)))
+            path = Path(tmp) / "short-8pt.svg"
+            path.write_text(self._svg("10.6667"), encoding="utf-8")
+            self.assertEqual([], candidate_errors(path))
 
-    def test_10pt_or_genuinely_dense_8pt_body_passes(self) -> None:
+    def test_unlisted_font_size_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
-            root = Path(tmp)
-            cases = {
-                "ten.svg": self._svg(font_size="13.3333", lines=3),
-                "five-lines.svg": self._svg(font_size="10.6667", lines=5),
-                "dense.svg": self._svg(
-                    font_size="10.6667", lines=3, justification="dense-table"
-                ),
-            }
-            for name, svg in cases.items():
-                path = root / name
-                path.write_text(svg, encoding="utf-8")
-                self.assertEqual([], candidate_errors(path), name)
+            path = Path(tmp) / "unlisted-size.svg"
+            path.write_text(self._svg("12"), encoding="utf-8")
+            self.assertTrue(candidate_errors(path))
 
+
+class TemplateIntegrityTests(unittest.TestCase):
     def test_page_type_mapping_and_fixed_atom_tamper_detection(self) -> None:
         binding = page_template_binding("Section divider")
         self.assertIsNotNone(binding)

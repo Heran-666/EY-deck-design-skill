@@ -49,8 +49,8 @@ PPT_MASTER_STAGE1_INSTRUCTION = (
 
 B_OPTION_KERNEL = (
     "B option guidance (advisory, never a blocking gate): start from the same locked content and semantic "
-    "Visual Direction without treating A as a repair target. A different suitable composition family or focal "
-    "mechanism may improve the usefulness of the choice, but similarity to A never blocks authoring, Visual QA, "
+    "Visual Direction without treating A as a repair target. A different complete visual approach may improve "
+    "the usefulness of the choice, but similarity to A never blocks authoring, Visual QA, "
     "presentation, or confirmation. Preserve all approved copy, data, sources, emphasis, semantic relationships, "
     "fixed constraints, and the same canvas."
 )

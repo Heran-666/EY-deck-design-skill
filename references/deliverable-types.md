@@ -53,8 +53,8 @@ Apply this universal structural shell before the selected type policy:
 - mark Cover, Agenda, and Section divider pages `Simplified`; apply the user's
   requested mode only to substantive content pages.
 
-Agenda uses its dedicated two-column numbered-card Layout while owning its directory
-composition as editable page content.
+Agenda uses its dedicated editable Layout while Embedded PPT Master owns its
+directory composition.
 
 After confirmation, read [storyline-and-content.md](storyline-and-content.md) and exactly one primary type policy:
 

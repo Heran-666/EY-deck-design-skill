@@ -1,15 +1,10 @@
-# EY page design principles
+# EY typography and integrity policy
 
 This reference supplies EY visual and typography policy to Embedded PPT Master Stage 1. PPT Master owns concept, composition, SVG construction, rendered visual QA, and internal repair. Do not expand content-facing Visual Direction into a wireframe, coordinate plan, or construction manual.
 
-## Canvas and visual language
+## Canvas and typography
 
 - Use the `ppt169` SVG canvas: `1280 × 720`.
-- Default background: black `#000000`; primary text: white `#FFFFFF`.
-- EY yellow `#FFE600` is the strongest emphasis; pale yellow `#FFFACC` is secondary; gray `#D9D9D9`/`#A6A6A6` supports hierarchy.
-- Use blue `#188CE5` only for a real comparison or contrast, never as a generic decorative accent.
-- Prefer Microsoft YaHei for Chinese and Calibri for English unless the user supplies another system.
-- Maintain readable hierarchy; do not shrink principal content merely to force a crowded page.
 
 Use this complete typography scale for every visible text run. Author with the
 listed SVG `font-size` value; the exporter converts it to the required PPTX
@@ -25,54 +20,54 @@ point size. Do not use intermediate or ad hoc sizes.
 | Other information | 6 pt | `8` | Notes, sources, annotations, and other tertiary information |
 
 Both permitted body-heading sizes and both permitted body-content sizes may
-appear on one page when importance differs. Choose only by information density
-and importance. A framed text block must fit its container: do not leave a
-large unused right or lower zone around short 8 pt copy. Prefer, in order:
-
-1. use 10 pt body copy;
-2. right-size or recompose the container;
-3. reopen content when the approved argument is materially incomplete;
-4. add only a semantic device that explains a relationship, sequence,
-   comparison, evidence status, or takeaway.
-
-Never add decorative filler or invent copy. Stage 1 acceptance rejects a
-normal Content-page 8 pt text block with four or fewer rendered lines unless
-the block carries an explicit `data-density-justification="dense-table"` or
-`data-density-justification="compact-matrix"` on itself or an ancestor. Use
-either exception only when 10 pt cannot fit after the composition and
-container have been optimized. If approved content still does not fit, revise
-the composition or reopen the content decision; never create another size or
-shrink principal content below its role.
-
-Except for this fixed typography scale, these remain directional principles,
-not SVG implementation rules. The bounded authoring action decides exact
-geometry, wrapping, grouping, spacing, and visual treatment.
+appear on one page. Use only the listed sizes; Embedded PPT Master otherwise
+owns typography-role assignment, geometry, wrapping, grouping, spacing, color,
+imagery, and visual treatment.
 
 ## Visual Direction
 
-Consume the approved semantic `Visual Direction（Build-only）` defined by [output-contract.md](output-contract.md). Preserve its attention priority and meaning without turning it into a card/grid/panel, named composition, coordinate plan, asset list, or wireframe. Retain room for two independent solutions.
+Consume the approved semantic `Visual Direction（Build-only）` defined by
+[output-contract.md](output-contract.md). Preserve its meaning without treating
+it as a prescribed layout or implementation plan.
 
-For authored Content pages, apply the authoring-only repertoire in
-[composition-and-data-visual-language.md](composition-and-data-visual-language.md).
-Choose one composition family from the approved meaning and use one signature
-EY gesture to establish a first read, second read, and supporting read. Do not
-default to a bordered core-insight banner followed by equal text columns, and
-do not treat a complete set of approved numbers as prose when an editable
-visual encoding communicates the relationship more directly.
+## Visual language and color economy
 
-## Page and asset principles
+Default authored content pages to black, white, neutral greys, and EY yellow.
+Use at most one additional accent hue on a page, and only when it carries an
+explicit, audience-relevant category, state, threshold, or comparison meaning.
+Never assign a different color to every peer merely to separate adjacent
+content. Labels, position, scale, grouping, line treatment, and whitespace must
+carry the structure first; color may reinforce that structure but must not
+invent it. Fixed Cover, Divider, Agenda, Ending, and inherited template artwork
+remain exempt from this authored-content palette rule.
 
-- Only the single opening Cover may optionally use a dark, text-free ImageGen background. Agenda and Section divider pages do not use ImageGen. Other pages use generated imagery only when it materially helps comprehension.
-- Keep tables and charts editable, simple, and evidence-backed. Do not invent missing labels, values, units, dates, caveats, or sources.
-- Use tables for exact multi-field lookup. For trend, ranking, gap,
-  part-to-whole, range, or another approved quantitative relationship, prefer
-  the simplest truthful chart or data mark defined in the authoring-only visual
-  repertoire.
-- On normal Content pages, prefer open composition, meaningful alignment, and
-  negative space over repeated rounded cards, bordered panels, pills, badges,
-  or a dashboard-like grid. The dedicated Agenda Layout remains the card-grid
-  exception.
-- Preserve approved copy, data, sources, emphasis, semantic relationships, and brand constraints.
+Treat content IDs as argument semantics, never as a container inventory. Do not
+default each block to an equal card, rounded panel, arrow, pill, column, or
+identically weighted module. Avoid nested panels and repeated decorative
+containers when one page-scale structure can express the relationship. Merge,
+stagger, subordinate, or spatially integrate blocks when that improves the
+approved meaning and reading task.
+
+Use one dominant composition per page. For evidence–system–outcome or
+input–mechanism–result arguments, keep evidence visually subordinate, make the
+mechanism or system the main explanatory object, and give the outcome a clear
+focal role. Express integration or convergence with one coherent shared
+structure or path rather than a row of separately colored peer arrows. Use
+proportion, asymmetry, rhythm, whitespace, typography, and precise geometry to
+create visual sophistication while preserving native editability.
+
+Choose the clearest truthful editable information model. Simplicity applies to
+the semantic model and audience reading task, not to visual ambition,
+composition quality, or craft. Native-PPTX compatibility does not justify a
+generic dashboard, equal-card grid, or mechanically literal block-to-shape
+mapping.
+
+## Integrity boundary
+
+Preserve approved copy, data, sources, emphasis, semantic relationships, fixed
+template atoms, and export compatibility. Do not invent missing factual labels,
+values, units, dates, caveats, or sources. These integrity requirements do not
+prescribe composition, color, imagery, information visualization, or layout.
 
 ## Mode-aware design intent
 
@@ -83,9 +78,8 @@ For a `Standard` page, produce two complete interpretations from the same locked
 - A: one confident complete solution.
 - B: another complete solution from the same locked content, not a repair of A.
 
-Both preserve the same approved meaning and canvas. A different composition
-family or focal mechanism can improve the usefulness of the choice, but this
-remains advisory. B may report material differences; identical A/B bytes or
+Both preserve the same approved meaning and canvas. B may use any complete
+visual approach and may report material differences; identical A/B bytes or
 insufficient difference evidence do not block production, comparison, or user
 selection. In either mode, the controller owns the
 manifest, presentation, user decision, revisions, and handoff. See

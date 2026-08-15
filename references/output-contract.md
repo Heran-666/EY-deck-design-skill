@@ -27,7 +27,11 @@ Begin both provisional and canonical files with only the deck language. Project-
 - Language: <Chinese | English>
 ```
 
-The fixed canvas and project exceptions remain in `framework.md`; basic EY palette, hierarchy, editability, and ImageGen principles remain in the design reference; display/decision evidence remains in controller receipts. Do not copy them into `content.md`. Do not add a Storyline table, intake-analysis register, coverage matrix, review log, open questions, or assumptions register.
+The fixed canvas and project exceptions remain in `framework.md`; fixed
+typography and integrity rules remain in the design reference;
+display/decision evidence remains in controller receipts. Do not copy them into
+`content.md`. Do not add a Storyline table, intake-analysis register, coverage
+matrix, review log, open questions, or assumptions register.
 
 ## 3. Page schema
 
@@ -71,11 +75,9 @@ Use this structure for each locked page:
 
 ### Visual Direction（Build-only）
 - Page type: <Cover | Agenda | Section divider | Standard content | Methodology | Approach | Table-led | Chart-led | Deliverable | Case | other precise type>
-- Visual focus: <the claim, value, or content ID that should receive first attention>
-- Information hierarchy: <primary and supporting information plus intended reading order, without layout>
-- Relationship to preserve: <semantic relationship among the approved content>
-- Fixed constraints: <approved content, evidence, emphasis, brand, or page-specific non-negotiables>
-- Avoid: <page-specific meaning, emphasis, or comprehension failures; no visual solution>
+- Visual priority: <the first-attention claim or value, plus only the necessary supporting hierarchy>
+- Semantic relationship: <the non-obvious causal, comparative, convergent, sequential, or hierarchical relationship to preserve>
+- Guardrails: <only page-specific non-negotiables and comprehension failures to avoid; no global-policy repetition or visual solution>
 
 ### Sources
 - On-slide source: <exact footer or None>
@@ -127,13 +129,13 @@ For an Agenda, it additionally contains one deterministic `agenda-number` item
 for every label block. These number items are system-derived visible copy, not
 template-fixed copy: they must be bound and exported as editable text.
 
-Annotate emphasis by quoting the exact target substring. Use only `关键重点`, `次级重点`, `对比重点`, and `普通加粗`. Use `对比重点` only when the page's `Relationship to preserve` states an explicit comparison or contrast; otherwise use yellow, pale yellow, or white emphasis.
+Annotate emphasis by quoting the exact target substring. Use only `关键重点`, `次级重点`, `对比重点`, and `普通加粗`. Use `对比重点` only when the page's `Semantic relationship` states an explicit comparison or contrast; otherwise use yellow, pale yellow, or white emphasis.
 
 Keep titles on one line and within 36 Chinese-width characters. Shorten crowded titles; the page-authoring action assigns text roles and chooses only from the fixed typography scale in `design-system.md`.
 
 ## 5. Semantic Visual Direction
 
-Use only the five Visual Direction decisions plus `Page type`. State what dominates, the semantic reading order/relationship, confirmed constraints, and comprehension failures to avoid.
+Use only the three Visual Direction decisions plus `Page type`. Keep each decision to one concise sentence and record only information that is not already self-evident from the approved content. `Visual priority` combines the focal claim and necessary hierarchy; `Semantic relationship` records only the relationship whose loss would change meaning; `Guardrails` combines page-specific non-negotiables and comprehension failures. Do not repeat global exact-copy, source, brand, typography, template, or export rules.
 
 Do not name or sketch a composition, layout family, geometry, position, shape, card/grid/panel structure, timeline, funnel, matrix, or other concrete design solution. Do not include coordinates, dimensions, font sizes, asset links, or construction instructions. The bounded page-authoring action owns composition and typography-role assignment within the fixed scale. Keep the Visual Direction open enough for one complete `Simplified` solution or two independent `Standard` A/B solutions under [authoring-modes.md](authoring-modes.md).
 

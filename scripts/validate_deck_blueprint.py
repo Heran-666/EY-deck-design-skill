@@ -23,11 +23,9 @@ PROFILE_FIELDS = (
 )
 DESIGN_FIELDS = (
     "Page type",
-    "Visual focus",
-    "Information hierarchy",
-    "Relationship to preserve",
-    "Fixed constraints",
-    "Avoid",
+    "Visual priority",
+    "Semantic relationship",
+    "Guardrails",
 )
 VISUAL_DIRECTION_FIELD_LIMIT = 400
 HARD_DESIGN_PRESCRIPTION_RE = re.compile(
@@ -315,28 +313,11 @@ def validate_slide(slide_id: str, section: str) -> tuple[list[str], str]:
                 )
 
     page_type = brief_fields.get("Page type", "")
-    normalized_type = page_type.strip().lower()
     if re.search(r"对比重点", section):
-        relationship = brief_fields.get("Relationship to preserve", "")
+        relationship = brief_fields.get("Semantic relationship", "")
         if not re.search(r"comparison|contrast|versus|\bvs\b|对比|比较|差异", relationship, re.IGNORECASE):
             errors.append(f"{slide_id} uses 对比重点 without an explicit comparison relationship")
-    if normalized_type in {"agenda", "section divider"} and re.search(r"ImageGen", section, re.IGNORECASE):
-        errors.append(f"{slide_id} {page_type} must not mention or use ImageGen")
     errors.extend(agenda_schema_errors(section, slide_id))
-    if normalized_type != "cover":
-        for line in section.splitlines():
-            if re.search(r"ImageGen", line, re.IGNORECASE) and re.search(
-                r"background|背景", line, re.IGNORECASE
-            ) and not re.search(
-                r"do not|must not|never|no |不得|不要|禁止|不使用|不可", line, re.IGNORECASE
-            ):
-                errors.append(f"{slide_id} non-cover page must not request an ImageGen background")
-                break
-    elif re.search(r"ImageGen", section, re.IGNORECASE):
-        if not re.search(r"background|背景", section, re.IGNORECASE):
-            errors.append(f"{slide_id} Cover ImageGen use must be a background")
-        if not re.search(r"text[- ]free|no embedded text|无文字|不含文字", section, re.IGNORECASE):
-            errors.append(f"{slide_id} Cover ImageGen background must prohibit embedded text")
 
     if "[占位：" in section and not is_placeholder:
         errors.append(f"{slide_id} protected placeholder must prohibit replacement content and design")

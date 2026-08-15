@@ -112,11 +112,9 @@ def content(slide_id: str = "S01") -> str:
 
 ### Visual Direction（Build-only）
 - Page type: Standard content
-- Visual focus: The recommendation
-- Information hierarchy: Conclusion first, evidence second
-- Relationship to preserve: Evidence supports action
-- Fixed constraints: Preserve approved copy
-- Avoid: Weakening the conclusion
+- Visual priority: The recommendation first; evidence remains supporting
+- Semantic relationship: Evidence supports action
+- Guardrails: Do not weaken the conclusion
 
 ### Sources
 - On-slide source: None
@@ -1966,6 +1964,39 @@ class LightweightWorkflowTests(unittest.TestCase):
             self.assertIn("- Authoring mode: Simplified", migrated)
             self.assertIn("- Confirmed version: Pending", migrated)
             self.assertNotIn("- Selected version:", migrated)
+
+    def test_migration_compacts_legacy_visual_direction_schema(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project = Path(tmp)
+            old_content = content().replace(
+                "- Visual priority: The recommendation first; evidence remains supporting\n"
+                "- Semantic relationship: Evidence supports action\n"
+                "- Guardrails: Do not weaken the conclusion",
+                "- Visual focus: The recommendation\n"
+                "- Information hierarchy: Conclusion first, evidence second\n"
+                "- Relationship to preserve: Evidence supports action\n"
+                "- Fixed constraints: Preserve approved copy\n"
+                "- Avoid: Do not weaken the conclusion",
+            )
+            content_path = project / "content.md"
+            content_path.write_text(old_content, encoding="utf-8")
+            self.assertTrue(
+                any("unsupported fields" in item for item in validate_blueprint(content_path))
+            )
+
+            framework_text = framework("Not started")
+            migrated_framework = migrate_workflow(framework_text, project)
+            migrated_content = content_path.read_text(encoding="utf-8")
+            self.assertEqual(migrated_framework, framework_text)
+            self.assertIn("- Visual priority: The recommendation; Conclusion first, evidence second", migrated_content)
+            self.assertIn("- Semantic relationship: Evidence supports action", migrated_content)
+            self.assertIn(
+                "- Guardrails: Preserve approved copy; Do not weaken the conclusion",
+                migrated_content,
+            )
+            self.assertNotIn("- Visual focus:", migrated_content)
+            self.assertNotIn("- Relationship to preserve:", migrated_content)
+            self.assertEqual(validate_blueprint(content_path), [])
 
     def test_migration_archives_legacy_active_authoring_block(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

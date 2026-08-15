@@ -459,9 +459,9 @@ def ensure_authoring_packet(text: str, project_dir: Path, page: PageEntry) -> di
         "Build-only text must never be visible. Text may be split into nested tspans inside one bound element or group. "
         "Start from the exact structured-template prototype below. Preserve its root Master/Layout "
         "identity, every fixed Master/Layout atom byte-for-byte, and every placeholder "
-        "id/type/index/bounds. Replace only placeholder content; the content-region proxy may "
-        "contain the page-specific composition. For an Agenda, start from the dedicated agenda "
-        "prototype and replace only its title and agenda-region placeholder content.\n\n"
+        "id/type/index/bounds. Attach page-authored elements to the editable placeholder proxy for "
+        "export, but treat its stored bounds as metadata rather than a composition restriction. "
+        "Embedded PPT Master otherwise owns the full visual approach.\n\n"
         + buffer.getvalue().strip()
         + "\n\n## Bound structured template\n\n```json\n"
         + template_json

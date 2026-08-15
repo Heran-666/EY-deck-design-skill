@@ -78,14 +78,64 @@ def migrate_visual_direction_schema(content: str) -> str:
         return (
             "### Visual Direction（Build-only）\n"
             f"- Page type: {page_type}\n"
-            "- Visual focus: The page's approved core conclusion\n"
-            "- Information hierarchy: Core conclusion first; supporting approved content follows in semantic order\n"
-            f"- Relationship to preserve: {relationship}\n"
-            "- Fixed constraints: Approved copy, data, sources, emphasis, and semantic relationships\n"
-            "- Avoid: Do not weaken the core conclusion, omit approved content, or distort the stated relationship\n\n"
+            "- Visual priority: The page's approved core conclusion first; supporting content remains subordinate\n"
+            f"- Semantic relationship: {relationship}\n"
+            "- Guardrails: Do not weaken the core conclusion or distort the stated relationship\n\n"
         )
 
     migrated = pattern.sub(replacement, content)
+    visual_pattern = re.compile(
+        r"^### Visual Direction（Build-only）\s*$\n(.*?)(?=^### |^## S\d{2}｜|\Z)",
+        re.MULTILINE | re.DOTALL,
+    )
+
+    def compact_values(*values: str) -> str:
+        compact: list[str] = []
+        for value in values:
+            normalized = value.strip().rstrip(";；。 ")
+            if normalized and normalized not in compact:
+                compact.append(normalized)
+        return "; ".join(compact)
+
+    def migrate_visual_direction(match: re.Match[str]) -> str:
+        fields = line_fields(match.group(1))
+        legacy_fields = {
+            "Visual focus",
+            "Information hierarchy",
+            "Relationship to preserve",
+            "Fixed constraints",
+            "Avoid",
+        }
+        if (
+            {"Page type", "Visual priority", "Semantic relationship", "Guardrails"}
+            <= set(fields)
+            and not legacy_fields.intersection(fields)
+        ):
+            return match.group(0)
+        page_type = fields.get("Page type", "Standard content")
+        visual_priority = compact_values(
+            fields.get("Visual priority", ""),
+            fields.get("Visual focus", ""),
+            fields.get("Information hierarchy", ""),
+        ) or "The page's approved core conclusion; supporting content remains subordinate"
+        semantic_relationship = compact_values(
+            fields.get("Semantic relationship", ""),
+            fields.get("Relationship to preserve", ""),
+        ) or "Approved semantic relationship among the on-slide content"
+        guardrails = compact_values(
+            fields.get("Guardrails", ""),
+            fields.get("Fixed constraints", ""),
+            fields.get("Avoid", ""),
+        ) or "Do not weaken the core conclusion or distort the stated relationship"
+        return (
+            "### Visual Direction（Build-only）\n"
+            f"- Page type: {page_type}\n"
+            f"- Visual priority: {visual_priority}\n"
+            f"- Semantic relationship: {semantic_relationship}\n"
+            f"- Guardrails: {guardrails}\n\n"
+        )
+
+    migrated = visual_pattern.sub(migrate_visual_direction, migrated)
     return re.sub(
         r"^### Wireframe（Build-only）\s*$\n+```text\s*\n.*?\n```\s*\n?",
         "",
@@ -150,6 +200,9 @@ def migrate_workflow(
 ) -> str:
     original_text = text
     text = migrate_legacy_project_schema(text)
+    content_path = project_dir / "content.md"
+    content = content_path.read_text(encoding="utf-8") if content_path.is_file() else ""
+    migrated_content = migrate_visual_direction_schema(content)
     current = h2_section(text, "Current position")
     original_position = line_fields(current)
     migration_target_version = (
@@ -173,6 +226,7 @@ def migrate_workflow(
         and all("Review mode" not in page.fields for page in page_entries(text))
         and all("Confirmed version" in page.fields for page in page_entries(text))
         and all("Previous connection" not in page.fields for page in page_entries(text))
+        and migrated_content == content
         and text == original_text
     ):
         return text
@@ -308,9 +362,6 @@ def migrate_workflow(
             section = replace_field(section, "Confirmed version", "Not applicable")
         text = text.replace(page.text, section, 1)
 
-    content_path = project_dir / "content.md"
-    content = content_path.read_text(encoding="utf-8") if content_path.is_file() else ""
-    migrated_content = migrate_visual_direction_schema(content)
     if migrated_content != content:
         atomic_write(content_path, migrated_content)
         content = migrated_content

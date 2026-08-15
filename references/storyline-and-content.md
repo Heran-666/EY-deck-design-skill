@@ -6,10 +6,9 @@
 2. Page argument
 3. Semantic content structure
 4. Content richness and form selection
-5. Visual focus and supporting information
+5. Visual priority and supporting information
 6. Evidence discipline
-7. Design variety and density
-8. Quality review
+7. Quality review
 
 ## 1. Audience purpose and thesis
 
@@ -43,10 +42,10 @@ Define these before writing substantive blocks:
 - `Audience move`: the intended change in client understanding or decision posture;
 - `Core insight`: the client-facing claim that must land when the page has an argumentative role; it may remain off-slide or be omitted for a genuine transition, selected case, or protected insertion;
 - `Content logic`: how the blocks prove the claim;
-- `Visual focus`: the claim, value, or content object that should receive first attention;
+- `Visual priority`: the claim or value that should receive first attention and only the supporting hierarchy needed to land it;
 - `Supporting information`: the evidence or explanation that helps the focus land.
 
-Use these as co-creation reasoning in conversation. Do not copy `Page objective`, `Audience move`, review analysis, or a concrete design proposal into `content.md`; translate only the approved visual focus, information hierarchy, semantic relationship, fixed constraints, and page-specific comprehension risks into the page's Visual Direction.
+Use these as co-creation reasoning in conversation. Do not copy `Page objective`, `Audience move`, review analysis, or a concrete design proposal into `content.md`; translate only the approved visual priority, non-obvious semantic relationship, and page-specific guardrails into the page's Visual Direction.
 
 Challenge or merge a page that cannot articulate an audience move. Use one main claim per substantive page and explain enough for the audience to understand what it means, why it matters, how the response works, and why it is credible.
 
@@ -80,13 +79,13 @@ Choose the expression that best matches the evidence:
 
 Provide complete buildable material. Tables require exact visible headers, row labels, cells, notes, and sources. Charts require categories, series, values, units, periods, definitions, caveats, and sources. Never convert unsupported qualitative claims into invented quantitative visuals.
 
-## 5. Visual focus and supporting information
+## 5. Visual priority and supporting information
 
 Treat a visual as primary only when removing it would prevent the core conclusion from being understood. Otherwise treat it as supporting.
 
 The presence of a table does not make a page table-led. When a page explains a mechanism or principle, keep the mechanism dominant and use the table as a compact illustration. Make the table dominant only when precise comparison, mapping, or lookup is itself the argument.
 
-Record the intended information hierarchy in the Visual Direction. Prevent supporting evidence, qualifications, sources, or notes from overpowering the core mechanism or conclusion, but leave the visual solution to the bounded page-authoring action.
+Record only the necessary hierarchy in `Visual priority`. Prevent supporting evidence, qualifications, sources, or notes from overpowering the core mechanism or conclusion, but leave the visual solution to the bounded page-authoring action.
 
 ## 6. Evidence discipline
 
@@ -96,21 +95,7 @@ For each proposed evidence object, specify its proof purpose, responsible party,
 
 Use protected placeholders for unverified client or EY evidence. Do not present a working hypothesis, interpretation, illustrative example, or recommendation as an established fact.
 
-## 7. Design variety and density
-
-Prefer substantive density over decorative emptiness. For normal content pages, use enough blocks, evidence, process detail, comparison dimensions, decision criteria, deliverable features, or visual explanation to fill the argument—not a fixed quota for its own sake.
-
-When a page feels sparse, strengthen the argument before adding decoration. When it feels crowded, prioritize the content before shrinking text or splitting the page. Record only the semantic relationship, visual focus, and primary/supporting information; let the bounded page-authoring action own composition and adjacent-page visual variety under [design-system.md](design-system.md).
-
-Before locking a normal content page, explicitly check whether its approved
-argument is sufficient for the promised page role. If the only plausible
-composition would put short copy in oversized frames, enrich the approved
-explanation with missing evidence, implications, criteria, steps, or caveats
-when supported by the source. Do not pad wording. If the argument is already
-complete, leave the copy unchanged and let page authoring use 10 pt body text,
-smaller containers, or a semantic visual device.
-
-## 8. Quality review
+## 7. Quality review
 
 Confirm that:
 
@@ -120,6 +105,3 @@ Confirm that:
 - concepts, evidence, action, methodology, deliverables, and value are not conflated;
 - evidence objects prove their stated purpose and claims are verified, labeled, or protected;
 - the Visual Direction preserves meaning without prescribing the final layout.
-- normal content pages have enough approved substance for their page role, and
-  any intentionally concise page can be composed without oversized empty text
-  frames or unjustified 8 pt body copy.

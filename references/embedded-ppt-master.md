@@ -19,16 +19,15 @@ to the outer controller:
 
 1. Understand the communication job, audience reading task, approved hierarchy,
    semantic Visual Direction, adjacent-page context, and project constraints.
-2. Choose a coherent page-scale composition and the simplest truthful editable
-   information model.
+2. Choose a coherent page-scale composition and the clearest truthful editable
+   information model. Simplicity applies to the semantic model, not to visual
+   ambition or compositional craft.
 3. Author the SVG from the bound structured-template prototype.
 4. Render and inspect the candidate at full-slide scale.
 5. Repair composition, hierarchy, legibility, data expression, brand treatment,
    fit, and export-readiness until the candidate is ready for user display.
 
-Use [design-system.md](design-system.md) for EY visual and typography policy,
-[composition-and-data-visual-language.md](composition-and-data-visual-language.md)
-for composition and information-visualization repertoire, and
+Use [design-system.md](design-system.md) for EY visual and typography policy and
 [structured-template-profile.md](structured-template-profile.md) for inherited
 Master/Layout atoms and placeholder boundaries.
 
@@ -39,24 +38,9 @@ assignment, SVG geometry, grouping, wrapping, spacing, density, and visual QA.
 Internal design notes or Design Decisions may be used when helpful, but they are
 not controller state, public receipts, or external approval gates.
 
-Treat the SVG as one presentation canvas rather than a UI component tree. Build
-one dominant visual field and a deliberate first, second, and supporting read.
-Use cards only for a real peer grouping, comparison, hierarchy, or capacity
-relationship. The Agenda Layout is the default card-grid exception.
-
-Select the information model from meaning:
-
-| Approved relationship | Preferred model |
-|---|---|
-| sequence, hierarchy, dependency, flow, roles, or grouping | structure/composition |
-| value-derived position, length, angle, area, radius, width, or color | chart/data visual |
-| row-header × column-header facts requiring exact lookup | table |
-| sourced or generated scene that materially improves comprehension | image and argument |
-| one conclusion supported by limited evidence | claim and evidence |
-
-For B, create another complete solution from the same locked packet. A different
-composition or focal mechanism can improve choice value, but similarity to A is
-never a blocker. For Rn, preserve the bound Base and change only the user's
+For B, create another complete solution from the same locked packet using any
+visual approach; similarity to A is never a blocker. For Rn, preserve the bound
+Base and change only the user's
 targeted request; PPT Master may redesign internally when that is necessary to
 fulfil the request without changing approved meaning.
 
@@ -70,12 +54,10 @@ Use the bound prototype as the literal starting SVG. Preserve root
 `data-pptx-master*` and `data-pptx-layout*` identity, every root-level fixed atom
 carrying `data-pptx-layer`, and every placeholder id/type/index/bounds. Content
 marked `data-copy-scope="template-fixed"` is inherited and must remain exact and
-unbound to page copy IDs. Replace only placeholder content; keep authored
-content above the reserved lower band beginning at `y=650`.
-
-For Agenda, retain the dedicated prototype and two-column numbered-card grammar.
-Each item contains one separately bound editable number and one label, with no
-subtitle, description, or supporting-detail line.
+unbound to page copy IDs. Keep authored elements attached to the editable
+placeholder proxy required for export; its internal geometry and footprint do
+not prescribe the composition. Agenda item numbers and labels remain separately
+bound editable text.
 
 ### SVG and visual-quality boundary
 
@@ -89,8 +71,8 @@ Keep every intended PowerPoint text box as one `<text>` element. Wrap with direc
 scale defined in `design-system.md`.
 
 Before returning COMPLETE, inspect the rendered page for exact copy, clipping,
-overlap, off-canvas content, hierarchy, composition, data truthfulness, brand
-expression, density, unused framed space, and native-PPTX readiness. Repair
+overlap, off-canvas content, legibility, data truthfulness, fixed-template
+integrity, and native-PPTX readiness. Repair
 design or implementation defects internally. Return BLOCKED only when the
 candidate cannot be completed without reopening locked content, restarting the
 design request, or fixing the environment.

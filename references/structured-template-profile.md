@@ -13,15 +13,12 @@ fingerprint, and placeholder-contract hash into every Stage 1 packet.
 | All other authored pages | `EY Dark` | `EY Content` | title `48 50 1128 43`; subtitle `48 93 1128 40`; composite content region `48 150 1168 500` |
 | Fixed ending | `EY Dark` | `EY Ending` | none; Stage 2 appends the user-supplied full-slide design as one unchanged fixed image after all confirmed pages |
 
-The Agenda Layout follows the supplied two-column numbered-card design. Balance
-the current item count across the two columns; use four-left/three-right for
-seven items. Each card contains only its number and one agenda-item label; do
-not add a subtitle, description, or supporting-detail line. Agenda numbers are
-not fixed Layout atoms: the visible-copy contract derives zero-padded numbers
-from approved item order and Embedded PPT Master exports each number and label as a
-separate editable text box. The content Layout
-reserves the lower band beginning at `y=650`; page-specific
-content must not enter it. The template owns the background, frame, glow, EY
+The Agenda prototype supplies an editable agenda-region proxy but does not
+prescribe the arrangement of its bound item numbers and labels. Agenda numbers
+are not fixed Layout atoms: the visible-copy contract derives zero-padded
+numbers from approved item order and Embedded PPT Master exports each number
+and label as a separate editable text box. The template owns the background,
+frame, glow, EY
 mark, and other fixed atoms. The EY mark is inherited fixed template content on
 every authored page and must never be page-authored, rebound, moved, changed, or
 deleted. Agenda, Section divider, and Content use the identical three-path EY
@@ -31,10 +28,14 @@ vector-outline two-line fixed lockup `Shape the future` / `with confidence`
 below its EY mark; do not retype or restyle it. The Cover Layout also owns the exact fixed tagline
 `The better the question. The better the answer. The better the world works.`
 at `x=51`, baseline `y=679`; it is not part of page-authored visible copy and
-must not be changed or deleted. Embedded PPT Master owns only the visible content
-inside the bound placeholders. The content-region placeholder uses PPT Master's
-`object` proxy binding so the authored composition remains editable while the
-Layout retains a single reusable content zone.
+must not be changed or deleted. Embedded PPT Master attaches authored content
+to the bound placeholder proxy so it remains editable; the proxy's stored
+bounds are technical metadata, not a composition or footprint restriction.
+The Content prototype's object proxy blends into the black Master background
+and has no visible border; it is an export carrier, not a required panel. Stage
+1 must replace its prototype child with the authored page composition and must
+not recreate an enclosing card unless the approved communication task genuinely
+requires one.
 
 Use Display title (`53.3333` SVG px / 40 pt) only for the Cover and Section
 divider title placeholders. The normal content title remains `32` SVG px / 24

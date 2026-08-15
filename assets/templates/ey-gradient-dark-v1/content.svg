@@ -10,6 +10,6 @@
     <text data-pptx-carrier="true" x="48" y="119" fill="#D9D9D9" font-family="EYInterstate, Microsoft YaHei, Calibri, sans-serif" font-size="16">Subtitle</text>
   </g>
   <g id="content-region" data-pptx-placeholder="object" data-pptx-binding="proxy" data-pptx-idx="3" data-pptx-bounds="48 150 1168 500">
-    <rect x="48" y="150" width="1168" height="500" rx="8" fill="#0B0B0B" stroke="#2E2E38" stroke-width="1"/>
+    <rect x="48" y="150" width="1168" height="500" fill="#000000" stroke="none"/>
   </g>
 </svg>

@@ -36,7 +36,7 @@ Store both forms with the page that uses them:
 
 Do not create a separate complete source register. Keep factual evidence next to the page it supports. Do not record construction-only photographs, illustrations, icons, or other visual assets selected during page authoring. If a visual itself carries factual evidence, retain its factual source with the page.
 
-The bounded page-authoring action may source external visual material and is responsible for any source or usage record required during production. Keep those selections, links, and concrete visual solutions out of `content.md`; state only the visual focus and semantic role in the Visual Direction. Never invent a license status.
+The bounded page-authoring action may source external visual material and is responsible for any source or usage record required during production. Keep those selections, links, and concrete visual solutions out of `content.md`; state only the visual priority and semantic role in the Visual Direction. Never invent a license status.
 
 ## 5. Internal, illustrative, and conflicting material
 

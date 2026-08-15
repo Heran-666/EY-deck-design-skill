@@ -46,6 +46,9 @@ PowerPoint Masters and five reusable Layouts.
 - Master: `ey-dark` / `EY Dark`
 - Layout: `content` / `EY Content`
 - Slots: title, optional subtitle, composite editable content region
+- Content-region proxy: one borderless black rectangle that blends into the
+  Master background. It exists only to carry the native object placeholder and
+  must not be interpreted as a visible panel or composition boundary.
 
 ### 5. Ending (`ending.svg`)
 

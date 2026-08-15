@@ -45,11 +45,9 @@ class RealPreviewRendererTests(unittest.TestCase):
 
 ### Visual Direction（Build-only）
 - Page type: Agenda
-- Visual focus: 七个章节名称
-- Information hierarchy: 标题后依次阅读七个章节名称
-- Relationship to preserve: 七个章节按汇报顺序并列展开
-- Fixed constraints: 保留批准的章节名称与顺序
-- Avoid: 不得加入章节说明或摘要
+- Visual priority: 标题后依次阅读七个章节名称
+- Semantic relationship: 七个章节按汇报顺序并列展开
+- Guardrails: 保留批准的名称与顺序；不得加入说明或摘要
 
 ### Sources
 - On-slide source: None
