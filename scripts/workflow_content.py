@@ -8,7 +8,6 @@ from pathlib import Path
 
 from framework_lib import PageEntry, page_entries
 from validate_deck_blueprint import validate as validate_blueprint
-from workflow_copy_contract import copy_contract_errors, visible_copy_contract
 
 
 def content_section(content: str, slide_id: str) -> str:
@@ -46,17 +45,6 @@ def provisional_content_errors(path: Path, expected_pages: list[PageEntry]) -> l
         )
     for page in expected_pages:
         section = content_section(text, page.slide_id)
-        contract_errors: list[str] = []
-        try:
-            contract_errors = copy_contract_errors(
-                visible_copy_contract(
-                    section,
-                    page.slide_id,
-                    expected_page_type=page.fields.get("Page type", ""),
-                )
-            )
-        except ValueError as exc:
-            contract_errors = [str(exc)]
         for error in (
             validate_blueprint(
                 path,
@@ -64,7 +52,6 @@ def provisional_content_errors(path: Path, expected_pages: list[PageEntry]) -> l
                 expected_page_type=page.fields.get("Page type", ""),
             )
             + content_identity_errors(page, section)
-            + contract_errors
         ):
             if error not in errors:
                 errors.append(error)

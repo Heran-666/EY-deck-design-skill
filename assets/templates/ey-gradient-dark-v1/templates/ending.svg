@@ -1,0 +1,4 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720" data-pptx-master="ey-dark" data-pptx-master-name="EY Dark" data-pptx-layout="ending" data-pptx-layout-name="EY Ending" data-pptx-show-master-shapes="true" data-pptx-show-inherited-shapes="true" data-ey-fixed-ending="true">
+  <rect id="dark-master-bg" data-pptx-layer="master" data-pptx-editable="false" x="0" y="0" width="1280" height="720" fill="#000000"/>
+  <image id="ending-source-slide" data-pptx-layer="layout" data-pptx-editable="false" x="0" y="0" width="1280" height="720" preserveAspectRatio="none" href="../images/ending-slide.png"/>
+</svg>

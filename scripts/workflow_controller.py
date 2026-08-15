@@ -1,60 +1,472 @@
 #!/usr/bin/env python3
-"""Stable public façade for the EY deck workflow authority.
-
-The workflow remains a single authority through this entrypoint. Domain state,
-directives, evidence, audits, transitions, and CLI dispatch live in cohesive
-modules so importing or executing this file preserves the established contract.
-"""
+"""Application controller for EY content approval and page-SVG decisions."""
 
 from __future__ import annotations
 
+import argparse
+import json
+import re
+import shlex
 from pathlib import Path
 
-# Re-export the established Python surface for callers and tests that imported
-# helpers from workflow_controller before the implementation was decomposed.
 from framework_lib import PageEntry, h2_section, line_fields, page_entries, replace_field
-from preview_renderer import (  # noqa: F401
-    PreviewError,
-    ensure_preview_pair,
-    ensure_preview_single,
-    preview_paths,
-    preview_runtime_errors,
-    preview_runtime_path,
+from validate_deck_blueprint import validate_collection
+from validate_framework import validate as validate_framework
+from workflow_content import content_section, promote_provisional_content, provisional_content_errors
+from workflow_io import atomic_write, command_line, now, read_json, sha256, write_json
+from workflow_paths import ProjectPaths
+from workflow_ppt_master import SERVICE_CLI, SERVICE_CONTRACT, embedding_errors, write_packet
+from workflow_spec import TERMINAL_PAGE_STATES
+from workflow_svg import (
+    INITIAL_VERSIONS,
+    candidate_valid,
+    confirm_candidate,
+    confirmation_valid,
+    discard_cycle,
+    latest_revision,
+    next_revision,
+    presentation_valid,
+    presented_versions,
+    record_candidate,
+    record_presentation,
+    require_version,
 )
-from svg_boundary import (  # noqa: F401
-    candidate_errors,
-    protected_candidate_errors,
-    svg_canvas,
-    svg_error,
-)
-from validate_deck_blueprint import (  # noqa: F401
-    validate as validate_blueprint,
-    validate_collection as validate_blueprint_collection,
-)
-from validate_framework import validate as validate_framework  # noqa: F401
-from validate_terminal_result import validate_terminal_result  # noqa: F401
-from workflow_audit import *  # noqa: F401,F403
-from workflow_authoring import *  # noqa: F401,F403
-from workflow_content import *  # noqa: F401,F403
-from workflow_directives import *  # noqa: F401,F403
-from workflow_doctor import export_runtime_binding, preview_failure_issue, run_doctor  # noqa: F401
-from workflow_export import *  # noqa: F401,F403
-from workflow_handoff import *  # noqa: F401,F403
-from workflow_io import *  # noqa: F401,F403
-from workflow_paths import *  # noqa: F401,F403
-from workflow_preview_evidence import *  # noqa: F401,F403
-from workflow_protected import *  # noqa: F401,F403
-from workflow_runtime import *  # noqa: F401,F403
-from workflow_spec import *  # noqa: F401,F403
-from workflow_state import *  # noqa: F401,F403
-from workflow_transitions import *  # noqa: F401,F403
+
+
+def update_page(text: str, slide_id: str, updates: dict[str, str]) -> str:
+    page = next((item for item in page_entries(text) if item.slide_id == slide_id), None)
+    if page is None:
+        raise ValueError(f"page not found: {slide_id}")
+    updated = page.text
+    for field, value in updates.items():
+        updated = replace_field(updated, field, value)
+    return text.replace(page.text, updated, 1)
+
+
+def update_page_title(text: str, slide_id: str, title: str) -> str:
+    return re.sub(
+        rf"^### {re.escape(slide_id)}｜.*$",
+        f"### {slide_id}｜{title}",
+        text,
+        count=1,
+        flags=re.MULTILINE,
+    )
+
+
+def active_page(text: str) -> PageEntry | None:
+    return next(
+        (page for page in page_entries(text) if page.fields.get("Status") not in TERMINAL_PAGE_STATES),
+        None,
+    )
+
+
+def page_by_id(text: str, slide_id: str) -> PageEntry:
+    page = next((item for item in page_entries(text) if item.slide_id == slide_id), None)
+    if page is None:
+        raise ValueError(f"page not found: {slide_id}")
+    return page
+
+
+def review_valid(paths: ProjectPaths, page: PageEntry) -> bool:
+    if not paths.content_review.is_file() or not paths.provisional.is_file():
+        return False
+    try:
+        receipt = read_json(paths.content_review)
+    except ValueError:
+        return False
+    return (
+        receipt.get("slide_id") == page.slide_id
+        and receipt.get("framework_sha256") == sha256(paths.framework)
+        and receipt.get("provisional_sha256") == sha256(paths.provisional)
+    )
+
+
+def content_validation_errors(paths: ProjectPaths, text: str) -> list[str]:
+    pages = [page for page in page_entries(text) if page.fields.get("Status") != "Protected placeholder"]
+    if not paths.content.is_file():
+        return [f"content not found: {paths.content}"]
+    return validate_collection(
+        paths.content,
+        [page.slide_id for page in pages],
+        require_complete=True,
+        expected_page_types={page.slide_id: page.fields.get("Page type", "") for page in pages},
+    )
+
+
+def review_context(text: str, page: PageEntry) -> dict[str, object]:
+    pages = page_entries(text)
+    index = next(i for i, item in enumerate(pages) if item.slide_id == page.slide_id)
+    return {
+        "project_context": line_fields(h2_section(text, "Project context")),
+        "active_page": {"slide_id": page.slide_id, "title": page.title, **page.fields},
+        "previous_page": None if index == 0 else {"slide_id": pages[index - 1].slide_id, "title": pages[index - 1].title},
+        "next_page": None if index + 1 == len(pages) else {"slide_id": pages[index + 1].slide_id, "title": pages[index + 1].title},
+    }
+
+
+def service_request_payload(paths: ProjectPaths, controller: Path, slide_id: str, version: str) -> dict[str, str]:
+    request = paths.packet(slide_id, version)
+    return {
+        "version": version,
+        "request_path": str(request),
+        "service_contract": str(SERVICE_CONTRACT),
+        "requested_artifact": str(paths.candidate(slide_id, version)),
+        "validate_request": shlex.join(["python3", str(SERVICE_CLI), "validate-request", str(request)]),
+        "complete": shlex.join(["python3", str(SERVICE_CLI), "complete", str(request)]),
+        "record": command_line(controller, "record-svg", paths.root, "--page", slide_id, "--version", version),
+    }
+
+
+def decision_directive(
+    paths: ProjectPaths,
+    slide_id: str,
+    versions: list[str],
+    controller: Path,
+    *,
+    revision: bool,
+) -> dict[str, object]:
+    feedback = paths.revision_request(slide_id)
+    return {
+        "action": "COLLECT_SVG_REVISION_DECISION" if revision else "COLLECT_SVG_DECISION",
+        "slide_id": slide_id,
+        "displayed_versions": versions,
+        "decision_rules": "Confirm either displayed version, or write one concrete revision request and choose its displayed base.",
+        "revision_feedback_file": str(feedback),
+        "commands": {
+            "confirm": command_line(controller, "confirm-svg", paths.root, "--page", slide_id, "--version", "<DISPLAYED_VERSION>"),
+            "revise": command_line(
+                controller, "request-svg-revision", paths.root,
+                "--page", slide_id, "--base", "<DISPLAYED_VERSION>",
+                "--feedback-file", str(feedback),
+            ),
+        },
+    }
+
+
+def svg_directive(paths: ProjectPaths, page: PageEntry, controller: Path) -> dict[str, object]:
+    latest = latest_revision(paths, page.slide_id)
+    if latest:
+        if not candidate_valid(paths, page.slide_id, latest):
+            return {
+                "action": "RUN_EMBEDDED_PPT_MASTER_SVG",
+                "slide_id": page.slide_id,
+                "requests": [service_request_payload(paths, controller, page.slide_id, latest)],
+            }
+        request = read_json(paths.packet(page.slide_id, latest))
+        base = request.get("base")
+        base_version = str(base.get("version")) if isinstance(base, dict) else ""
+        versions = [base_version, latest]
+        if not presentation_valid(paths, page.slide_id, versions):
+            return {
+                "action": "PRESENT_SVG_REVISION",
+                "slide_id": page.slide_id,
+                "versions": versions,
+                "artifacts": [str(paths.candidate(page.slide_id, item)) for item in versions],
+                "commands": {
+                    "present": command_line(
+                        controller, "present-svg", paths.root,
+                        "--page", page.slide_id, "--versions", ",".join(versions),
+                    )
+                },
+            }
+        return decision_directive(paths, page.slide_id, versions, controller, revision=True)
+
+    missing = [item for item in INITIAL_VERSIONS if not candidate_valid(paths, page.slide_id, item)]
+    if missing:
+        return {
+            "action": "RUN_EMBEDDED_PPT_MASTER_SVG",
+            "slide_id": page.slide_id,
+            "requests": [service_request_payload(paths, controller, page.slide_id, item) for item in missing],
+        }
+    versions = list(INITIAL_VERSIONS)
+    if not presentation_valid(paths, page.slide_id, versions):
+        return {
+            "action": "PRESENT_SVG_OPTIONS",
+            "slide_id": page.slide_id,
+            "versions": versions,
+            "artifacts": [str(paths.candidate(page.slide_id, item)) for item in versions],
+            "commands": {
+                "present": command_line(
+                    controller, "present-svg", paths.root,
+                    "--page", page.slide_id, "--versions", ",".join(versions),
+                )
+            },
+        }
+    return decision_directive(paths, page.slide_id, versions, controller, revision=False)
+
+
+def directive_payload(project_dir: Path, text: str, controller: Path) -> dict[str, object]:
+    paths = ProjectPaths(project_dir)
+    for page in page_entries(text):
+        if page.fields.get("Status") == "SVG confirmed" and not confirmation_valid(paths, page.slide_id):
+            return {
+                "action": "REPAIR_STALE_SVG_CONFIRMATION",
+                "slide_id": page.slide_id,
+                "commands": {"reopen": command_line(controller, "reopen-svg", project_dir, "--page", page.slide_id)},
+            }
+    page = active_page(text)
+    if page is None:
+        return {
+            "action": "SVG_STAGE_COMPLETE",
+            "confirmed_svgs": [
+                str((paths.svg_output / f"{item.slide_id}.svg").resolve())
+                for item in page_entries(text)
+                if item.fields.get("Status") == "SVG confirmed"
+            ],
+        }
+    status = page.fields.get("Status")
+    if status in {"Not started", "Content reviewing"}:
+        if status == "Content reviewing" and review_valid(paths, page):
+            return {
+                "action": "COLLECT_CONTENT_DECISION",
+                "slide_id": page.slide_id,
+                "review_path": str(paths.provisional),
+                "commands": {
+                    "approve": command_line(controller, "approve-content", project_dir),
+                    "revise": "Replace working/provisional-content.md, then run present-review again.",
+                },
+            }
+        return {
+            "action": "PRESENT_PAGE_REVIEW",
+            "slide_id": page.slide_id,
+            "provisional_content": {"path": str(paths.provisional), "expected_pages": [page.slide_id]},
+            "review_context": review_context(text, page),
+            "commands": {"present": command_line(controller, "present-review", project_dir)},
+        }
+    if status == "Content locked":
+        return {
+            "action": "PREPARE_SVG_CANDIDATES",
+            "slide_id": page.slide_id,
+            "versions": list(INITIAL_VERSIONS),
+            "commands": {"run": command_line(controller, "prepare-svg-candidates", project_dir, "--page", page.slide_id)},
+        }
+    if status == "Awaiting SVG decision":
+        return svg_directive(paths, page, controller)
+    raise ValueError(f"unsupported active state for {page.slide_id}: {status}")
+
+
+def load_context(project_dir: Path) -> tuple[Path, str]:
+    paths = ProjectPaths(project_dir)
+    errors = validate_framework(paths.framework, project_dir)
+    if errors:
+        raise ValueError("; ".join(errors))
+    return paths.framework, paths.framework.read_text(encoding="utf-8")
+
+
+def print_next(project_dir: Path, text: str, controller: Path) -> None:
+    print(json.dumps(directive_payload(project_dir, text, controller), ensure_ascii=False, indent=2))
+
+
+def handle_present_review(project_dir: Path, framework: Path, text: str, controller: Path) -> int:
+    page = active_page(text)
+    if page is None or page.fields.get("Status") not in {"Not started", "Content reviewing"}:
+        raise ValueError("no page is waiting for content review")
+    paths = ProjectPaths(project_dir)
+    errors = provisional_content_errors(paths.provisional, [page])
+    if errors:
+        raise ValueError(" | ".join(errors))
+    if page.fields.get("Status") != "Content reviewing":
+        text = update_page(text, page.slide_id, {"Status": "Content reviewing"})
+        atomic_write(framework, text)
+    write_json(
+        paths.content_review,
+        {
+            "slide_id": page.slide_id,
+            "framework_sha256": sha256(framework),
+            "provisional_sha256": sha256(paths.provisional),
+            "presented_at": now(),
+        },
+    )
+    print(paths.provisional.read_text(encoding="utf-8"))
+    print("\nContent review is ready. Explicit approval is required.")
+    print(command_line(controller, "approve-content", project_dir))
+    return 0
+
+
+def handle_approve_content(project_dir: Path, framework: Path, text: str, controller: Path) -> int:
+    page = active_page(text)
+    paths = ProjectPaths(project_dir)
+    if page is None or page.fields.get("Status") != "Content reviewing" or not review_valid(paths, page):
+        raise ValueError("no current presented content review to approve")
+    provisional = paths.provisional.read_text(encoding="utf-8")
+    existing = paths.content.read_text(encoding="utf-8") if paths.content.is_file() else ""
+    atomic_write(paths.content, promote_provisional_content(text, existing, provisional))
+    section = content_section(provisional, page.slide_id)
+    title_match = re.search(r"^- Title:\s*(.+)$", section, re.MULTILINE)
+    if not title_match:
+        raise ValueError(f"{page.slide_id} has no Title field")
+    text = update_page(text, page.slide_id, {"Status": "Content locked", "Open items": "None"})
+    text = update_page_title(text, page.slide_id, title_match.group(1).strip())
+    atomic_write(framework, text)
+    paths.provisional.unlink(missing_ok=True)
+    print_next(project_dir, text, controller)
+    return 0
+
+
+def handle_prepare_candidates(project_dir: Path, framework: Path, text: str, page_id: str, controller: Path) -> int:
+    page = page_by_id(text, page_id)
+    current = active_page(text)
+    if current is None or current.slide_id != page.slide_id or page.fields.get("Status") != "Content locked":
+        raise ValueError(f"{page_id} is not the active content-locked page")
+    errors = embedding_errors()
+    if errors:
+        raise ValueError(" | ".join(errors))
+    paths = ProjectPaths(project_dir)
+    paths.svg_dir(page_id).mkdir(parents=True, exist_ok=True)
+    for version in INITIAL_VERSIONS:
+        write_packet(paths, text, page, version)
+    text = update_page(text, page_id, {"Status": "Awaiting SVG decision"})
+    atomic_write(framework, text)
+    print_next(project_dir, text, controller)
+    return 0
+
+
+def handle_present_svg(project_dir: Path, text: str, page_id: str, versions_text: str, controller: Path) -> int:
+    page = page_by_id(text, page_id)
+    if page.fields.get("Status") != "Awaiting SVG decision":
+        raise ValueError(f"{page_id} is not awaiting an SVG decision")
+    versions = [require_version(item.strip()) for item in versions_text.split(",") if item.strip()]
+    if len(versions) != 2 or len(set(versions)) != 2:
+        raise ValueError("present-svg requires exactly two distinct versions")
+    paths = ProjectPaths(project_dir)
+    latest = latest_revision(paths, page_id)
+    if latest:
+        request = read_json(paths.packet(page_id, latest))
+        base = request.get("base")
+        expected = [str(base.get("version")) if isinstance(base, dict) else "", latest]
+    else:
+        expected = list(INITIAL_VERSIONS)
+    if versions != expected:
+        raise ValueError(f"present-svg must use the current comparison: {','.join(expected)}")
+    paths.revision_request(page_id).parent.mkdir(parents=True, exist_ok=True)
+    record_presentation(paths, page_id, versions)
+    for version in versions:
+        artifact = paths.candidate(page_id, version).resolve()
+        print(f"### {page_id}｜{version}\n\n![{page_id} {version}]({artifact})\n")
+    print("Both SVGs are displayed at the same scale. Collect an explicit confirmation or revision request.")
+    print(json.dumps(decision_directive(paths, page_id, versions, controller, revision=versions[-1].startswith("R")), ensure_ascii=False, indent=2))
+    return 0
+
+
+def handle_request_revision(project_dir: Path, text: str, page_id: str, base: str, feedback_file: Path, controller: Path) -> int:
+    page = page_by_id(text, page_id)
+    paths = ProjectPaths(project_dir)
+    if page.fields.get("Status") != "Awaiting SVG decision" or base not in presented_versions(paths, page_id):
+        raise ValueError("revision base must be one of the currently displayed candidates")
+    feedback_file = feedback_file.expanduser().resolve()
+    if not feedback_file.is_file():
+        raise ValueError(f"revision feedback file not found: {feedback_file}")
+    feedback = feedback_file.read_text(encoding="utf-8").strip()
+    if not feedback:
+        raise ValueError("revision feedback must be non-empty")
+    version = next_revision(paths, page_id)
+    write_packet(paths, text, page, version, base_version=base, feedback=feedback)
+    paths.presentation_receipt(page_id).unlink(missing_ok=True)
+    print_next(project_dir, text, controller)
+    return 0
+
+
+def handle_confirm_svg(project_dir: Path, framework: Path, text: str, page_id: str, version: str, controller: Path) -> int:
+    page = page_by_id(text, page_id)
+    if page.fields.get("Status") != "Awaiting SVG decision":
+        raise ValueError(f"{page_id} is not awaiting an SVG decision")
+    paths = ProjectPaths(project_dir)
+    target = confirm_candidate(paths, page_id, require_version(version))
+    text = update_page(text, page_id, {"Status": "SVG confirmed"})
+    atomic_write(framework, text)
+    print(f"Confirmed {page_id} {version}: {target}")
+    print_next(project_dir, text, controller)
+    return 0
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser()
+    sub = parser.add_subparsers(dest="command", required=True)
+    commands = (
+        "bootstrap", "next", "audit", "present-review", "approve-content",
+        "prepare-svg-candidates", "record-svg", "present-svg", "request-svg-revision",
+        "confirm-svg", "reopen-content", "reopen-svg", "set-output-filename",
+    )
+    for name in commands:
+        command = sub.add_parser(name)
+        command.add_argument("--project-dir", type=Path, required=True)
+        if name == "next":
+            command.add_argument("--format", choices=("text", "json"), default="text")
+        if name in {"prepare-svg-candidates", "record-svg", "present-svg", "request-svg-revision", "confirm-svg", "reopen-content", "reopen-svg"}:
+            command.add_argument("--page", required=True)
+        if name in {"record-svg", "confirm-svg"}:
+            command.add_argument("--version", required=True)
+        if name == "present-svg":
+            command.add_argument("--versions", required=True)
+        if name == "request-svg-revision":
+            command.add_argument("--base", required=True)
+            command.add_argument("--feedback-file", type=Path, required=True)
+        if name == "set-output-filename":
+            command.add_argument("--filename", required=True)
+    return parser
 
 
 def main() -> int:
-    """Run the stable controller CLI from its canonical public path."""
-    from workflow_cli import main as run_cli
-
-    return run_cli(Path(__file__).resolve())
+    args = build_parser().parse_args()
+    project_dir = args.project_dir.expanduser().resolve()
+    controller = Path(__file__).resolve()
+    try:
+        framework, text = load_context(project_dir)
+        if args.command in {"bootstrap", "next"}:
+            if args.command == "bootstrap":
+                ProjectPaths(project_dir).working.mkdir(parents=True, exist_ok=True)
+            payload = directive_payload(project_dir, text, controller)
+            if args.command == "next" and args.format == "text":
+                print(f"NEXT ACTION: {payload['action']}")
+            print(json.dumps(payload, ensure_ascii=False, indent=2))
+            return 0
+        if args.command == "audit":
+            paths = ProjectPaths(project_dir)
+            errors = content_validation_errors(paths, text)
+            for page in page_entries(text):
+                if page.fields.get("Status") == "SVG confirmed" and not confirmation_valid(paths, page.slide_id):
+                    errors.append(f"{page.slide_id} has a stale SVG confirmation")
+            if errors:
+                raise ValueError(" | ".join(errors))
+            print("EY content and SVG workflow audit passed.")
+            return 0
+        if args.command == "present-review":
+            return handle_present_review(project_dir, framework, text, controller)
+        if args.command == "approve-content":
+            return handle_approve_content(project_dir, framework, text, controller)
+        if args.command == "prepare-svg-candidates":
+            return handle_prepare_candidates(project_dir, framework, text, args.page, controller)
+        if args.command == "record-svg":
+            record_candidate(ProjectPaths(project_dir), args.page, args.version)
+            print_next(project_dir, text, controller)
+            return 0
+        if args.command == "present-svg":
+            return handle_present_svg(project_dir, text, args.page, args.versions, controller)
+        if args.command == "request-svg-revision":
+            return handle_request_revision(project_dir, text, args.page, args.base, args.feedback_file, controller)
+        if args.command == "confirm-svg":
+            return handle_confirm_svg(project_dir, framework, text, args.page, args.version, controller)
+        if args.command in {"reopen-content", "reopen-svg"}:
+            page = page_by_id(text, args.page)
+            if page.fields.get("Status") == "Protected placeholder":
+                raise ValueError(f"page cannot be reopened: {args.page}")
+            discard_cycle(ProjectPaths(project_dir), args.page)
+            target = "Not started" if args.command == "reopen-content" else "Content locked"
+            text = update_page(text, args.page, {"Status": target})
+            atomic_write(framework, text)
+            print_next(project_dir, text, controller)
+            return 0
+        if args.command == "set-output-filename":
+            if not args.filename.lower().endswith(".pptx") or Path(args.filename).name != args.filename:
+                raise ValueError("filename must be one plain .pptx filename")
+            current = h2_section(text, "Current position")
+            atomic_write(framework, text.replace(current, replace_field(current, "Output filename", args.filename), 1))
+            print(f"Output filename updated: {args.filename}")
+            return 0
+    except (OSError, ValueError) as exc:
+        print(f"ERROR: {exc}")
+        return 1
+    return 1
 
 
 if __name__ == "__main__":

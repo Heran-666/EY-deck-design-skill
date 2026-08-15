@@ -1,7 +1,7 @@
 interface:
   display_name: "EY Deck Design"
-  short_description: "Control EY deck content and PPT Master delivery"
-  default_prompt: "Use $ey-deck-design to approve the Storyline and exact content, then delegate Stage 1 SVG production and Stage 2 editable-PPTX export to its embedded PPT Master."
+  short_description: "Approve EY content and iterate PPT Master SVG options"
+  default_prompt: "Use $ey-deck-design to approve the EY Storyline and exact content, generate A/B SVGs with bundled PPT Master, iterate revisions from my feedback, and publish only confirmed pages."
 
 policy:
   allow_implicit_invocation: false

@@ -4,9 +4,8 @@
 
 1. Classify from the supplied background
 2. Confirm the type
-3. Confirm the authoring mode
-4. Route to the type policy
-5. Present the Storyline for approval
+3. Route to the type policy
+4. Present the Storyline for approval
 
 ## 1. Classify from the supplied background
 
@@ -37,11 +36,7 @@ If two types remain genuinely plausible, recommend one and name only the closest
 
 Treat a direct correction as confirmation of the corrected type. Record the confirmed type in the temporary intake summary and later in `framework.md`; do not repeatedly reconfirm it unless the user's objective changes.
 
-## 3. Confirm the authoring mode
-
-After type confirmation and before Storyline drafting, ask the user to choose `Simplified` or `Standard` under [authoring-modes.md](authoring-modes.md). Record the choice in temporary intake context and later as project-level `Requested authoring mode`. Do not infer the choice from urgency, deck length, or deliverable type.
-
-## 4. Route to the type policy
+## 3. Route to the type policy
 
 Apply this universal structural shell before the selected type policy:
 
@@ -49,12 +44,7 @@ Apply this universal structural shell before the selected type policy:
 - when there are at least six substantive pages, place one `Agenda` at S02 and
   at least one `Section divider` before the relevant major chapter;
 - allow Agenda or divider pages in shorter decks when they materially improve
-  navigation, but do not add them as decoration;
-- mark Cover, Agenda, and Section divider pages `Simplified`; apply the user's
-  requested mode only to substantive content pages.
-
-Agenda uses its dedicated editable Layout while Embedded PPT Master owns its
-directory composition.
+  navigation, but do not add them as decoration.
 
 After confirmation, read [storyline-and-content.md](storyline-and-content.md) and exactly one primary type policy:
 
@@ -78,7 +68,7 @@ Treat each type policy as the sole owner of that type's Storyline sequence, requ
 
 For a hybrid, choose one primary type and only the necessary secondary behavior. Read one additional type policy only when that secondary behavior materially changes the Storyline. Surface conflicting audience outcomes before drafting, and keep `Deliverable type` set to the confirmed primary type.
 
-## 5. Present the Storyline for approval
+## 4. Present the Storyline for approval
 
 For every confirmed type, briefly explain the overall narrative arc and how it serves the confirmed audience outcome, then show the complete page sequence beginning with S01 Cover. Use the following fixed field order for every displayed page:
 
@@ -88,7 +78,6 @@ For every confirmed type, briefly explain the overall narrative arc and how it s
 4. `Narrative role`
 5. `Content Summary`
 6. `Next connection`
-7. `Authoring mode`
 
 Format `Content Summary` as a short bullet list, normally two to four bullets. Each bullet summarizes one distinct content block, claim, evidence group, or audience takeaway planned for the page. Keep it at Storyline level: do not draft exact on-slide copy, invent unsupported facts, or include visual-design instructions.
 
@@ -107,7 +96,9 @@ Use this page block unless a compact table can preserve the bullet hierarchy and
   - <planned content point>
   - <planned content point>
 - Next connection: <specific content-to-content bridge | Not applicable>
-- Authoring mode: <Simplified | Standard | Not applicable>
 ```
 
-Obtain explicit approval before creating `framework.md` or `content.md`, unless the user expressly waives the Storyline gate. After approval, all types use the same controller-governed workflow, with each page following its own effective authoring mode.
+Obtain explicit approval before creating `framework.md` or `content.md`, unless
+the user expressly waives the Storyline gate. After approval, all types use the
+same page-by-page content-review controller and bundled PPT Master SVG candidate
+loop. The current workflow ends after every authored page has one confirmed SVG.

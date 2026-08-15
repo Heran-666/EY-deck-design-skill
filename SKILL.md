@@ -1,130 +1,114 @@
 ---
 name: ey-deck-design
 description: >
-  Control an EY presentation workflow from background, deliverable-type and
-  Storyline approval through locked page content and user-confirmed SVGs, then
-  delegate complete Stage 1 visual production and Stage 2 editable-PPTX export
-  to the bundled Embedded PPT Master. Use only when the user explicitly invokes
-  $ey-deck-design.
+  Create and approve EY presentation Storylines and exact slide content, then
+  use the bundled PPT Master to generate two complete SVG alternatives per page,
+  iterate from user-selected bases and feedback, and publish only explicitly
+  confirmed SVGs. Use only when the user explicitly invokes $ey-deck-design.
 ---
 
 # EY Deck Design
 
-Act as the workflow and content-control layer. Use the bundled controller as the
-only authority for page order, state, paths, hashes, receipts, recovery, user
-display, decisions, and final handoff. Delegate all visual design, SVG
-construction, internal visual QA, export normalization, native-PPTX conversion,
-and technical package QA to Embedded PPT Master.
+Own the deck workflow, approved content, candidate lifecycle, and user gates.
+Use the bundled PPT Master page-SVG service for all page strategy, visual design,
+SVG authoring, and visual/technical QA.
+
+Treat `ppt-master/` as an internal runtime package, never as a second skill. It
+has no `SKILL.md` or UI metadata and may be called only through the EY request
+adapter. The separately installed global `$ppt-master` remains the only
+user-visible PPT Master skill.
 
 ## Ownership
 
-| Owner | Owns |
+| Owner | Responsibility |
 |---|---|
-| User | Storyline, exact content approval, candidate choice, revision confirmation |
-| EY Deck Design | intake, content, sources, authoring mode, workflow state, candidate/version requests, user gates, evidence, recovery, delivery |
-| `framework.md` | compact project context, approved Storyline, page modes, state, unresolved decisions |
-| `content.md` | exact approved copy, data, sources, and emphasis |
-| Embedded PPT Master Stage 1 | page design, information visualization, SVG construction, rendering, visual QA, and internal repair |
-| Embedded PPT Master Stage 2 | isolated normalization, Master/Layout construction, native PPTX conversion, compatibility, package QA |
+| User | Approve Storyline and exact content; choose, revise, and confirm SVGs |
+| EY controller | Order, states, paths, hashes, request packets, receipts, recovery, and publication |
+| `framework.md` | Compact project context, Storyline, and coarse page state |
+| `content.md` | Exact approved visible copy, data, emphasis, and page-local sources |
+| Bundled PPT Master | Full page strategy, information design, template application, SVG construction, review, and repair |
 
-Do not expose Embedded PPT Master's internal Design Decisions, design memory, or
-visual-review steps as controller state or user approval gates. The controller
-binds only the subsystem interfaces: locked input, requested version and output,
-artifact identity, exact copy, template integrity, preview evidence, user
-decision, export manifest, and terminal result.
-
-Keep candidates and previews in `svg_working/`; keep exactly one user-confirmed
-SVG per Storyline page in `svg_output/`. Never activate or read a separate global
-`$ppt-master` skill.
-
-The project directory is the user-owned working directory that contains the
-deck's `framework.md`; it is never this skill's installation directory. Resolve
-the controller as `<skill-root>/scripts/workflow_controller.py`, where
-`<skill-root>` is the directory containing this `SKILL.md`.
+Keep candidates in `svg_working/<Slide ID>/`. Publish exactly one confirmed
+artifact per authored page to `svg_output/<Slide ID>.svg`. Do not put candidate
+versions, revision text, or PPT Master internals in `framework.md`.
 
 ## Load only what the current action needs
 
-- New intake: read [references/deliverable-types.md](references/deliverable-types.md) and [references/authoring-modes.md](references/authoring-modes.md).
-- Storyline or content: read [references/storyline-and-content.md](references/storyline-and-content.md) plus exactly the confirmed primary type policy: [Proposal](references/storyline-type-proposal.md), [Sharing deck](references/storyline-type-sharing-deck.md), [Training](references/storyline-type-training.md), [Interpretation](references/storyline-type-interpretation.md), or [Other](references/storyline-type-other.md).
-- Create, migrate, or reindex `framework.md`: read [references/framework-contract.md](references/framework-contract.md).
-- First provisional content write or schema failure: read [references/output-contract.md](references/output-contract.md).
+- Intake: read [references/deliverable-types.md](references/deliverable-types.md).
+- Storyline/content: read [references/storyline-and-content.md](references/storyline-and-content.md) and exactly one confirmed type policy.
+- Create or repair `framework.md`: read [references/framework-contract.md](references/framework-contract.md).
+- First content write or schema failure: read [references/output-contract.md](references/output-contract.md).
 - External facts or citations: read [references/research-and-sources.md](references/research-and-sources.md).
-- `RUN_PPT_MASTER_*` or `RUN_PPT_MASTER_EXPORT`: read [references/embedded-ppt-master.md](references/embedded-ppt-master.md) and follow only the supplied hash-bound packet or manifest.
-- Initialization, migration, reopen, reindex, or recovery: read [references/presentation-workflow.md](references/presentation-workflow.md).
-- Any `BLOCKED` result: read [references/quality-gates.md](references/quality-gates.md) before using the emitted recovery command.
+- Any SVG action: read [references/svg-candidate-workflow.md](references/svg-candidate-workflow.md).
+- Initialization, reopen, or recovery: read [references/presentation-workflow.md](references/presentation-workflow.md).
 
 ## Intake and Storyline
 
-Classify the background as `Proposal`, `Sharing deck`, `Training`,
+Classify the deliverable as `Proposal`, `Sharing deck`, `Training`,
 `Interpretation`, or `Other: <specific form>` and obtain confirmation unless the
-user waives the gate. Then ask the user to choose `Simplified` or `Standard`.
+user waives it. Draft and obtain approval for the complete Storyline before
+creating `framework.md`.
 
-Every deck begins with one Cover at S01. At six or more substantive pages, add
-an Agenda at S02 and at least one Section divider. Cover, Agenda, and Section
-divider pages are always `Simplified`; other normal pages inherit the requested
-project mode. Protected placeholders use `Not applicable`.
+Begin with Cover at S01. At six or more substantive pages, add Agenda at S02 and
+at least one Section divider. Create framework 3.1 / workflow 6.0 with a stable
+plain `.pptx` filename reserved for the future export stage, then run:
 
-Show the complete Storyline using the fixed contract in
-[references/deliverable-types.md](references/deliverable-types.md) and obtain
-explicit approval before creating `framework.md`. Create framework 2.8 / workflow
-4.2 with the requested or deterministic `.pptx` filename. Call
-`load_workspace_dependencies` once, then run controller `bootstrap` with the
-reported `Python executable` and `Bundle version`. Use the directory containing
-the new `framework.md` as `--project-dir`.
+```bash
+python3 <skill-root>/scripts/workflow_controller.py bootstrap --project-dir <absolute-project-directory>
+```
 
-## Controller execution
+## Controller discipline
 
-On entry, re-entry, post-compaction, or uncertain state, reload this skill and
-run controller `next --format json` once. Treat its packet, artifact, preview,
-manifest, receipt paths, and hashes as recovery authority. Follow only `action`,
-`command_when`, and the matching command data. A successful mutation already
-prints the next directive; do not replay it or immediately call `next` again.
+On entry, re-entry, post-compaction, or uncertain state, run controller
+`next --format json` once. Follow only its current action and emitted paths and
+commands. A successful mutation prints the next directive; do not immediately
+replay `next`.
 
-Process only the first non-terminal Slide ID.
+Process only the first non-terminal Slide ID. Never mutate workflow state,
+promote content, publish an SVG, or infer a user decision outside controller
+commands.
 
-For content review, replace all of `working/provisional-content.md` with exactly
-the active sections listed by `provisional_content.expected_pages`. Run the
-printed `present-review` command. Explicit user approval promotes those unchanged
-sections into `content.md`, records hashes, clears handled open items, and locks
-the page.
+## Content gate
 
-For each required candidate, follow this outer chain:
-
-1. `PREPARE_PPT_MASTER_*`: materialize the locked packet.
-2. `RUN_PPT_MASTER_*`: in the current Codex task, assume the bounded Embedded
-   PPT Master Stage 1 role. Design, author, render, visually review, internally
-   repair, and return one terminal Stage 1 JSON object. This is not a separate
-   skill, subagent, process, or controller state.
-3. Record the result with the emitted `ppt-master-result` command.
-4. Run the emitted presentation command, inspect the exact rendered preview,
-   then show it to the user and collect the mode-required decision.
-
-`Simplified` requests A only. `Standard` requests A and B from the same locked
-content, then shows both at equal scale. Candidate similarity and missing
-`material_differences` remain advisories. A targeted revision binds one displayed
-Base and one Rn; show both together and accept only that pair.
+For `PRESENT_PAGE_REVIEW`, replace all of
+`working/provisional-content.md` with exactly the active page. Write final
+on-slide copy, complete data, emphasis, and sources; include no visual direction
+or layout instruction. Run `present-review`, show the full content, and wait for
+explicit approval before `approve-content`.
 
 Never invent client, audience, source, EY, credential, case, people, capacity,
 fee, schedule, tool, approval, learning outcome, or business-outcome facts.
-Never silently rewrite locked content or protected material.
 
-Map user decisions by meaning to the exact controller command already emitted:
-confirmation selects the displayed A, an ordinal choice selects the displayed A
-or B, and a revision request must state the displayed Base plus the targeted
-change. Do not construct a decision command from memory.
+## SVG gate
 
-## Final handoff
+For `PREPARE_SVG_CANDIDATES`, run the emitted command. It creates independent A
+and B requests from the same locked content.
 
-After every Storyline page is terminal, the controller prints
-`STAGE_1_COMPLETE`. Run `prepare-export`, then run the emitted Embedded PPT Master
-Stage 2 `runner_command` exactly once. It is bound to the confirmed SVG manifest,
-staged hashes, structured-template profile when applicable, fixed Ending,
-required output path, runtime, and terminal validator.
+For `RUN_EMBEDDED_PPT_MASTER_SVG`, process every request independently:
 
-The bundled fixed Ending is an export-only prototype, not a Storyline page. It
-is exempt from Storyline approval, content review, Stage 1 production, and
-candidate approval, and Stage 2 always appends it after the confirmed pages.
+1. Read its `service_contract` and request JSON.
+2. Run `validate_request`.
+3. Let the bundled PPT Master execute its full internal design loop and write
+   only `requested_artifact`.
+4. Run `complete`, then run `record` only for a COMPLETE result.
 
-Record the runner's exact JSON with `handoff-result`. Deliver a `COMPLETE` PPTX.
-For `BLOCKED`, use only the controller's matching recovery command and scope.
-Warnings, advisories, and inherited observations never reopen content or design.
+Do not reduce B to a cosmetic variation when a meaningful alternative exists.
+Do not expose PPT Master's internal strategy as another EY approval gate.
+
+Run the emitted presentation command for `PRESENT_SVG_OPTIONS` or
+`PRESENT_SVG_REVISION`, display both SVGs at equal scale, and collect one explicit
+decision. Confirm either displayed version, or write the user's concrete advice
+to the emitted feedback file and request a revision from one displayed base.
+Each revision produces one immutable `R<n>` and may repeat until confirmation.
+
+Only `confirm-svg` may copy a candidate into `svg_output/`. Reopen content when
+approved meaning or exact copy changes; reopen SVG when only design should be
+restarted. Deliver the confirmed SVG set only when the controller reports
+`SVG_STAGE_COMPLETE`.
+
+## Current delivery boundary
+
+Stop at `SVG_STAGE_COMPLETE`. A later skill version may add a separate
+confirmed-SVG-to-PPTX export stage, but the current workflow must not initialize,
+simulate, or invoke that future stage. `Output filename` is reserved metadata;
+it does not imply that this version produces a PPTX.
