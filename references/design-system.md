@@ -1,6 +1,11 @@
-# EY typography and integrity policy
+# EY typography and color policy
 
-This reference supplies EY visual and typography policy to Embedded PPT Master Stage 1. PPT Master owns concept, composition, SVG construction, rendered visual QA, and internal repair. Do not expand content-facing Visual Direction into a wireframe, coordinate plan, or construction manual.
+This reference contains the only EY Deck Design constraints on Embedded PPT
+Master's visual design: the fixed typography scale and the color policy below.
+The bound template is supplied separately. Apart from those three constraints,
+PPT Master owns the visual approach without EY Deck Design composition, layout,
+geometry, density, hierarchy, imagery, information-visualization, style, or
+editability preferences.
 
 ## Canvas and typography
 
@@ -21,14 +26,7 @@ point size. Do not use intermediate or ad hoc sizes.
 
 Both permitted body-heading sizes and both permitted body-content sizes may
 appear on one page. Use only the listed sizes; Embedded PPT Master otherwise
-owns typography-role assignment, geometry, wrapping, grouping, spacing, color,
-imagery, and visual treatment.
-
-## Visual Direction
-
-Consume the approved semantic `Visual Direction（Build-only）` defined by
-[output-contract.md](output-contract.md). Preserve its meaning without treating
-it as a prescribed layout or implementation plan.
+owns typography-role assignment and all other typographic treatment.
 
 ## Visual language and color economy
 
@@ -36,51 +34,5 @@ Default authored content pages to black, white, neutral greys, and EY yellow.
 Use at most one additional accent hue on a page, and only when it carries an
 explicit, audience-relevant category, state, threshold, or comparison meaning.
 Never assign a different color to every peer merely to separate adjacent
-content. Labels, position, scale, grouping, line treatment, and whitespace must
-carry the structure first; color may reinforce that structure but must not
-invent it. Fixed Cover, Divider, Agenda, Ending, and inherited template artwork
+content. Fixed Cover, Divider, Agenda, Ending, and inherited template artwork
 remain exempt from this authored-content palette rule.
-
-Treat content IDs as argument semantics, never as a container inventory. Do not
-default each block to an equal card, rounded panel, arrow, pill, column, or
-identically weighted module. Avoid nested panels and repeated decorative
-containers when one page-scale structure can express the relationship. Merge,
-stagger, subordinate, or spatially integrate blocks when that improves the
-approved meaning and reading task.
-
-Use one dominant composition per page. For evidence–system–outcome or
-input–mechanism–result arguments, keep evidence visually subordinate, make the
-mechanism or system the main explanatory object, and give the outcome a clear
-focal role. Express integration or convergence with one coherent shared
-structure or path rather than a row of separately colored peer arrows. Use
-proportion, asymmetry, rhythm, whitespace, typography, and precise geometry to
-create visual sophistication while preserving native editability.
-
-Choose the clearest truthful editable information model. Simplicity applies to
-the semantic model and audience reading task, not to visual ambition,
-composition quality, or craft. Native-PPTX compatibility does not justify a
-generic dashboard, equal-card grid, or mechanically literal block-to-shape
-mapping.
-
-## Integrity boundary
-
-Preserve approved copy, data, sources, emphasis, semantic relationships, fixed
-template atoms, and export compatibility. Do not invent missing factual labels,
-values, units, dates, caveats, or sources. These integrity requirements do not
-prescribe composition, color, imagery, information visualization, or layout.
-
-## Mode-aware design intent
-
-For a `Simplified` page, produce one confident complete A solution. Do not lower composition, copy, typography, preview, or export quality because the page has one candidate.
-
-For a `Standard` page, produce two complete interpretations from the same locked packet:
-
-- A: one confident complete solution.
-- B: another complete solution from the same locked content, not a repair of A.
-
-Both preserve the same approved meaning and canvas. B may use any complete
-visual approach and may report material differences; identical A/B bytes or
-insufficient difference evidence do not block production, comparison, or user
-selection. In either mode, the controller owns the
-manifest, presentation, user decision, revisions, and handoff. See
-[authoring-modes.md](authoring-modes.md).

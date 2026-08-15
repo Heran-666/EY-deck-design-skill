@@ -56,7 +56,7 @@ def framework(status: str = "Content locked", version: str = "3.8", slide_id: st
 
 ## Current position
 
-- Framework version: 2.7
+- Framework version: 2.8
 - Workflow version: {version}
 - Storyline version: 1.0
 - Output filename: Test deck.pptx
@@ -110,19 +110,13 @@ def content(slide_id: str = "S01") -> str:
 #### {slide_id}-B1｜Evidence
 - Detail: A complete and approved statement for leadership decision-making.
 
-### Visual Direction（Build-only）
-- Page type: Standard content
-- Visual priority: The recommendation first; evidence remains supporting
-- Semantic relationship: Evidence supports action
-- Guardrails: Do not weaken the conclusion
-
 ### Sources
 - On-slide source: None
 - Source details: No external sources
 """
 
 
-def legacy_proposal_framework(status: str = "Content locked", version: str = "2.7") -> str:
+def legacy_proposal_framework(status: str = "Content locked", version: str = "2.8") -> str:
     return (
         framework(status, version)
         .replace("# Presentation Framework", "# Proposal Framework", 1)
@@ -417,12 +411,12 @@ def protected_framework() -> str:
 
 
 class LightweightWorkflowTests(unittest.TestCase):
-    def test_workflow_41_exposes_one_ppt_master_stage1_boundary(self) -> None:
+    def test_workflow_42_exposes_one_ppt_master_stage1_boundary(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             project = Path(tmp)
             framework_path = setup_locked(project)
             text = framework_path.read_text(encoding="utf-8").replace(
-                "- Workflow version: 3.8", "- Workflow version: 4.1"
+                "- Workflow version: 3.8", "- Workflow version: 4.2"
             )
             framework_path.write_text(text, encoding="utf-8")
             action, pages = directive(text, project)
@@ -875,6 +869,16 @@ class LightweightWorkflowTests(unittest.TestCase):
             prototype = Path(payload["template_prototype"])
             self.assertTrue(prototype.is_file())
             self.assertEqual(payload["template_prototype_sha256"], sha256(prototype))
+            packet_text = packet.read_text(encoding="utf-8")
+            self.assertNotIn("### Visual Direction（Build-only）", packet_text)
+            self.assertIn(
+                "constrains visual design only through the fixed typography scale, color policy, and this bound template",
+                packet_text,
+            )
+            self.assertIn(
+                "fixed typography scale, color policy, and bound template",
+                payload["route_instruction"],
+            )
             self.assertNotIn("Evidence supports action", result.stdout)
 
     def test_present_ab_uses_standalone_local_image_blocks(self) -> None:
@@ -1916,8 +1920,8 @@ class LightweightWorkflowTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             project = Path(tmp)
             (project / "content.md").write_text(content(), encoding="utf-8")
-            old = framework("Content locked", "2.7").replace(
-                "- Framework version: 2.7", "- Framework version: 2.2"
+            old = framework("Content locked", "2.8").replace(
+                "- Framework version: 2.8", "- Framework version: 2.2"
             ).replace(
                 "- Storyline version: 1.0",
                 "- Storyline version: 1.0\n"
@@ -1931,7 +1935,7 @@ class LightweightWorkflowTests(unittest.TestCase):
                 "- Status: Content locked", "- Status: SVG selected"
             ).replace("- Confirmed version: Pending", "- Confirmed version: A")
             migrated = migrate_workflow(old, project)
-            self.assertIn("- Framework version: 2.7", migrated)
+            self.assertIn("- Framework version: 2.8", migrated)
             self.assertIn("- Workflow version: 3.8", migrated)
             self.assertNotIn("- Last checkpoint:", migrated)
             self.assertNotIn("- Final PPTX owner:", migrated)
@@ -1945,7 +1949,7 @@ class LightweightWorkflowTests(unittest.TestCase):
             project = Path(tmp)
             old = (
                 framework("Not started")
-                .replace("- Framework version: 2.7", "- Framework version: 2.6")
+                .replace("- Framework version: 2.8", "- Framework version: 2.7")
                 .replace("- Workflow version: 3.8", "- Workflow version: 3.7")
                 .replace("- Requested authoring mode: Standard\n", "")
                 .replace("- Page type: Standard content", "- Page type: Cover")
@@ -1965,35 +1969,31 @@ class LightweightWorkflowTests(unittest.TestCase):
             self.assertIn("- Confirmed version: Pending", migrated)
             self.assertNotIn("- Selected version:", migrated)
 
-    def test_migration_compacts_legacy_visual_direction_schema(self) -> None:
+    def test_migration_removes_legacy_visual_direction_schema(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             project = Path(tmp)
             old_content = content().replace(
-                "- Visual priority: The recommendation first; evidence remains supporting\n"
-                "- Semantic relationship: Evidence supports action\n"
-                "- Guardrails: Do not weaken the conclusion",
+                "### Sources\n",
+                "### Visual Direction（Build-only）\n"
+                "- Page type: Standard content\n"
                 "- Visual focus: The recommendation\n"
                 "- Information hierarchy: Conclusion first, evidence second\n"
                 "- Relationship to preserve: Evidence supports action\n"
                 "- Fixed constraints: Preserve approved copy\n"
-                "- Avoid: Do not weaken the conclusion",
+                "- Avoid: Do not weaken the conclusion\n\n"
+                "### Sources\n",
             )
             content_path = project / "content.md"
             content_path.write_text(old_content, encoding="utf-8")
             self.assertTrue(
-                any("unsupported fields" in item for item in validate_blueprint(content_path))
+                any("must not contain design directions" in item for item in validate_blueprint(content_path))
             )
 
             framework_text = framework("Not started")
             migrated_framework = migrate_workflow(framework_text, project)
             migrated_content = content_path.read_text(encoding="utf-8")
             self.assertEqual(migrated_framework, framework_text)
-            self.assertIn("- Visual priority: The recommendation; Conclusion first, evidence second", migrated_content)
-            self.assertIn("- Semantic relationship: Evidence supports action", migrated_content)
-            self.assertIn(
-                "- Guardrails: Preserve approved copy; Do not weaken the conclusion",
-                migrated_content,
-            )
+            self.assertNotIn("### Visual Direction（Build-only）", migrated_content)
             self.assertNotIn("- Visual focus:", migrated_content)
             self.assertNotIn("- Relationship to preserve:", migrated_content)
             self.assertEqual(validate_blueprint(content_path), [])
@@ -2019,7 +2019,7 @@ class LightweightWorkflowTests(unittest.TestCase):
             (project / "framework.md").write_text(migrated, encoding="utf-8")
             self.assertFalse(legacy_receipt.exists())
             archived = list(
-                (project / "working" / "archive" / "workflow-4.1-stage1-boundary").rglob(
+                (project / "working" / "archive" / "workflow-4.2-stage1-boundary").rglob(
                     "S01-A-authoring.json"
                 )
             )
@@ -2038,7 +2038,7 @@ class LightweightWorkflowTests(unittest.TestCase):
             final_path.write_text(svg(), encoding="utf-8")
             old = (
                 framework("SVG confirmed")
-                .replace("- Framework version: 2.7", "- Framework version: 2.6")
+                .replace("- Framework version: 2.8", "- Framework version: 2.7")
                 .replace("- Workflow version: 3.8", "- Workflow version: 3.7")
                 .replace("- Requested authoring mode: Standard\n", "")
                 .replace("- Authoring mode: Standard\n", "")
@@ -2113,12 +2113,19 @@ class LightweightWorkflowTests(unittest.TestCase):
                 "hierarchy-level": content().replace(
                     "#### S01-B1｜Evidence", "###### S01-B1｜Evidence"
                 ),
+                "visual-direction": content().replace(
+                    "### Sources\n",
+                    "### Visual Direction（Build-only）\n"
+                    "- Page type: Standard content\n\n"
+                    "### Sources\n",
+                ),
             }
             expected_fragments = {
                 "old-heading": "compact Deck build profile",
                 "emphasis-style": "unsupported Emphasis style",
                 "source-field": "Sources has unsupported fields",
                 "hierarchy-level": "must use heading level 4",
+                "visual-direction": "must not contain design directions",
             }
             for name, value in invalid_cases.items():
                 path = root / f"{name}.md"

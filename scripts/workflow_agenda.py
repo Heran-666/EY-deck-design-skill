@@ -22,12 +22,6 @@ def _h3_body(section: str, name: str) -> str:
     return section[match.end():end]
 
 
-def page_type_from_section(section: str) -> str:
-    visual_direction = _h3_body(section, "Visual Direction（Build-only）")
-    match = re.search(r"^- Page type:\s*(.+?)\s*$", visual_direction, re.MULTILINE)
-    return match.group(1).strip().lower() if match else ""
-
-
 def agenda_items(section: str, slide_id: str) -> list[tuple[str, str]]:
     """Return validated Agenda item IDs and labels in approved order."""
     return [
@@ -37,9 +31,9 @@ def agenda_items(section: str, slide_id: str) -> list[tuple[str, str]]:
     ]
 
 
-def agenda_schema_errors(section: str, slide_id: str) -> list[str]:
+def agenda_schema_errors(section: str, slide_id: str, page_type: str = "") -> list[str]:
     """Require a lean Agenda: Title plus sequential label-only blocks."""
-    if page_type_from_section(section) != "agenda":
+    if page_type.strip().lower() != "agenda":
         return []
 
     errors: list[str] = []

@@ -4,9 +4,9 @@
 from __future__ import annotations
 
 
-FRAMEWORK_VERSION = "2.7"
-WORKFLOW_VERSION = "4.1"
-READABLE_WORKFLOW_VERSIONS = {"3.8", "3.9", "4.0", WORKFLOW_VERSION}
+FRAMEWORK_VERSION = "2.8"
+WORKFLOW_VERSION = "4.2"
+READABLE_WORKFLOW_VERSIONS = {"3.8", "3.9", "4.0", "4.1", WORKFLOW_VERSION}
 STAGE1_ACCEPTANCE_SCHEMA = "ey-deck.stage1-acceptance.v1"
 
 REQUESTED_AUTHORING_MODES = {"Simplified", "Standard"}
@@ -40,6 +40,7 @@ PPT_MASTER_STAGE1_INSTRUCTION = (
     "Act only as EY Deck Design's embedded PPT Master Stage 1 engine. From the exact hash-bound locked page packet, "
     "design, author, render, review, and internally repair one complete SVG candidate at the requested path. "
     "Own all subjective design decisions, page composition, information visualization, SVG construction, and visual QA. "
+    "EY Deck Design constrains visual design only through the fixed typography scale, color policy, and bound template. "
     "Do not expose or require the outer controller to record your internal design reasoning. Preserve approved meaning, "
     "copy, data, sources, template-fixed atoms, and the bound Master/Layout contract exactly. Bind every page-authored "
     "visible text run to the packet's data-copy-id, keep the SVG self-contained and export-compatible, and return COMPLETE "
@@ -48,11 +49,10 @@ PPT_MASTER_STAGE1_INSTRUCTION = (
 )
 
 B_OPTION_KERNEL = (
-    "B option guidance (advisory, never a blocking gate): start from the same locked content and semantic "
-    "Visual Direction without treating A as a repair target. A different complete visual approach may improve "
+    "B option guidance (advisory, never a blocking gate): start from the same locked content without treating A "
+    "as a repair target. A different complete visual approach may improve "
     "the usefulness of the choice, but similarity to A never blocks authoring, Visual QA, "
-    "presentation, or confirmation. Preserve all approved copy, data, sources, emphasis, semantic relationships, "
-    "fixed constraints, and the same canvas."
+    "presentation, or confirmation. Preserve all approved copy, data, sources, emphasis, and the bound template."
 )
 
 PREPARE_PPT_MASTER_ACTIONS = {

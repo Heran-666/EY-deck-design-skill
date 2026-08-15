@@ -43,17 +43,11 @@ class RealPreviewRendererTests(unittest.TestCase):
 
 {blocks}
 
-### Visual Direction（Build-only）
-- Page type: Agenda
-- Visual priority: 标题后依次阅读七个章节名称
-- Semantic relationship: 七个章节按汇报顺序并列展开
-- Guardrails: 保留批准的名称与顺序；不得加入说明或摘要
-
 ### Sources
 - On-slide source: None
 - Source details: No external sources
 """
-        contract = visible_copy_contract(section, "S02")
+        contract = visible_copy_contract(section, "S02", expected_page_type="Agenda")
         tree = ET.parse(SKILL / "assets" / "templates" / "ey-gradient-dark-v1" / "agenda.svg")
         root = tree.getroot()
         title_group = next(element for element in root.iter() if element.get("id") == "agenda-title")

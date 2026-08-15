@@ -56,12 +56,6 @@ CONTENT = r"""## S01｜Approved title
 
 - Table note: Visible note.
 
-### Visual Direction（Build-only）
-- Page type: Interpretation
-- Visual priority: Never render this priority.
-- Semantic relationship: Never render this relationship.
-- Guardrails: Never render this warning.
-
 ### Sources
 - On-slide source: Approved source.
 - Source details: Never render source details.
@@ -77,12 +71,6 @@ AGENDA_CONTENT = """## S02｜目录
 #### S02-B2｜核心方法与路径
 
 #### S02-B3｜实施计划与保障
-
-### Visual Direction（Build-only）
-- Page type: Agenda
-- Visual priority: 标题后依次阅读三个章节名称
-- Semantic relationship: 三个章节按汇报顺序并列展开
-- Guardrails: 保留批准的名称与顺序；不得加入说明或摘要
 
 ### Sources
 - On-slide source: None
@@ -264,7 +252,11 @@ class VisibleCopyContractTests(unittest.TestCase):
             self.assertTrue(any("S01-title changed" in error for error in errors))
 
     def test_agenda_contract_generates_editable_number_bindings(self) -> None:
-        contract = visible_copy_contract(AGENDA_CONTENT, "S02")
+        contract = visible_copy_contract(
+            AGENDA_CONTENT,
+            "S02",
+            expected_page_type="Agenda",
+        )
         agenda_items = [
             (item["id"], item["role"], item["text"])
             for item in contract["items"]
@@ -298,10 +290,10 @@ class VisibleCopyContractTests(unittest.TestCase):
             "#### S02-B1｜战略背景与目标\n",
             "#### S02-B1｜战略背景与目标\n- Detail: 这行不应进入目录页。\n",
         )
-        errors = agenda_schema_errors(invalid, "S02")
+        errors = agenda_schema_errors(invalid, "S02", "Agenda")
         self.assertTrue(any("supporting-detail" in error for error in errors))
         with self.assertRaisesRegex(ValueError, "supporting-detail"):
-            visible_copy_contract(invalid, "S02")
+            visible_copy_contract(invalid, "S02", expected_page_type="Agenda")
 
         review = (
             "# Presentation Build Specification\n\n"
@@ -321,18 +313,23 @@ class VisibleCopyContractTests(unittest.TestCase):
             "- Title: 目录\n",
             "- Title: 目录\n- Subtitle: 汇报结构\n",
         ).replace("#### S02-B2｜", "##### S02-B3｜")
-        errors = agenda_schema_errors(invalid, "S02")
+        errors = agenda_schema_errors(invalid, "S02", "Agenda")
         self.assertTrue(any("On-slide content supports only Title" in error for error in errors))
         self.assertTrue(any("top-level sequential blocks" in error for error in errors))
 
-    def test_framework_agenda_type_cannot_be_bypassed_in_content(self) -> None:
-        disguised = AGENDA_CONTENT.replace("- Page type: Agenda", "- Page type: Standard content")
-        with self.assertRaisesRegex(ValueError, "does not match framework Page type"):
-            visible_copy_contract(
-                disguised,
-                "S02",
-                expected_page_type="Agenda",
-            )
+    def test_framework_page_type_drives_agenda_contract(self) -> None:
+        agenda = visible_copy_contract(
+            AGENDA_CONTENT,
+            "S02",
+            expected_page_type="Agenda",
+        )
+        standard = visible_copy_contract(
+            AGENDA_CONTENT,
+            "S02",
+            expected_page_type="Standard content",
+        )
+        self.assertTrue(any(item["role"] == "agenda-number" for item in agenda["items"]))
+        self.assertFalse(any(item["role"] == "agenda-number" for item in standard["items"]))
 
 
 class PagePreflightReuseTests(unittest.TestCase):

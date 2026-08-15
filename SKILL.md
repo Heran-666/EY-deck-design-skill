@@ -23,7 +23,7 @@ and technical package QA to Embedded PPT Master.
 | User | Storyline, exact content approval, candidate choice, revision confirmation |
 | EY Deck Design | intake, content, sources, authoring mode, workflow state, candidate/version requests, user gates, evidence, recovery, delivery |
 | `framework.md` | compact project context, approved Storyline, page modes, state, unresolved decisions |
-| `content.md` | exact approved copy, data, sources, emphasis, and semantic Visual Direction |
+| `content.md` | exact approved copy, data, sources, and emphasis |
 | Embedded PPT Master Stage 1 | page design, information visualization, SVG construction, rendering, visual QA, and internal repair |
 | Embedded PPT Master Stage 2 | isolated normalization, Master/Layout construction, native PPTX conversion, compatibility, package QA |
 
@@ -66,8 +66,8 @@ project mode. Protected placeholders use `Not applicable`.
 
 Show the complete Storyline using the fixed contract in
 [references/deliverable-types.md](references/deliverable-types.md) and obtain
-explicit approval before creating `framework.md`. Create framework 2.7 / workflow
-4.1 with the requested or deterministic `.pptx` filename. Call
+explicit approval before creating `framework.md`. Create framework 2.8 / workflow
+4.2 with the requested or deterministic `.pptx` filename. Call
 `load_workspace_dependencies` once, then run controller `bootstrap` with the
 reported `Python executable` and `Bundle version`. Use the directory containing
 the new `framework.md` as `--project-dir`.
@@ -106,8 +106,7 @@ Base and one Rn; show both together and accept only that pair.
 
 Never invent client, audience, source, EY, credential, case, people, capacity,
 fee, schedule, tool, approval, learning outcome, or business-outcome facts.
-Never silently rewrite locked content, protected material, or confirmed semantic
-Visual Direction.
+Never silently rewrite locked content or protected material.
 
 Map user decisions by meaning to the exact controller command already emitted:
 confirmation selects the displayed A, an ordinal choice selects the displayed A

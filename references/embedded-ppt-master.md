@@ -2,8 +2,9 @@
 
 Embedded PPT Master is EY Deck Design's complete visual-production engine. EY
 Deck Design supplies locked content, candidate/version requirements, template
-bindings, user revision requests, confirmed-page manifests, and required output
-paths. PPT Master owns every visual and technical decision inside those bounds.
+bindings, explicit user or project requirements, user revision requests,
+confirmed-page manifests, and required output paths. PPT Master owns every
+visual and technical decision inside those bounds.
 
 ## Stage 1 — design and SVG candidate
 
@@ -17,17 +18,18 @@ separate runner, subagent, or global skill and creates no outer design state.
 Internally perform the complete loop without exposing intermediate design state
 to the outer controller:
 
-1. Understand the communication job, audience reading task, approved hierarchy,
-   semantic Visual Direction, adjacent-page context, and project constraints.
-2. Choose a coherent page-scale composition and the clearest truthful editable
-   information model. Simplicity applies to the semantic model, not to visual
-   ambition or compositional craft.
+1. Understand the locked content, requested candidate, adjacent-page context,
+   and explicit user or project requirements.
+2. Choose the complete visual approach independently. EY Deck Design imposes no
+   composition, layout, geometry, density, hierarchy, imagery,
+   information-visualization, style, or editability preference.
 3. Author the SVG from the bound structured-template prototype.
 4. Render and inspect the candidate at full-slide scale.
-5. Repair composition, hierarchy, legibility, data expression, brand treatment,
-   fit, and export-readiness until the candidate is ready for user display.
+5. Repair content-integrity, template, rendering, visibility, and export defects
+   until the candidate is ready for user display.
 
-Use [design-system.md](design-system.md) for EY visual and typography policy and
+Use [design-system.md](design-system.md) only for the fixed typography scale and
+color policy, and
 [structured-template-profile.md](structured-template-profile.md) for inherited
 Master/Layout atoms and placeholder boundaries.
 
@@ -38,6 +40,13 @@ assignment, SVG geometry, grouping, wrapping, spacing, density, and visual QA.
 Internal design notes or Design Decisions may be used when helpful, but they are
 not controller state, public receipts, or external approval gates.
 
+The only EY Deck Design visual constraints are the fixed typography scale, the
+color policy, and the bound template. Do not infer any additional house style,
+composition pattern, preferred information model, container treatment,
+page-density target, or native-editability preference from this skill. Explicit
+user and project requirements still apply because they are task inputs, not EY
+Deck Design defaults.
+
 For B, create another complete solution from the same locked packet using any
 visual approach; similarity to A is never a blocker. For Rn, preserve the bound
 Base and change only the user's
@@ -46,8 +55,8 @@ fulfil the request without changing approved meaning.
 
 ### Content and template boundary
 
-Preserve every approved word, number, source, emphasis, relationship, and fixed
-constraint. Never invent or rewrite content. Bind every page-authored visible
+Preserve every approved word, number, source, and emphasis. Never invent or
+rewrite content. Bind every page-authored visible
 text run to exactly one packet `data-copy-id`. Do not expose Build-only text.
 
 Use the bound prototype as the literal starting SVG. Preserve root
@@ -71,9 +80,9 @@ Keep every intended PowerPoint text box as one `<text>` element. Wrap with direc
 scale defined in `design-system.md`.
 
 Before returning COMPLETE, inspect the rendered page for exact copy, clipping,
-overlap, off-canvas content, legibility, data truthfulness, fixed-template
-integrity, and native-PPTX readiness. Repair
-design or implementation defects internally. Return BLOCKED only when the
+overlap, off-canvas content, usable visibility, data truthfulness,
+fixed-template integrity, and native-PPTX readiness. Repair implementation or
+integrity defects internally. Return BLOCKED only when the
 candidate cannot be completed without reopening locked content, restarting the
 design request, or fixing the environment.
 

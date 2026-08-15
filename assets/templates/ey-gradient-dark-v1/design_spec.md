@@ -31,9 +31,8 @@ PowerPoint Masters and five reusable Layouts.
 - Master: `ey-dark` / `EY Dark`
 - Layout: `agenda` / `EY Agenda`
 - Slots: title and a composite editable directory region
-- Composition: two balanced columns of rounded `#141414` cards, each with a
-  yellow left rule, numbered emphasis, and exactly one agenda-item label;
-  the seven-item reference uses four cards left and three right
+- Reference content: the prototype demonstrates one editable agenda treatment;
+  it is replaceable and does not constrain the authored agenda composition
 
 ### 3. Section divider (`divider.svg`)
 
@@ -48,7 +47,7 @@ PowerPoint Masters and five reusable Layouts.
 - Slots: title, optional subtitle, composite editable content region
 - Content-region proxy: one borderless black rectangle that blends into the
   Master background. It exists only to carry the native object placeholder and
-  must not be interpreted as a visible panel or composition boundary.
+  does not constrain the authored composition.
 
 ### 5. Ending (`ending.svg`)
 

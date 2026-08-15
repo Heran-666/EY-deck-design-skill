@@ -86,7 +86,7 @@ def action_for_group(
         if not revision_presentation_valid(project_dir, page.slide_id, request):
             return "PRESENT_SVG_REVISION", [page]
         return "COLLECT_REVISION_CONFIRMATION", [page]
-    raise ValueError("active workflow 4.1 page has no actionable state")
+    raise ValueError("active workflow 4.2 page has no actionable state")
 
 
 def directive(text: str, project_dir: Path) -> tuple[str, list[PageEntry]]:

@@ -32,10 +32,9 @@ must not be changed or deleted. Embedded PPT Master attaches authored content
 to the bound placeholder proxy so it remains editable; the proxy's stored
 bounds are technical metadata, not a composition or footprint restriction.
 The Content prototype's object proxy blends into the black Master background
-and has no visible border; it is an export carrier, not a required panel. Stage
-1 must replace its prototype child with the authored page composition and must
-not recreate an enclosing card unless the approved communication task genuinely
-requires one.
+and has no visible border. It is an export carrier, not a design instruction;
+Stage 1 may replace its prototype child with any authored composition while
+preserving the bound template contract.
 
 Use Display title (`53.3333` SVG px / 40 pt) only for the Cover and Section
 divider title placeholders. The normal content title remains `32` SVG px / 24

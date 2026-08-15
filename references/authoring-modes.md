@@ -24,8 +24,8 @@ a normal content page unless the user explicitly changes its page mode.
 
 Apply this mapping to every deliverable type. Cover, Agenda, and Section divider
 pages always generate only A, regardless of the requested project mode. Agenda
-binds the dedicated Agenda Layout; each numbered card contains exactly one
-agenda-item label and no secondary supporting detail.
+binds the dedicated Agenda Layout; its approved items contain labels and no
+secondary supporting detail. Embedded PPT Master owns their composition.
 
 Use project mode only to initialize new pages. Treat each page's effective `Authoring mode` as the runtime authority for generation, display, decision evidence, recovery, and mode-specific audit rules.
 
@@ -46,7 +46,6 @@ For `Standard`:
 4. Show A and B together at equal scale.
 5. Require explicit selection of A or B, or a targeted revision request.
 
-Different A/B composition families remain useful creative guidance only.
 Identical candidates or weak difference evidence are non-blocking advisories.
 
 Set the page to `Awaiting SVG decision` after its required initial presentation. On confirmation or selection, copy the confirmed version to the canonical SVG, record the page mode and presentation evidence in the SVG decision receipt, and set `Confirmed version`.

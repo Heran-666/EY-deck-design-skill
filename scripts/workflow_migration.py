@@ -30,7 +30,7 @@ LEGACY_WORKFLOW_RULE_FIELDS = {
 }
 
 
-def migrate_visual_direction_schema(content: str) -> str:
+def migrate_content_schema(content: str) -> str:
     content = re.sub(
         r"\A# Proposal Build Specification\b",
         "# Presentation Build Specification",
@@ -56,92 +56,19 @@ def migrate_visual_direction_schema(content: str) -> str:
                 f"- Language: {language}\n\n"
                 + content[first_slide.start():]
             )
-    pattern = re.compile(
-        r"^### Design Brief（Build-only）\s*$\n(.*?)(?=^### |^## S\d{2}｜|\Z)",
-        re.MULTILINE | re.DOTALL,
+    migrated = re.sub(
+        r"^### (?:Design Brief|Visual Direction)（Build-only）\s*$\n.*?(?=^### |^## S\d{2}｜|\Z)",
+        "",
+        content,
+        flags=re.MULTILINE | re.DOTALL,
     )
-
-    def replacement(match: re.Match[str]) -> str:
-        fields = line_fields(match.group(1))
-        page_type = fields.get("Page type", "Standard content")
-        legacy_relationship = fields.get("Relationship to express", "")
-        relationship = (
-            legacy_relationship
-            if re.search(
-                r"comparison|contrast|progression|hierarchy|cause|effect|convergence|parallel|"
-                r"support|sequence|对比|比较|递进|层级|因果|汇聚|并列|支撑|顺序",
-                legacy_relationship,
-                re.IGNORECASE,
-            )
-            else "Approved semantic relationship among the on-slide content"
-        )
-        return (
-            "### Visual Direction（Build-only）\n"
-            f"- Page type: {page_type}\n"
-            "- Visual priority: The page's approved core conclusion first; supporting content remains subordinate\n"
-            f"- Semantic relationship: {relationship}\n"
-            "- Guardrails: Do not weaken the core conclusion or distort the stated relationship\n\n"
-        )
-
-    migrated = pattern.sub(replacement, content)
-    visual_pattern = re.compile(
-        r"^### Visual Direction（Build-only）\s*$\n(.*?)(?=^### |^## S\d{2}｜|\Z)",
-        re.MULTILINE | re.DOTALL,
-    )
-
-    def compact_values(*values: str) -> str:
-        compact: list[str] = []
-        for value in values:
-            normalized = value.strip().rstrip(";；。 ")
-            if normalized and normalized not in compact:
-                compact.append(normalized)
-        return "; ".join(compact)
-
-    def migrate_visual_direction(match: re.Match[str]) -> str:
-        fields = line_fields(match.group(1))
-        legacy_fields = {
-            "Visual focus",
-            "Information hierarchy",
-            "Relationship to preserve",
-            "Fixed constraints",
-            "Avoid",
-        }
-        if (
-            {"Page type", "Visual priority", "Semantic relationship", "Guardrails"}
-            <= set(fields)
-            and not legacy_fields.intersection(fields)
-        ):
-            return match.group(0)
-        page_type = fields.get("Page type", "Standard content")
-        visual_priority = compact_values(
-            fields.get("Visual priority", ""),
-            fields.get("Visual focus", ""),
-            fields.get("Information hierarchy", ""),
-        ) or "The page's approved core conclusion; supporting content remains subordinate"
-        semantic_relationship = compact_values(
-            fields.get("Semantic relationship", ""),
-            fields.get("Relationship to preserve", ""),
-        ) or "Approved semantic relationship among the on-slide content"
-        guardrails = compact_values(
-            fields.get("Guardrails", ""),
-            fields.get("Fixed constraints", ""),
-            fields.get("Avoid", ""),
-        ) or "Do not weaken the core conclusion or distort the stated relationship"
-        return (
-            "### Visual Direction（Build-only）\n"
-            f"- Page type: {page_type}\n"
-            f"- Visual priority: {visual_priority}\n"
-            f"- Semantic relationship: {semantic_relationship}\n"
-            f"- Guardrails: {guardrails}\n\n"
-        )
-
-    migrated = visual_pattern.sub(migrate_visual_direction, migrated)
-    return re.sub(
+    migrated = re.sub(
         r"^### Wireframe（Build-only）\s*$\n+```text\s*\n.*?\n```\s*\n?",
         "",
         migrated,
         flags=re.MULTILINE | re.DOTALL,
     )
+    return re.sub(r"\n{3,}", "\n\n", migrated).rstrip() + ("\n" if migrated else "")
 
 
 def default_output_filename(text: str) -> str:
@@ -202,7 +129,7 @@ def migrate_workflow(
     text = migrate_legacy_project_schema(text)
     content_path = project_dir / "content.md"
     content = content_path.read_text(encoding="utf-8") if content_path.is_file() else ""
-    migrated_content = migrate_visual_direction_schema(content)
+    migrated_content = migrate_content_schema(content)
     current = h2_section(text, "Current position")
     original_position = line_fields(current)
     migration_target_version = (
@@ -382,7 +309,7 @@ def migrate_workflow(
                 obsolete_authoring_receipts.append(path)
     archive_items(
         project_dir,
-        "workflow-4.1-stage1-boundary",
+        "workflow-4.2-stage1-boundary",
         obsolete_authoring_receipts,
     )
 

@@ -9,7 +9,7 @@ import unicodedata
 from pathlib import Path
 from xml.etree import ElementTree
 
-from workflow_agenda import agenda_schema_errors, page_type_from_section
+from workflow_agenda import agenda_schema_errors
 from workflow_io import text_sha256
 
 
@@ -107,15 +107,9 @@ def visible_copy_contract(
     if not heading:
         raise ValueError(f"missing approved content section for {slide_id}")
 
-    page_type = page_type_from_section(section)
-    expected_type = (expected_page_type or "").strip().lower()
-    if expected_type and page_type != expected_type:
-        raise ValueError(
-            f"{slide_id} content Page type {page_type or 'Missing'!r} does not match "
-            f"framework Page type {expected_page_type!r}"
-        )
+    page_type = (expected_page_type or "").strip().lower()
     if page_type == "agenda":
-        agenda_errors = agenda_schema_errors(section, slide_id)
+        agenda_errors = agenda_schema_errors(section, slide_id, page_type)
         if agenda_errors:
             raise ValueError("; ".join(agenda_errors))
 

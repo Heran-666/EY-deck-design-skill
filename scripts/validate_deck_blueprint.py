@@ -21,29 +21,6 @@ FIELD_RE = re.compile(r"^- (Title|Subtitle|Core insight):\s*(.+)$", re.MULTILINE
 PROFILE_FIELDS = (
     "Language",
 )
-DESIGN_FIELDS = (
-    "Page type",
-    "Visual priority",
-    "Semantic relationship",
-    "Guardrails",
-)
-VISUAL_DIRECTION_FIELD_LIMIT = 400
-HARD_DESIGN_PRESCRIPTION_RE = re.compile(
-    r"(?:\b(?:wireframe|layout|mock[- ]?up)\b|"
-    r"坐标|线框|版式|布局|x\s*=|y\s*=|\b\d+(?:\.\d+)?\s*(?:px|pt|cm|mm)\b)",
-    re.IGNORECASE,
-)
-DESIGN_SOLUTION_TERM = (
-    r"(?:\b(?:grid|card|panel|column|row|timeline|funnel|matrix|radial|"
-    r"hub[- ]and[- ]spoke|split[- ]screen|staircase|dashboard)\b|"
-    r"网格|卡片|面板|分栏|左右栏|上下栏|时间线|漏斗|矩阵|环形|放射|阶梯|仪表盘)"
-)
-PRESCRIPTIVE_DESIGN_RE = re.compile(
-    rf"(?:(?:\b(?:use|adopt|arrange|place|render|present|build|draw|design)\b|"
-    rf"采用|使用|安排|放置|呈现|设计|绘制|排成|分成).{{0,32}}{DESIGN_SOLUTION_TERM}|"
-    rf"{DESIGN_SOLUTION_TERM}.{{0,24}}(?:\b(?:layout|arrangement|composition)\b|布局|排列|构图))",
-    re.IGNORECASE,
-)
 PROHIBITED_PAGE_FIELDS = (
     "Chapter",
     "Narrative role",
@@ -95,14 +72,6 @@ def chinese_width(value: str) -> float:
         )
         width += 1.0 if is_wide else 0.5
     return width
-
-
-def prescribes_concrete_design(value: str) -> bool:
-    """Reject construction instructions, not isolated analytical vocabulary."""
-    return bool(
-        HARD_DESIGN_PRESCRIPTION_RE.search(value)
-        or PRESCRIPTIVE_DESIGN_RE.search(value)
-    )
 
 
 def named_h2_section(text: str, heading: str) -> str:
@@ -240,7 +209,11 @@ def validate_block_hierarchy(slide_id: str, section: str, page_type: str) -> lis
     return errors
 
 
-def validate_slide(slide_id: str, section: str) -> tuple[list[str], str]:
+def validate_slide(
+    slide_id: str,
+    section: str,
+    page_type: str = "",
+) -> tuple[list[str], str]:
     errors: list[str] = []
     visible_matches = FIELD_RE.findall(section)
     visible_fields = dict(visible_matches)
@@ -258,15 +231,16 @@ def validate_slide(slide_id: str, section: str) -> tuple[list[str], str]:
 
     if re.search(r"^### Content structure", section, re.MULTILINE):
         errors.append(f"{slide_id} must not contain the deprecated Content structure section")
-    if re.search(r"^### (?:Production Brief|Design Brief（Build-only）)", section, re.MULTILINE):
-        errors.append(f"{slide_id} must use semantic Visual Direction, not a production or design plan")
-    if re.search(r"^### Wireframe（Build-only）", section, re.MULTILINE):
-        errors.append(f"{slide_id} must not contain a wireframe or prescribed layout")
+    if re.search(
+        r"^### (?:Production Brief|Design Brief（Build-only）|Visual Direction（Build-only）|Wireframe（Build-only）)",
+        section,
+        re.MULTILINE,
+    ):
+        errors.append(f"{slide_id} must not contain design directions")
     if re.search(r"^### Internal notes", section, re.MULTILINE):
         errors.append(f"{slide_id} must not contain Internal notes")
     allowed_h3 = {
         "On-slide content",
-        "Visual Direction（Build-only）",
         "Sources",
     }
     unexpected_h3 = [
@@ -282,42 +256,7 @@ def validate_slide(slide_id: str, section: str) -> tuple[list[str], str]:
         if re.search(rf"^- {re.escape(prohibited)}:", section, re.MULTILINE):
             errors.append(f"{slide_id} must not contain review-oriented field: {prohibited}")
 
-    brief = named_h3_section(section, "Visual Direction（Build-only）")
-    if not brief:
-        errors.append(f"{slide_id} has no Visual Direction")
-        brief_fields: dict[str, str] = {}
-    else:
-        brief_fields = line_fields(brief)
-        errors.extend(
-            f"{slide_id} Visual Direction has duplicate field: {field}"
-            for field in duplicate_line_fields(brief)
-        )
-        for field in DESIGN_FIELDS:
-            if not brief_fields.get(field, "").strip():
-                errors.append(f"{slide_id} Visual Direction is missing {field}")
-        unexpected = set(brief_fields) - set(DESIGN_FIELDS)
-        if unexpected:
-            errors.append(
-                f"{slide_id} Visual Direction has unsupported fields: "
-                + ", ".join(sorted(unexpected))
-            )
-        for field, value in brief_fields.items():
-            if len(value) > VISUAL_DIRECTION_FIELD_LIMIT:
-                errors.append(
-                    f"{slide_id} Visual Direction {field} exceeds "
-                    f"{VISUAL_DIRECTION_FIELD_LIMIT} characters"
-                )
-            if field != "Page type" and prescribes_concrete_design(value):
-                errors.append(
-                    f"{slide_id} Visual Direction {field} prescribes a concrete design solution"
-                )
-
-    page_type = brief_fields.get("Page type", "")
-    if re.search(r"对比重点", section):
-        relationship = brief_fields.get("Semantic relationship", "")
-        if not re.search(r"comparison|contrast|versus|\bvs\b|对比|比较|差异", relationship, re.IGNORECASE):
-            errors.append(f"{slide_id} uses 对比重点 without an explicit comparison relationship")
-    errors.extend(agenda_schema_errors(section, slide_id))
+    errors.extend(agenda_schema_errors(section, slide_id, page_type))
 
     if "[占位：" in section and not is_placeholder:
         errors.append(f"{slide_id} protected placeholder must prohibit replacement content and design")
@@ -374,6 +313,7 @@ def validate_collection(
     expected_pages: list[str],
     *,
     require_complete: bool = False,
+    expected_page_types: dict[str, str] | None = None,
 ) -> list[str]:
     """Validate all current sections against framework order without rejecting partial progress."""
     content = content_path.read_text(encoding="utf-8")
@@ -394,7 +334,8 @@ def validate_collection(
 
     cover_ids: list[str] = []
     for slide_id, section in slide_sections(content).items():
-        slide_errors, page_type = validate_slide(slide_id, section)
+        page_type = (expected_page_types or {}).get(slide_id, "")
+        slide_errors, page_type = validate_slide(slide_id, section, page_type)
         errors.extend(slide_errors)
         if page_type.strip().lower() == "cover":
             cover_ids.append(slide_id)
@@ -404,7 +345,12 @@ def validate_collection(
     return errors
 
 
-def validate(content_path: Path, only_page: str | None = None) -> list[str]:
+def validate(
+    content_path: Path,
+    only_page: str | None = None,
+    *,
+    expected_page_type: str = "",
+) -> list[str]:
     content = content_path.read_text(encoding="utf-8")
     errors = validate_header(content)
 
@@ -422,7 +368,11 @@ def validate(content_path: Path, only_page: str | None = None) -> list[str]:
     for slide_id, section in slide_sections(content).items():
         if only_page is not None and slide_id != only_page:
             continue
-        slide_errors, page_type = validate_slide(slide_id, section)
+        slide_errors, page_type = validate_slide(
+            slide_id,
+            section,
+            expected_page_type if only_page == slide_id else "",
+        )
         errors.extend(slide_errors)
         if page_type.strip().lower() == "cover":
             cover_ids.append(slide_id)
@@ -459,8 +409,18 @@ def main() -> int:
                 print(f"ERROR: framework not found: {args.framework}")
                 return 2
             framework_text = args.framework.read_text(encoding="utf-8")
-            expected = [page.slide_id for page in page_entries(framework_text)]
-            errors = validate_collection(content_path, expected, require_complete=False)
+            framework_pages = page_entries(framework_text)
+            expected = [page.slide_id for page in framework_pages]
+            expected_types = {
+                page.slide_id: page.fields.get("Page type", "")
+                for page in framework_pages
+            }
+            errors = validate_collection(
+                content_path,
+                expected,
+                require_complete=False,
+                expected_page_types=expected_types,
+            )
             present = set(SLIDE_RE.findall(content_path.read_text(encoding="utf-8")))
             for slide_id in args.page:
                 if slide_id not in present:

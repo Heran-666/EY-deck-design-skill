@@ -400,7 +400,7 @@ href="data:image/png;base64,AAAA"/>
                 """# Presentation Framework
 
 ## Current position
-- Framework version: 2.7
+- Framework version: 2.8
 - Workflow version: 3.8
 - Storyline version: 1.0
 - Output filename: EY-confirmed-export.pptx
@@ -523,17 +523,11 @@ href="data:image/png;base64,AAAA"/>
 
 {blocks}
 
-### Visual Direction（Build-only）
-- Page type: Agenda
-- Visual priority: 标题后依次阅读七个章节名称
-- Semantic relationship: 七个章节按汇报顺序并列展开
-- Guardrails: 保留批准的名称与顺序；不得加入说明或摘要
-
 ### Sources
 - On-slide source: None
 - Source details: No external sources
 """
-        contract = visible_copy_contract(section, "S02")
+        contract = visible_copy_contract(section, "S02", expected_page_type="Agenda")
 
         with tempfile.TemporaryDirectory() as tmp:
             project = Path(tmp) / "agenda-project"
@@ -570,7 +564,7 @@ href="data:image/png;base64,AAAA"/>
                 """# Presentation Framework
 
 ## Current position
-- Framework version: 2.7
+- Framework version: 2.8
 - Workflow version: 3.9
 - Storyline version: 1.0
 - Output filename: Agenda-contract-integration.pptx

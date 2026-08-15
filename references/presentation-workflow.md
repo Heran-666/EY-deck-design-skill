@@ -8,7 +8,7 @@ controller-reported block. Normal work follows `next --format json`.
 Work in the user-owned deck directory containing `framework.md`, never in the
 skill installation directory. Resolve `<controller>` to
 `<skill-root>/scripts/workflow_controller.py`, where `<skill-root>` contains
-`SKILL.md`. Create framework 2.7 / workflow 4.1 `framework.md`, call
+`SKILL.md`. Create framework 2.8 / workflow 4.2 `framework.md`, call
 `load_workspace_dependencies` once, and copy its reported `Python executable`
 and `Bundle version` into:
 

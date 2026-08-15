@@ -6,7 +6,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from framework_lib import PageEntry, line_fields, page_entries
+from framework_lib import PageEntry, page_entries
 from validate_deck_blueprint import validate as validate_blueprint
 from workflow_copy_contract import copy_contract_errors, visible_copy_contract
 
@@ -26,18 +26,6 @@ def content_identity_errors(page: PageEntry, section: str) -> list[str]:
     title = re.search(r"^- Title:\s*(.+)$", section, re.MULTILINE)
     if heading and title and heading.group(1).strip() != title.group(1).strip():
         errors.append(f"{page.slide_id} content heading must equal its exact Title field")
-    brief = re.search(
-        r"^### Visual Direction（Build-only）\s*$\n(.*?)(?=^### |\Z)",
-        section,
-        re.MULTILINE | re.DOTALL,
-    )
-    brief_type = line_fields(brief.group(1)).get("Page type") if brief else None
-    page_type = page.fields.get("Page type", "").strip().lower()
-    if brief_type and brief_type.strip().lower() != page_type:
-        errors.append(
-            f"{page.slide_id} Visual Direction Page type {brief_type!r} does not match "
-            f"framework Page type {page.fields.get('Page type')!r}"
-        )
     return errors
 
 
@@ -70,7 +58,11 @@ def provisional_content_errors(path: Path, expected_pages: list[PageEntry]) -> l
         except ValueError as exc:
             contract_errors = [str(exc)]
         for error in (
-            validate_blueprint(path, page.slide_id)
+            validate_blueprint(
+                path,
+                page.slide_id,
+                expected_page_type=page.fields.get("Page type", ""),
+            )
             + content_identity_errors(page, section)
             + contract_errors
         ):

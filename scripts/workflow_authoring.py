@@ -461,7 +461,10 @@ def ensure_authoring_packet(text: str, project_dir: Path, page: PageEntry) -> di
         "identity, every fixed Master/Layout atom byte-for-byte, and every placeholder "
         "id/type/index/bounds. Attach page-authored elements to the editable placeholder proxy for "
         "export, but treat its stored bounds as metadata rather than a composition restriction. "
-        "Embedded PPT Master otherwise owns the full visual approach.\n\n"
+        "EY Deck Design constrains visual design only through the fixed typography scale, "
+        "color policy, and this bound template. Embedded PPT Master otherwise owns the full "
+        "visual approach. Explicit project requirements in this packet remain user inputs, "
+        "not EY Deck Design defaults.\n\n"
         + buffer.getvalue().strip()
         + "\n\n## Bound structured template\n\n```json\n"
         + template_json

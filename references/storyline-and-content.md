@@ -6,9 +6,8 @@
 2. Page argument
 3. Semantic content structure
 4. Content richness and form selection
-5. Visual priority and supporting information
-6. Evidence discipline
-7. Quality review
+5. Evidence discipline
+6. Quality review
 
 ## 1. Audience purpose and thesis
 
@@ -42,16 +41,17 @@ Define these before writing substantive blocks:
 - `Audience move`: the intended change in client understanding or decision posture;
 - `Core insight`: the client-facing claim that must land when the page has an argumentative role; it may remain off-slide or be omitted for a genuine transition, selected case, or protected insertion;
 - `Content logic`: how the blocks prove the claim;
-- `Visual priority`: the claim or value that should receive first attention and only the supporting hierarchy needed to land it;
 - `Supporting information`: the evidence or explanation that helps the focus land.
 
-Use these as co-creation reasoning in conversation. Do not copy `Page objective`, `Audience move`, review analysis, or a concrete design proposal into `content.md`; translate only the approved visual priority, non-obvious semantic relationship, and page-specific guardrails into the page's Visual Direction.
+Use these as co-creation reasoning in conversation. Do not copy `Page
+objective`, `Audience move`, review analysis, Visual Direction, or a concrete
+design proposal into `content.md`.
 
 Challenge or merge a page that cannot articulate an audience move. Use one main claim per substantive page and explain enough for the audience to understand what it means, why it matters, how the response works, and why it is credible.
 
 ## 3. Semantic content structure
 
-Treat block IDs as argument semantics, not layout containers. IDs must not automatically create equal cards, equal widths, nested plates, or identical visual weight.
+Treat block IDs as content semantics, not layout instructions.
 
 Choose the actual relationship before assigning IDs:
 
@@ -60,8 +60,6 @@ Choose the actual relationship before assigning IDs:
 - `Hierarchical decomposition` uses a meaningful parent with at least two supporting children.
 
 Record the peer relationship once in `Content logic`. Record each genuine parent's child relationship once in `Child logic`. Put detail in children and do not repeat it in the parent. Collapse a single-child structure into one leaf. Keep normal nesting to three levels.
-
-Visual design may group, merge, stagger, or spatially separate IDs as long as every approved meaning and relationship remains clear.
 
 ## 4. Content richness and form selection
 
@@ -79,15 +77,7 @@ Choose the expression that best matches the evidence:
 
 Provide complete buildable material. Tables require exact visible headers, row labels, cells, notes, and sources. Charts require categories, series, values, units, periods, definitions, caveats, and sources. Never convert unsupported qualitative claims into invented quantitative visuals.
 
-## 5. Visual priority and supporting information
-
-Treat a visual as primary only when removing it would prevent the core conclusion from being understood. Otherwise treat it as supporting.
-
-The presence of a table does not make a page table-led. When a page explains a mechanism or principle, keep the mechanism dominant and use the table as a compact illustration. Make the table dominant only when precise comparison, mapping, or lookup is itself the argument.
-
-Record only the necessary hierarchy in `Visual priority`. Prevent supporting evidence, qualifications, sources, or notes from overpowering the core mechanism or conclusion, but leave the visual solution to the bounded page-authoring action.
-
-## 6. Evidence discipline
+## 5. Evidence discipline
 
 Distinguish evidence by what it proves. Training records, confidentiality commitments such as an NDA, personal-information collection or use consent, authorization, approvals, attestations, and certifications are not interchangeable simply because each is a document.
 
@@ -95,13 +85,12 @@ For each proposed evidence object, specify its proof purpose, responsible party,
 
 Use protected placeholders for unverified client or EY evidence. Do not present a working hypothesis, interpretation, illustrative example, or recommendation as an established fact.
 
-## 7. Quality review
+## 6. Quality review
 
 Confirm that:
 
 - the page advances the confirmed audience outcome and supports the Storyline thesis;
-- the audience move, conclusion, evidence, and design hierarchy agree;
+- the audience move, conclusion, and evidence agree;
 - every text block is substantive and every table or chart is buildable;
 - concepts, evidence, action, methodology, deliverables, and value are not conflated;
-- evidence objects prove their stated purpose and claims are verified, labeled, or protected;
-- the Visual Direction preserves meaning without prescribing the final layout.
+- evidence objects prove their stated purpose and claims are verified, labeled, or protected.

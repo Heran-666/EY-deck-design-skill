@@ -4,7 +4,12 @@
 
 Create `framework.md` only after explicit approval of the complete Storyline. It owns durable project meaning, project-specific hard rules, the requested project authoring mode, Storyline intent and adjacency, each effective page authoring mode, page state, effective cross-page decisions, and unresolved items.
 
-It must not contain generic workflow policy, exact approved slide copy/data, Visual Directions, standard artifact paths, receipts, review transcripts, rejected alternatives, or cached controller outputs. Those belong respectively to the Skill/controller, `content.md`, working evidence, or temporary conversation/intake notes.
+It must not contain generic workflow policy, exact approved slide copy/data,
+Visual Directions, standard artifact paths, receipts, review transcripts,
+rejected alternatives, or cached controller outputs. Visual Directions are not
+part of the workflow; the remaining material belongs respectively to the
+Skill/controller, `content.md`, working evidence, or temporary
+conversation/intake notes.
 
 Before approval, use optional `working/intake-summary.md`. After approval, merge only effective durable information into `framework.md`; do not retain a second memory authority.
 
@@ -15,8 +20,8 @@ Before approval, use optional `working/intake-summary.md`. After approval, merge
 
 ## Current position
 
-- Framework version: 2.7
-- Workflow version: 4.1
+- Framework version: 2.8
+- Workflow version: 4.2
 - Storyline version: 1.0
 - Output filename: <user-requested or deterministic plain filename ending in .pptx>
 
