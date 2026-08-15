@@ -18,3 +18,24 @@ PAGE_STATES = {
 }
 
 TERMINAL_PAGE_STATES = {"SVG confirmed", "Protected placeholder"}
+
+STRUCTURAL_PAGE_TYPES = frozenset(
+    {
+        "cover",
+        "agenda",
+        "section divider",
+        "divider",
+        "ending",
+        "closing",
+        "closing page",
+        "protected placeholder",
+    }
+)
+
+
+def normalize_page_type(value: str) -> str:
+    return " ".join(value.strip().lower().replace("_", " ").replace("-", " ").split())
+
+
+def is_substantive_page_type(value: str) -> bool:
+    return normalize_page_type(value) not in STRUCTURAL_PAGE_TYPES

@@ -46,6 +46,9 @@ class ProjectPaths:
     def packet(self, slide_id: str, version: str) -> Path:
         return self.working / "packets" / slide_id / f"{version}.json"
 
+    def template_prototype(self, slide_id: str, version: str) -> Path:
+        return self.working / "template-prototypes" / slide_id / f"{version}.svg"
+
     def candidate_receipt(self, slide_id: str, version: str) -> Path:
         return self.working / "receipts" / "svg" / slide_id / f"{version}.json"
 

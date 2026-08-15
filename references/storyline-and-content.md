@@ -24,8 +24,13 @@ and reserve substantive argument for content pages.
 
 Keep all type-specific sequence, input, safeguard, and completion rules in the selected type policy. This file owns only reasoning shared by every deliverable type.
 
-When presenting the Storyline for approval, summarize each page's planned
-content as bullets under `Content Summary`. For `Next connection`, name the
+When presenting the Storyline for approval, summarize each substantive page's
+planned content as normally three to five specific bullets under `Content
+Summary`. Make the bullets collectively state the page's main claim and the
+relevant explanation, mechanism, evidence, example, boundary, implication, or
+action; do not reduce them to topic labels. Keep structural pages concise and
+role-appropriate rather than padding them to meet the substantive-page range.
+For `Next connection`, name the
 specific part of the current content page that creates the need for the next
 content page. Do not show a connection for structural or protected pages, the
 last page, or a content page followed by a Cover, Agenda, Section divider or
@@ -48,6 +53,12 @@ objective`, `Audience move`, review analysis, Visual Direction, or a concrete
 design proposal into `content.md`.
 
 Challenge or merge a page that cannot articulate an audience move. Use one main claim per substantive page and explain enough for the audience to understand what it means, why it matters, how the response works, and why it is credible.
+
+Plan one main claim plus normally three to five planned content blocks for each
+substantive page, or an equivalently rich and buildable table, chart, process,
+or other semantic form. Allow a deliberate single-impact page to use fewer
+blocks only when focus itself serves the audience journey. Never use a long
+paragraph, repeated phrasing, or unsupported detail to simulate richness.
 
 ## 3. Semantic content structure
 
@@ -92,5 +103,7 @@ Confirm that:
 - the page advances the confirmed audience outcome and supports the Storyline thesis;
 - the audience move, conclusion, and evidence agree;
 - every text block is substantive and every table or chart is buildable;
+- every substantive page has enough distinct planned material to support its
+  claim without relying on vague labels or later invention;
 - concepts, evidence, action, methodology, deliverables, and value are not conflated;
 - evidence objects prove their stated purpose and claims are verified, labeled, or protected.

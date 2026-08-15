@@ -41,7 +41,7 @@ only effective durable information into `framework.md`.
 - Chapter: <chapter>
 - Page type: <type>
 - Narrative role: <why this page exists>
-- Content scope: <compact scope, not final copy>
+- Content scope: <compact semicolon-separated summary of the approved planned content units, not final copy>
 - Next connection: <connection or None>
 - Status: <allowed state>
 - Confirmed decisions: <durable decisions not already evident in content.md; or None>
@@ -51,6 +51,14 @@ only effective durable information into `framework.md`.
 Use one sequential Slide ID system only. After content approval, the controller
 synchronizes the Storyline heading to the exact approved audience-facing title.
 Do not duplicate approved copy in `Content scope` or `Confirmed decisions`.
+
+When materializing an approved substantive page, preserve the three to five
+distinct planned units from its Storyline `Content Summary` in `Content scope`;
+compress wording and separate units with semicolons, but do not collapse the
+scope to a vague topic label. Preserve the main claim plus the relevant
+explanation, evidence, example, boundary, implication, or action that the user
+approved. Keep structural pages role-appropriate and concise. This is planning
+scope for later content authoring, not exact on-slide copy.
 
 Every new Storyline starts with exactly one Cover at S01. At six or more
 substantive pages, include one Agenda at S02 and at least one Section divider.

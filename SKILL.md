@@ -2,7 +2,8 @@
 name: ey-deck-design
 description: >
   Create and approve EY presentation Storylines and exact slide content, then
-  use the bundled PPT Master to generate two complete SVG alternatives per page,
+  use the bundled PPT Master to generate one complete SVG for Cover, Agenda,
+  Section divider, and Ending pages and two alternatives for substantive pages,
   iterate from user-selected bases and feedback, and publish only explicitly
   confirmed SVGs. Use only when the user explicitly invokes $ey-deck-design.
 ---
@@ -49,6 +50,13 @@ Classify the deliverable as `Proposal`, `Sharing deck`, `Training`,
 user waives it. Draft and obtain approval for the complete Storyline before
 creating `framework.md`.
 
+Make each substantive page's Storyline plan content-rich: normally include
+three to five specific planned content units that together establish the main
+claim and the relevant explanation, evidence, example, boundary, implication,
+or action. Do not use vague topic labels or pad unsupported material. Keep
+Cover, Agenda, Section divider, protected, and closing pages appropriately
+concise for their structural role.
+
 Begin with Cover at S01. At six or more substantive pages, add Agenda at S02 and
 at least one Section divider. Create framework 3.1 / workflow 6.0 with a stable
 plain `.pptx` filename reserved for the future export stage, then run:
@@ -81,25 +89,36 @@ fee, schedule, tool, approval, learning outcome, or business-outcome facts.
 
 ## SVG gate
 
-For `PREPARE_SVG_CANDIDATES`, run the emitted command. It creates independent A
-and B requests from the same locked content.
+For `PREPARE_SVG_CANDIDATES`, run the emitted command. It creates one independent
+A request for Cover, Agenda, Section divider, and Ending pages. It creates
+independent A and B requests from the same locked content for every other
+authored page.
 
 For `RUN_EMBEDDED_PPT_MASTER_SVG`, process every request independently:
 
 1. Read its `service_contract` and request JSON.
 2. Run `validate_request`.
-3. Let the bundled PPT Master execute its full internal design loop and write
-   only `requested_artifact`.
-4. Run `complete`, then run `record` only for a COMPLETE result.
+3. Obey the request's `design_quality` and `variant_direction`. Treat the first
+   authored SVG as an internal draft; complete information design, page
+   composition, art-direction refinement, full-slide review, and source repair
+   before the candidate becomes visible.
+4. Let the bundled PPT Master write only `requested_artifact` as the durable
+   output of that internal loop.
+5. Run `complete`, then run `record` only for a COMPLETE result.
 
-Do not reduce B to a cosmetic variation when a meaningful alternative exists.
+Make both A and B executive-grade. Use coherent icons where they improve
+recognition, scanning, or visual rhythm, and omit them otherwise. Do not reduce
+A to a generic safe draft, B to an ornamental experiment, or design quality to
+extra icons or effects. Do not reduce B to a cosmetic variation when a
+meaningful alternative exists.
 Do not expose PPT Master's internal strategy as another EY approval gate.
 
-Run the emitted presentation command for `PRESENT_SVG_OPTIONS` or
-`PRESENT_SVG_REVISION`, display both SVGs at equal scale, and collect one explicit
-decision. Confirm either displayed version, or write the user's concrete advice
-to the emitted feedback file and request a revision from one displayed base.
-Each revision produces one immutable `R<n>` and may repeat until confirmation.
+Run the emitted presentation command for `PRESENT_SVG_OPTION`,
+`PRESENT_SVG_OPTIONS`, or `PRESENT_SVG_REVISION`. Display every emitted SVG at
+review scale and collect one explicit decision. Confirm one displayed version,
+or write the user's concrete advice to the emitted feedback file and request a
+revision from one displayed base. Each revision produces one immutable `R<n>`;
+present Base/Rn for comparison and repeat until confirmation.
 
 Only `confirm-svg` may copy a candidate into `svg_output/`. Reopen content when
 approved meaning or exact copy changes; reopen SVG when only design should be

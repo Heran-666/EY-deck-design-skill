@@ -8,7 +8,13 @@ import re
 from pathlib import Path
 
 from framework_lib import duplicate_line_fields, h2_section, line_fields, page_entries
-from workflow_spec import FRAMEWORK_VERSION, PAGE_STATES, WORKFLOW_VERSION
+from workflow_spec import (
+    FRAMEWORK_VERSION,
+    PAGE_STATES,
+    WORKFLOW_VERSION,
+    is_substantive_page_type,
+    normalize_page_type,
+)
 
 
 CURRENT_FIELDS = (
@@ -44,8 +50,6 @@ LENGTH_LIMITS = {
     "Confirmed decisions": 500,
     "Open items": 500,
 }
-
-
 def _required(section: str, fields: tuple[str, ...], label: str) -> list[str]:
     values = line_fields(section)
     errors = [f"{label} is missing {field}" for field in fields if not values.get(field, "").strip()]
@@ -111,6 +115,27 @@ def validate(framework: Path, project_dir: Path | None = None) -> list[str]:
     if pages[0].fields.get("Page type", "").strip().lower() != "cover":
         errors.append("S01 must be Cover")
 
+    page_types = [normalize_page_type(page.fields.get("Page type", "")) for page in pages]
+    cover_ids = [page.slide_id for page, page_type in zip(pages, page_types) if page_type == "cover"]
+    if len(cover_ids) != 1:
+        errors.append("Confirmed Storyline must contain exactly one Cover: " + (", ".join(cover_ids) or "None"))
+    agenda_ids = [page.slide_id for page, page_type in zip(pages, page_types) if page_type == "agenda"]
+    if len(agenda_ids) > 1:
+        errors.append("Confirmed Storyline may contain at most one Agenda: " + ", ".join(agenda_ids))
+    if agenda_ids and agenda_ids != ["S02"]:
+        errors.append("Agenda must be S02 when present")
+    substantive_count = sum(is_substantive_page_type(page_type) for page_type in page_types)
+    divider_ids = [
+        page.slide_id
+        for page, page_type in zip(pages, page_types)
+        if page_type in {"section divider", "divider"}
+    ]
+    if substantive_count >= 6:
+        if agenda_ids != ["S02"]:
+            errors.append("At six or more substantive pages, S02 must be Agenda")
+        if not divider_ids:
+            errors.append("At six or more substantive pages, at least one Section divider is required")
+
     for page in pages:
         errors.extend(_required(page.text, PAGE_FIELDS, page.slide_id))
         for field, limit in LENGTH_LIMITS.items():
@@ -129,6 +154,21 @@ def validate(framework: Path, project_dir: Path | None = None) -> list[str]:
             errors.append(f"{page.slide_id} Page type Protected placeholder requires matching Status")
         if status in {"Content locked", "Awaiting SVG decision", "SVG confirmed"} and page.fields.get("Open items") != "None":
             errors.append(f"{page.slide_id} must clear Open items before content locks")
+
+    for index, page in enumerate(pages):
+        next_page = pages[index + 1] if index + 1 < len(pages) else None
+        current_is_substantive = is_substantive_page_type(page.fields.get("Page type", ""))
+        next_is_substantive = bool(
+            next_page and is_substantive_page_type(next_page.fields.get("Page type", ""))
+        )
+        connection = page.fields.get("Next connection", "").strip()
+        if current_is_substantive and next_is_substantive:
+            if not connection or connection.lower() == "none":
+                errors.append(
+                    f"{page.slide_id} must name a substantive Next connection to {next_page.slide_id}"
+                )
+        elif connection.lower() != "none":
+            errors.append(f"{page.slide_id} Next connection must be None outside adjacent content pages")
 
     if project_dir is not None and project_dir.resolve() != framework.parent.resolve():
         errors.append("framework.md must live directly in --project-dir")

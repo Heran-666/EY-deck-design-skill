@@ -14,7 +14,7 @@ metadata:
 # PPT Master Internal Runtime
 
 This package is not a standalone skill. Invoke it only through EY Deck Design
-with a validated `ppt-master.page-svg-request.v1` request.
+with a validated `ppt-master.page-svg-request.v2` request.
 
 ## Entry
 

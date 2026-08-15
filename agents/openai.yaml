@@ -1,7 +1,7 @@
 interface:
   display_name: "EY Deck Design"
-  short_description: "Approve EY content and iterate PPT Master SVG options"
-  default_prompt: "Use $ey-deck-design to approve the EY Storyline and exact content, generate A/B SVGs with bundled PPT Master, iterate revisions from my feedback, and publish only confirmed pages."
+  short_description: "Approve EY content with role-based SVG candidate review"
+  default_prompt: "Use $ey-deck-design to approve the EY Storyline and exact content, generate one SVG for structural pages and A/B SVGs for substantive pages, iterate revisions from my feedback, and publish only confirmed pages."
 
 policy:
   allow_implicit_invocation: false

@@ -56,7 +56,6 @@ PROHIBITED_PAGE_FIELDS = (
     "Fixed",
     "Flexible",
 )
-NON_SUBSTANTIVE_TYPES = {"cover", "agenda", "section divider", "protected placeholder"}
 BUILD_SPEC_HEADING_RE = r"# Presentation Build Specification"
 ALLOWED_EMPHASIS_STYLES = {"关键重点", "次级重点", "对比重点", "普通加粗"}
 
@@ -290,16 +289,56 @@ def _emphasis_errors(content: str) -> list[str]:
     for index, match in enumerate(matches):
         end = matches[index + 1].start() if index + 1 < len(matches) else len(content)
         body = content[match.end():end]
-        detail_match = re.search(r"^- Detail:\s*(.+)$", body, re.MULTILINE)
-        if not detail_match:
+        emphasis_matches = list(re.finditer(r"^- Emphasis:\s*$", body, re.MULTILINE))
+        if not emphasis_matches:
             continue
-        detail = detail_match.group(1)
-        tail = body[detail_match.end():]
-        for phrase, style in re.findall(r'^\s+- “([^”]+)”｜([^\n]+)$', tail, re.MULTILINE):
-            if phrase not in detail:
+        if len(emphasis_matches) > 1:
+            errors.append(f"{match.group(2)} has duplicate Emphasis fields")
+        emphasis_match = emphasis_matches[0]
+        visible_text = [match.group(3).strip()]
+        visible_text.extend(
+            value.strip()
+            for value in re.findall(
+                r"^- (?:Detail|Table note|Unit|Period|Chart note):\s*(.+)$",
+                body,
+                re.MULTILINE,
+            )
+        )
+        for line in body.splitlines():
+            stripped = line.strip()
+            if not (stripped.startswith("|") and stripped.endswith("|")):
+                continue
+            cells = [cell.strip() for cell in stripped[1:-1].split("|")]
+            if cells and all(re.fullmatch(r":?-{3,}:?", cell) for cell in cells):
+                continue
+            visible_text.extend(cell for cell in cells if cell)
+        tail = body[emphasis_match.end():]
+        boundary = re.search(r"^(?:- [^\s].*|#{3,6} .*)$", tail, re.MULTILINE)
+        emphasis_section = tail[:boundary.start()] if boundary else tail
+        lines = [line for line in emphasis_section.splitlines() if line.strip()]
+        if not lines:
+            errors.append(f"{match.group(2)} Emphasis must contain at least one annotation")
+            continue
+        annotations: list[tuple[str, str]] = []
+        for line in lines:
+            annotation = re.fullmatch(r'\s{2,}- “([^”\n]+)”｜([^\n]+)', line)
+            if not annotation:
+                errors.append(
+                    f"{match.group(2)} has malformed Emphasis annotation: {line.strip()!r}"
+                )
+                continue
+            annotations.append((annotation.group(1), annotation.group(2)))
+        phrases = [phrase for phrase, _style in annotations]
+        duplicates = sorted(phrase for phrase, count in Counter(phrases).items() if count > 1)
+        if duplicates:
+            errors.append(
+                f"{match.group(2)} has duplicate Emphasis targets: " + ", ".join(duplicates)
+            )
+        for phrase, style in annotations:
+            if not any(phrase in value for value in visible_text):
                 errors.append(
                     f"{match.group(2)} Emphasis phrase must quote an exact substring from "
-                    f"its - Detail: field: {phrase!r}"
+                    f"visible text in the same block: {phrase!r}"
                 )
             if style.strip() not in ALLOWED_EMPHASIS_STYLES:
                 errors.append(

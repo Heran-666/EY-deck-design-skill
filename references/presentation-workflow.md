@@ -27,7 +27,8 @@ does not generate a candidate or infer approval.
 
 ## SVG recovery
 
-- `prepare-svg-candidates` creates A and B requests only for the active
+- `prepare-svg-candidates` creates only A for an active Cover, Agenda, Section
+  divider, or Ending page; it creates A and B for every other active
   content-locked page.
 - A missing/invalid candidate remains in `RUN_EMBEDDED_PPT_MASTER_SVG`; repair
   the same requested artifact and rerun the service completion check.
@@ -36,8 +37,9 @@ does not generate a candidate or infer approval.
 - A revision request binds its displayed base and exact feedback. Rerun the same
   Rn request after an environment failure; do not allocate a new version.
 - Use `reopen-svg --page <Slide ID>` to delete the current page's A/B/Rn,
-  receipts, and confirmed output, then restart A/B from unchanged approved
-  content. Reopen does not archive the deleted visual cycle.
+  receipts, and confirmed output, then restart with the page type's one- or
+  two-candidate policy from unchanged approved content. Reopen does not archive
+  the deleted visual cycle.
 
 ## Confirmation recovery
 

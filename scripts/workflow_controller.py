@@ -7,6 +7,8 @@ import argparse
 import json
 import re
 import shlex
+import subprocess
+import sys
 from pathlib import Path
 
 from framework_lib import PageEntry, h2_section, line_fields, page_entries, replace_field
@@ -18,11 +20,11 @@ from workflow_paths import ProjectPaths
 from workflow_ppt_master import SERVICE_CLI, SERVICE_CONTRACT, embedding_errors, write_packet
 from workflow_spec import TERMINAL_PAGE_STATES
 from workflow_svg import (
-    INITIAL_VERSIONS,
     candidate_valid,
     confirm_candidate,
     confirmation_valid,
     discard_cycle,
+    initial_versions_for_page_type,
     latest_revision,
     next_revision,
     presentation_valid,
@@ -44,9 +46,10 @@ def update_page(text: str, slide_id: str, updates: dict[str, str]) -> str:
 
 
 def update_page_title(text: str, slide_id: str, title: str) -> str:
+    replacement = f"### {slide_id}｜{title}"
     return re.sub(
         rf"^### {re.escape(slide_id)}｜.*$",
-        f"### {slide_id}｜{title}",
+        lambda _match: replacement,
         text,
         count=1,
         flags=re.MULTILINE,
@@ -106,13 +109,14 @@ def review_context(text: str, page: PageEntry) -> dict[str, object]:
 
 def service_request_payload(paths: ProjectPaths, controller: Path, slide_id: str, version: str) -> dict[str, str]:
     request = paths.packet(slide_id, version)
+    python = str(Path(sys.executable).resolve())
     return {
         "version": version,
         "request_path": str(request),
         "service_contract": str(SERVICE_CONTRACT),
         "requested_artifact": str(paths.candidate(slide_id, version)),
-        "validate_request": shlex.join(["python3", str(SERVICE_CLI), "validate-request", str(request)]),
-        "complete": shlex.join(["python3", str(SERVICE_CLI), "complete", str(request)]),
+        "validate_request": shlex.join([python, str(SERVICE_CLI), "validate-request", str(request)]),
+        "complete": shlex.join([python, str(SERVICE_CLI), "complete", str(request)]),
         "record": command_line(controller, "record-svg", paths.root, "--page", slide_id, "--version", version),
     }
 
@@ -130,7 +134,7 @@ def decision_directive(
         "action": "COLLECT_SVG_REVISION_DECISION" if revision else "COLLECT_SVG_DECISION",
         "slide_id": slide_id,
         "displayed_versions": versions,
-        "decision_rules": "Confirm either displayed version, or write one concrete revision request and choose its displayed base.",
+        "decision_rules": "Confirm one displayed version, or write one concrete revision request and choose its displayed base.",
         "revision_feedback_file": str(feedback),
         "commands": {
             "confirm": command_line(controller, "confirm-svg", paths.root, "--page", slide_id, "--version", "<DISPLAYED_VERSION>"),
@@ -171,17 +175,18 @@ def svg_directive(paths: ProjectPaths, page: PageEntry, controller: Path) -> dic
             }
         return decision_directive(paths, page.slide_id, versions, controller, revision=True)
 
-    missing = [item for item in INITIAL_VERSIONS if not candidate_valid(paths, page.slide_id, item)]
+    initial_versions = initial_versions_for_page_type(page.fields.get("Page type", ""))
+    missing = [item for item in initial_versions if not candidate_valid(paths, page.slide_id, item)]
     if missing:
         return {
             "action": "RUN_EMBEDDED_PPT_MASTER_SVG",
             "slide_id": page.slide_id,
             "requests": [service_request_payload(paths, controller, page.slide_id, item) for item in missing],
         }
-    versions = list(INITIAL_VERSIONS)
+    versions = list(initial_versions)
     if not presentation_valid(paths, page.slide_id, versions):
         return {
-            "action": "PRESENT_SVG_OPTIONS",
+            "action": "PRESENT_SVG_OPTION" if len(versions) == 1 else "PRESENT_SVG_OPTIONS",
             "slide_id": page.slide_id,
             "versions": versions,
             "artifacts": [str(paths.candidate(page.slide_id, item)) for item in versions],
@@ -204,6 +209,8 @@ def directive_payload(project_dir: Path, text: str, controller: Path) -> dict[st
                 "slide_id": page.slide_id,
                 "commands": {"reopen": command_line(controller, "reopen-svg", project_dir, "--page", page.slide_id)},
             }
+        if page.fields.get("Status") not in TERMINAL_PAGE_STATES:
+            break
     page = active_page(text)
     if page is None:
         return {
@@ -234,10 +241,11 @@ def directive_payload(project_dir: Path, text: str, controller: Path) -> dict[st
             "commands": {"present": command_line(controller, "present-review", project_dir)},
         }
     if status == "Content locked":
+        initial_versions = initial_versions_for_page_type(page.fields.get("Page type", ""))
         return {
             "action": "PREPARE_SVG_CANDIDATES",
             "slide_id": page.slide_id,
-            "versions": list(INITIAL_VERSIONS),
+            "versions": list(initial_versions),
             "commands": {"run": command_line(controller, "prepare-svg-candidates", project_dir, "--page", page.slide_id)},
         }
     if status == "Awaiting SVG decision":
@@ -313,10 +321,51 @@ def handle_prepare_candidates(project_dir: Path, framework: Path, text: str, pag
         raise ValueError(" | ".join(errors))
     paths = ProjectPaths(project_dir)
     paths.svg_dir(page_id).mkdir(parents=True, exist_ok=True)
-    for version in INITIAL_VERSIONS:
+    for version in initial_versions_for_page_type(page.fields.get("Page type", "")):
         write_packet(paths, text, page, version)
     text = update_page(text, page_id, {"Status": "Awaiting SVG decision"})
     atomic_write(framework, text)
+    print_next(project_dir, text, controller)
+    return 0
+
+
+def handle_record_svg(project_dir: Path, text: str, page_id: str, version: str, controller: Path) -> int:
+    version = require_version(version)
+    page = page_by_id(text, page_id)
+    current = active_page(text)
+    if (
+        current is None
+        or current.slide_id != page.slide_id
+        or page.fields.get("Status") != "Awaiting SVG decision"
+    ):
+        raise ValueError(f"{page_id} is not the active page awaiting an SVG decision")
+    paths = ProjectPaths(project_dir)
+    latest = latest_revision(paths, page_id)
+    expected = [latest] if latest else list(initial_versions_for_page_type(page.fields.get("Page type", "")))
+    if version not in expected:
+        raise ValueError(f"record-svg must use a current requested version: {','.join(expected)}")
+    packet = paths.packet(page_id, version)
+    completed = subprocess.run(
+        [str(Path(sys.executable).resolve()), str(SERVICE_CLI), "complete", str(packet)],
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    try:
+        result = json.loads(completed.stdout)
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"PPT Master complete returned invalid JSON: {completed.stdout.strip()}") from exc
+    if not isinstance(result, dict):
+        raise ValueError("PPT Master complete result must be a JSON object")
+    if (
+        completed.returncode != 0
+        or result.get("status") != "COMPLETE"
+        or result.get("slide_id") != page_id
+        or result.get("version") != version
+    ):
+        reason = result.get("reason") or completed.stderr.strip() or completed.stdout.strip()
+        raise ValueError(f"PPT Master complete did not accept {page_id} {version}: {reason}")
+    record_candidate(paths, page_id, version)
     print_next(project_dir, text, controller)
     return 0
 
@@ -326,8 +375,8 @@ def handle_present_svg(project_dir: Path, text: str, page_id: str, versions_text
     if page.fields.get("Status") != "Awaiting SVG decision":
         raise ValueError(f"{page_id} is not awaiting an SVG decision")
     versions = [require_version(item.strip()) for item in versions_text.split(",") if item.strip()]
-    if len(versions) != 2 or len(set(versions)) != 2:
-        raise ValueError("present-svg requires exactly two distinct versions")
+    if len(versions) not in {1, 2} or len(set(versions)) != len(versions):
+        raise ValueError("present-svg requires one or two distinct versions")
     paths = ProjectPaths(project_dir)
     latest = latest_revision(paths, page_id)
     if latest:
@@ -335,7 +384,7 @@ def handle_present_svg(project_dir: Path, text: str, page_id: str, versions_text
         base = request.get("base")
         expected = [str(base.get("version")) if isinstance(base, dict) else "", latest]
     else:
-        expected = list(INITIAL_VERSIONS)
+        expected = list(initial_versions_for_page_type(page.fields.get("Page type", "")))
     if versions != expected:
         raise ValueError(f"present-svg must use the current comparison: {','.join(expected)}")
     paths.revision_request(page_id).parent.mkdir(parents=True, exist_ok=True)
@@ -343,7 +392,10 @@ def handle_present_svg(project_dir: Path, text: str, page_id: str, versions_text
     for version in versions:
         artifact = paths.candidate(page_id, version).resolve()
         print(f"### {page_id}｜{version}\n\n![{page_id} {version}]({artifact})\n")
-    print("Both SVGs are displayed at the same scale. Collect an explicit confirmation or revision request.")
+    if len(versions) == 1:
+        print("The SVG is displayed at review scale. Collect an explicit confirmation or revision request.")
+    else:
+        print("Both SVGs are displayed at the same scale. Collect an explicit confirmation or revision request.")
     print(json.dumps(decision_directive(paths, page_id, versions, controller, revision=versions[-1].startswith("R")), ensure_ascii=False, indent=2))
     return 0
 
@@ -437,9 +489,7 @@ def main() -> int:
         if args.command == "prepare-svg-candidates":
             return handle_prepare_candidates(project_dir, framework, text, args.page, controller)
         if args.command == "record-svg":
-            record_candidate(ProjectPaths(project_dir), args.page, args.version)
-            print_next(project_dir, text, controller)
-            return 0
+            return handle_record_svg(project_dir, text, args.page, args.version, controller)
         if args.command == "present-svg":
             return handle_present_svg(project_dir, text, args.page, args.versions, controller)
         if args.command == "request-svg-revision":

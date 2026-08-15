@@ -64,7 +64,13 @@ Each type policy must define these sections:
 4. `Safeguards`: failure modes and unsupported behaviors to prevent;
 5. `Completion checks`: conditions the proposed Storyline must satisfy.
 
-Treat each type policy as the sole owner of that type's Storyline sequence, required inputs, safeguards, and completion checks. To add a new primary type, create one policy with this contract, add one route above, expose its direct conditional link in `SKILL.md`, and extend the `Deliverable type` schema and validator. Do not copy type-specific rules back into this router or into `storyline-and-content.md`.
+Treat each type policy as the sole owner of that type's Storyline sequence,
+required inputs, safeguards, and completion checks. To add a new primary type,
+create one policy with this contract, add one route above, and extend the
+`Deliverable type` schema and validator. Keep `SKILL.md` pointed at this router
+so the controller can continue loading exactly one confirmed type policy. Do
+not copy type-specific rules back into this router or into
+`storyline-and-content.md`.
 
 For a hybrid, choose one primary type and only the necessary secondary behavior. Read one additional type policy only when that secondary behavior materially changes the Storyline. Surface conflicting audience outcomes before drafting, and keep `Deliverable type` set to the confirmed primary type.
 
@@ -79,7 +85,17 @@ For every confirmed type, briefly explain the overall narrative arc and how it s
 5. `Content Summary`
 6. `Next connection`
 
-Format `Content Summary` as a short bullet list, normally two to four bullets. Each bullet summarizes one distinct content block, claim, evidence group, or audience takeaway planned for the page. Keep it at Storyline level: do not draft exact on-slide copy, invent unsupported facts, or include visual-design instructions.
+Format `Content Summary` for each substantive content page as normally three to
+five bullets. Make every bullet name one distinct planned content block, claim,
+evidence group, example, boundary, implication, action, or audience takeaway,
+and state enough for the user to understand what that unit will contribute.
+Together, the bullets must establish the page's main claim and the support
+needed to make it useful. Allow two bullets only for a deliberate single-impact
+page whose focus serves the audience journey. Keep Cover, Agenda, Section
+divider, protected, Ending, and other structural pages concise and
+role-appropriate. Keep all bullets at Storyline level: do not draft exact
+on-slide copy, invent unsupported facts, pad repeated ideas, or include
+visual-design instructions.
 
 Show a substantive `Next connection` only when the current page is a content page and the immediately following page is also a content page. Explain which specific claim, evidence, question, conclusion, or implication on the current page creates the need for the following page; do not merely write “leads to the next page.” Display `Not applicable` when the current page is structural or protected, has no following page, or the next page is a Cover, Agenda, Section divider/chapter page, Ending/closing page, or Protected placeholder.
 
@@ -93,6 +109,7 @@ Use this page block unless a compact table can preserve the bullet hierarchy and
 - Page type: <type>
 - Narrative role: <why this page exists>
 - Content Summary:
+  - <planned content point>
   - <planned content point>
   - <planned content point>
 - Next connection: <specific content-to-content bridge | Not applicable>

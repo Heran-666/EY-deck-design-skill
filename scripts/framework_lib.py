@@ -47,7 +47,8 @@ def replace_field(section: str, field: str, value: str) -> str:
         raise ValueError(f"missing field: {field}")
     if len(matches) > 1:
         raise ValueError(f"duplicate field: {field}")
-    return re.sub(pattern, f"- {field}: {value}", section, count=1, flags=re.MULTILINE)
+    replacement = f"- {field}: {value}"
+    return re.sub(pattern, lambda _match: replacement, section, count=1, flags=re.MULTILINE)
 
 
 def page_entries(text: str) -> list[PageEntry]:

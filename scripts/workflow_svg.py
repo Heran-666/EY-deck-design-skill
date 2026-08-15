@@ -11,11 +11,17 @@ from pathlib import Path
 from workflow_content import content_section
 from workflow_io import now, read_json, sha256, text_sha256, write_json
 from workflow_paths import ProjectPaths
+from workflow_spec import is_substantive_page_type
 
 
 INITIAL_VERSIONS = ("A", "B")
 VERSION_RE = re.compile(r"(?:A|B|R[1-9]\d*)")
 FORBIDDEN_TAGS = {"foreignObject", "script", "style"}
+
+
+def initial_versions_for_page_type(page_type: str) -> tuple[str, ...]:
+    """Return one structural candidate or two substantive candidates."""
+    return INITIAL_VERSIONS if is_substantive_page_type(page_type) else ("A",)
 
 
 def require_version(version: str) -> str:
@@ -65,6 +71,11 @@ def candidate_valid(paths: ProjectPaths, slide_id: str, version: str) -> bool:
         and receipt.get("version") == version
         and receipt.get("packet_sha256") == sha256(packet)
         and receipt.get("artifact_sha256") == sha256(artifact)
+        and request.get("schema") == "ppt-master.page-svg-request.v2"
+        and request.get("caller") == "ey-deck-design"
+        and request.get("slide_id") == slide_id
+        and request.get("version") == version
+        and request.get("artifact_path") == str(artifact.resolve())
         and request.get("approved_content_sha256")
         == text_sha256(content_section(paths.content.read_text(encoding="utf-8"), slide_id).rstrip())
         and not svg_errors(artifact)
@@ -198,6 +209,7 @@ def discard_cycle(paths: ProjectPaths, slide_id: str) -> None:
     sources = [
         paths.svg_dir(slide_id),
         paths.packet(slide_id, "A").parent,
+        paths.template_prototype(slide_id, "A").parent,
         paths.candidate_receipt(slide_id, "A").parent,
         paths.svg_output / f"{slide_id}.svg",
     ]

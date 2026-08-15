@@ -101,3 +101,6 @@ google-genai>=1.0.0
 # Localhost web editor for annotating SVG elements with edit instructions.
 # 本地 Web 编辑器，用于在 SVG 元素上添加编辑标注指令
 flask>=3.0.0
+# Chromium rendering used by scripts/visual_review.py. Reuse this same Python
+# environment for Pillow finalization, Flask preview, and render QA.
+playwright>=1.40.0

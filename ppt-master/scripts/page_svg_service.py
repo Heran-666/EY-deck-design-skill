@@ -12,9 +12,25 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 
 
-REQUEST_SCHEMA = "ppt-master.page-svg-request.v1"
+REQUEST_SCHEMA = "ppt-master.page-svg-request.v2"
 RESULT_SCHEMA = "ppt-master.page-svg-result.v1"
 VERSION_RE = re.compile(r"(?:A|B|R[1-9]\d*)")
+DESIGN_QUALITY_PROFILE = "ey-executive-editorial-v2"
+ICON_QUALITY_RULE = (
+    "Add coherent icon elements at semantically appropriate positions when they improve recognition, "
+    "scanning, or visual rhythm; omit them when they have no clear communication job."
+)
+VISIBLE_CANDIDATE_GATE = [
+    "information_design",
+    "page_composition",
+    "art_direction_refinement",
+    "full_slide_render_review",
+    "source_repair_and_recheck",
+]
+INDEPENDENT_VARIANT_ROLES = {
+    "A": "clarity-led-editorial",
+    "B": "concept-led-spatial",
+}
 
 
 def digest(path: Path) -> str:
@@ -42,6 +58,59 @@ def _bound_file(payload: dict, field: str, hash_field: str, label: str) -> list[
     if payload.get(hash_field) != digest(path):
         return [f"{label} SHA-256 mismatch: {path}"]
     return []
+
+
+def _nonempty_text(value: object) -> bool:
+    return isinstance(value, str) and bool(value.strip())
+
+
+def _nonempty_text_list(value: object, minimum: int) -> bool:
+    return (
+        isinstance(value, list)
+        and len(value) >= minimum
+        and all(_nonempty_text(item) for item in value)
+    )
+
+
+def design_contract_errors(request: dict, mode: object, version: object) -> list[str]:
+    errors: list[str] = []
+    quality = request.get("design_quality")
+    if not isinstance(quality, dict):
+        errors.append("design_quality must be an object")
+    else:
+        if quality.get("profile") != DESIGN_QUALITY_PROFILE:
+            errors.append(f"design_quality.profile must be {DESIGN_QUALITY_PROFILE}")
+        if not _nonempty_text(quality.get("target")):
+            errors.append("design_quality.target must be non-empty")
+        if not _nonempty_text_list(quality.get("must_have"), 6):
+            errors.append("design_quality.must_have must contain at least six non-empty rules")
+        elif ICON_QUALITY_RULE not in quality["must_have"]:
+            errors.append("design_quality.must_have must contain the required semantic icon rule")
+        if not _nonempty_text_list(quality.get("avoid"), 5):
+            errors.append("design_quality.avoid must contain at least five non-empty rules")
+        if quality.get("visible_candidate_gate") != VISIBLE_CANDIDATE_GATE:
+            errors.append("design_quality.visible_candidate_gate must contain the required ordered P0 passes")
+
+    direction = request.get("variant_direction")
+    if not isinstance(direction, dict):
+        errors.append("variant_direction must be an object")
+        return errors
+    if not _nonempty_text(direction.get("intent")) or not _nonempty_text(direction.get("adaptation_rule")):
+        errors.append("variant_direction intent and adaptation_rule must be non-empty")
+    if mode == "independent" and isinstance(version, str):
+        expected = INDEPENDENT_VARIANT_ROLES.get(version)
+        if direction.get("role") != expected:
+            errors.append(f"variant_direction.role for {version} must be {expected}")
+        if "base_version" in direction:
+            errors.append("independent variant_direction must not contain base_version")
+    elif mode == "revision":
+        base = request.get("base")
+        base_version = base.get("version") if isinstance(base, dict) else None
+        if direction.get("role") != "revision":
+            errors.append("revision variant_direction.role must be revision")
+        if direction.get("base_version") != base_version:
+            errors.append("revision variant_direction.base_version must match base.version")
+    return errors
 
 
 def request_errors(request: dict) -> list[str]:
@@ -84,11 +153,14 @@ def request_errors(request: dict) -> list[str]:
         if not isinstance(base, dict):
             errors.append("revision mode requires a base object")
         else:
+            if not isinstance(base.get("version"), str) or not VERSION_RE.fullmatch(base["version"]):
+                errors.append("revision base.version must be A, B, or Rn")
             errors.extend(_bound_file(base, "path", "sha256", "revision base"))
         if not isinstance(feedback, str) or not feedback.strip():
             errors.append("revision mode requires non-empty feedback")
     else:
         errors.append("mode must be independent or revision")
+    errors.extend(design_contract_errors(request, mode, version))
     return errors
 
 

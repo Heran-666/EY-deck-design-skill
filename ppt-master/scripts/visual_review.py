@@ -60,6 +60,19 @@ def _safe_print(msg: str) -> None:
     print(msg, file=sys.stderr, flush=True)
 
 
+def _launch_browser(playwright):
+    """Use Playwright Chromium, falling back to an installed Chrome channel."""
+    try:
+        return playwright.chromium.launch()
+    except Exception as bundled_error:  # noqa: BLE001 - preserve fallback
+        try:
+            return playwright.chromium.launch(channel='chrome')
+        except Exception as chrome_error:  # noqa: BLE001 - report both attempts
+            raise RuntimeError(
+                f'Playwright Chromium failed ({bundled_error}); Chrome fallback failed ({chrome_error})'
+            ) from chrome_error
+
+
 @contextmanager
 def file_lock(lock_path: Path, timeout: float = 30.0):
     """POSIX advisory lock via fcntl. Falls back to lockless on Windows."""
@@ -179,7 +192,7 @@ def render_pages(server_url: str, pages: list[str], preview_dir: Path) -> list[d
 """
 
     with sync_playwright() as p:
-        browser = p.chromium.launch()
+        browser = _launch_browser(p)
         try:
             context = browser.new_context()
             for page_name in pages:
@@ -332,8 +345,8 @@ def main() -> int:
     except ImportError:
         _safe_print(
             'playwright not installed. Install with:\n'
-            '    pip install playwright\n'
-            '    python3 -m playwright install chromium\n'
+            f'    {sys.executable} -m pip install -r skills/ppt-master/requirements.txt\n'
+            f'    {sys.executable} -m playwright install chromium\n'
             '(see skills/ppt-master/requirements.txt)'
         )
         return 3
@@ -364,7 +377,7 @@ def main() -> int:
         except Exception as e:  # noqa: BLE001 — browser launch failure
             _safe_print(f'browser session failed: {type(e).__name__}: {e}')
             _safe_print(
-                'try:  python3 -m playwright install chromium'
+                f'try:  {sys.executable} -m playwright install chromium'
             )
             return 3
 

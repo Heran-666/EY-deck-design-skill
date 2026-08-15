@@ -128,10 +128,18 @@ headings, Title, Subtitle, Core insight, Detail, table/chart cells, Unit, Period
 visible notes, and On-slide source while excluding Build-only instructions from
 the visible SVG.
 
-Annotate emphasis by quoting the exact target substring. Use only `关键重点`,
-`次级重点`, `对比重点`, and `普通加粗`. Use `对比重点` only when the approved
-on-slide content itself makes an explicit comparison or contrast; otherwise use
-yellow, pale yellow, or white emphasis.
+Use Emphasis to mark semantic priorities that the content author explicitly
+requires to stand out. Quote an exact target substring from visible text in the
+same content block: its heading, Detail, table cells, Unit, Period, or visible
+table/chart note. Build-only fields and neighboring blocks are not valid
+targets. Emphasis is not an exhaustive visual-style manifest: PPT Master may
+create visual hierarchy among other existing text according to composition and
+information hierarchy, but must not add or rewrite audience-facing copy. Icons,
+shapes, color fields, dividers, and other non-text visual elements are not
+limited by Emphasis annotations. Use only `关键重点`, `次级重点`, `对比重点`, and
+`普通加粗`. Use `对比重点` only when the approved on-slide content itself makes
+an explicit comparison or contrast; otherwise use yellow, pale yellow, or white
+emphasis.
 
 Keep titles on one line and within 36 Chinese-width characters. Shorten crowded
 titles during content review; bundled PPT Master owns later typography and page
