@@ -17,6 +17,11 @@ from workflow_spec import is_substantive_page_type
 INITIAL_VERSIONS = ("A", "B")
 VERSION_RE = re.compile(r"(?:A|B|R[1-9]\d*)")
 FORBIDDEN_TAGS = {"foreignObject", "script", "style"}
+PAGE_CONTEXT_SCHEMA = "ey-deck.page-authoring-context.v1"
+REQUEST_SCHEMAS = {
+    "ppt-master.page-svg-request.v2",
+    "ppt-master.page-svg-request.v3",
+}
 
 
 def initial_versions_for_page_type(page_type: str) -> tuple[str, ...]:
@@ -65,18 +70,43 @@ def candidate_valid(paths: ProjectPaths, slide_id: str, version: str) -> bool:
         request = read_json(packet)
     except ValueError:
         return False
+    if request.get("schema") == "ppt-master.page-svg-request.v3":
+        descriptor = request.get("authoring_context")
+        if not isinstance(descriptor, dict):
+            return False
+        context_path = paths.page_context(slide_id)
+        if (
+            descriptor.get("path") != str(context_path.resolve())
+            or not context_path.is_file()
+            or descriptor.get("sha256") != sha256(context_path)
+        ):
+            return False
+        try:
+            context = read_json(context_path)
+        except ValueError:
+            return False
+        approved_content_sha256 = context.get("approved_content_sha256")
+        context_valid = (
+            context.get("schema") == PAGE_CONTEXT_SCHEMA
+            and context.get("caller") == "ey-deck-design"
+            and context.get("slide_id") == slide_id
+        )
+    else:
+        approved_content_sha256 = request.get("approved_content_sha256")
+        context_valid = request.get("schema") == "ppt-master.page-svg-request.v2"
     return (
         receipt.get("schema") == "ey-deck.svg-candidate.v1"
         and receipt.get("slide_id") == slide_id
         and receipt.get("version") == version
         and receipt.get("packet_sha256") == sha256(packet)
         and receipt.get("artifact_sha256") == sha256(artifact)
-        and request.get("schema") == "ppt-master.page-svg-request.v2"
+        and request.get("schema") in REQUEST_SCHEMAS
         and request.get("caller") == "ey-deck-design"
         and request.get("slide_id") == slide_id
         and request.get("version") == version
         and request.get("artifact_path") == str(artifact.resolve())
-        and request.get("approved_content_sha256")
+        and context_valid
+        and approved_content_sha256
         == text_sha256(content_section(paths.content.read_text(encoding="utf-8"), slide_id).rstrip())
         and not svg_errors(artifact)
     )
@@ -209,7 +239,7 @@ def discard_cycle(paths: ProjectPaths, slide_id: str) -> None:
     sources = [
         paths.svg_dir(slide_id),
         paths.packet(slide_id, "A").parent,
-        paths.template_prototype(slide_id, "A").parent,
+        paths.template_prototype(slide_id).parent,
         paths.candidate_receipt(slide_id, "A").parent,
         paths.svg_output / f"{slide_id}.svg",
     ]

@@ -1,7 +1,7 @@
 interface:
   display_name: "EY Deck Design"
-  short_description: "Approve EY content with role-based SVG candidate review"
-  default_prompt: "Use $ey-deck-design to approve the EY Storyline and exact content, generate one SVG for structural pages and A/B SVGs for substantive pages, iterate revisions from my feedback, and publish only confirmed pages."
+  short_description: "Approve EY content, SVG designs, and editable PPTX export"
+  default_prompt: "Use $ey-deck-design to approve the EY Storyline and exact content, generate and confirm SVG candidates, then compile the confirmed SVG roster into an editable native PowerPoint with text-frame integrity checks."
 
 policy:
   allow_implicit_invocation: false

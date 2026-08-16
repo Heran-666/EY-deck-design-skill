@@ -5,17 +5,22 @@ from __future__ import annotations
 
 
 FRAMEWORK_VERSION = "3.1"
-WORKFLOW_VERSION = "6.0"
-READABLE_WORKFLOW_VERSIONS = {WORKFLOW_VERSION}
+WORKFLOW_VERSION = "7.0"
+READABLE_WORKFLOW_VERSIONS = {"6.0", WORKFLOW_VERSION}
 
 PAGE_STATES = {
     "Not started",
-    "Content reviewing",
     "Content locked",
-    "Awaiting SVG decision",
     "SVG confirmed",
     "Protected placeholder",
 }
+
+LEGACY_TRANSIENT_PAGE_STATES = {
+    "Content reviewing",
+    "Awaiting SVG decision",
+}
+
+READABLE_PAGE_STATES = PAGE_STATES | LEGACY_TRANSIENT_PAGE_STATES
 
 TERMINAL_PAGE_STATES = {"SVG confirmed", "Protected placeholder"}
 

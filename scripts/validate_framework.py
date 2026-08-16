@@ -10,7 +10,7 @@ from pathlib import Path
 from framework_lib import duplicate_line_fields, h2_section, line_fields, page_entries
 from workflow_spec import (
     FRAMEWORK_VERSION,
-    PAGE_STATES,
+    READABLE_PAGE_STATES,
     WORKFLOW_VERSION,
     is_substantive_page_type,
     normalize_page_type,
@@ -142,7 +142,7 @@ def validate(framework: Path, project_dir: Path | None = None) -> list[str]:
             if len(page.fields.get(field, "")) > limit:
                 errors.append(f"{page.slide_id} {field} exceeds {limit} characters")
         status = page.fields.get("Status", "")
-        if status not in PAGE_STATES:
+        if status not in READABLE_PAGE_STATES:
             errors.append(f"{page.slide_id} has unsupported Status: {status}")
         page_type = page.fields.get("Page type", "").strip().lower()
         if status == "Protected placeholder":

@@ -912,6 +912,17 @@ Recorded narration:
 
     text_flow_group = parser.add_mutually_exclusive_group()
     text_flow_group.add_argument(
+        '--preserve-text',
+        action='store_const',
+        const=TEXT_FLOW_PRESERVE,
+        dest='text_flow',
+        help=(
+            'Preserve authored positional-tspan line breaks inside one editable '
+            'PowerPoint text frame. This is the default; the explicit flag is '
+            'available to workflow adapters that must lock the contract.'
+        ),
+    )
+    text_flow_group.add_argument(
         '--reflow-text',
         action='store_const',
         const=TEXT_FLOW_REFLOW,

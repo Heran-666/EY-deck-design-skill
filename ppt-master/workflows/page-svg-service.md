@@ -6,7 +6,9 @@ description: Composable page-level SVG variant service used by a parent workflow
 
 This is an EY-only internal service entrypoint, not a top-level presentation
 route. Use it only when EY Deck Design supplies a validated
-`ppt-master.page-svg-request.v2` JSON request with `caller: ey-deck-design`. EY
+`ppt-master.page-svg-request.v3` JSON request with `caller: ey-deck-design` and
+a hash-bound `ey-deck.page-authoring-context.v1`. Read v2 only for recovery of
+an already active legacy cycle. EY
 owns page order, content approval, candidate naming, user choice, and final
 publication. PPT Master owns page design, SVG construction,
 visual inspection, and technical SVG quality.
@@ -14,19 +16,24 @@ visual inspection, and technical SVG quality.
 ## Entry
 
 1. Run the attribution guard from the embedded PPT Master root.
-2. Run the parent-provided `validate_request` command. Reuse that command's
-   absolute Python executable for finalization, preview, and render QA.
-3. Read the request, including `design_quality` and `variant_direction`, then
-   read `references/strategist.md`, `references/strategist-template.md`,
+2. Load workspace dependencies, set command-scoped `EY_DECK_SVG_PYTHON` to the
+   returned absolute Python executable, and run the parent-provided
+   `validate_request` command. Use that verified runtime for SVG validation and
+   finalization. Browser rendering remains an independent capability and need
+   not share the same Python environment.
+3. Read the request's hash-bound `authoring_context`. Read `design_quality` and
+   `template.design_spec.path` from that shared context and
+   `variant_direction` from the candidate request, then read
+   `references/strategist.md`, `references/strategist-template.md`,
    `references/executor-base.md`, and `references/executor-structured.md`. Load chart, table,
    structure, image, semantic-SVG, visual-style, image-palette, or effects
    references whenever the page benefits from them.
 4. Execute the full internal design loop and write only `artifact_path` as its
    durable output.
 5. Treat the first authored SVG as an internal draft. Complete every ordered
-   `design_quality.visible_candidate_gate` pass, then run
-   the parent-provided `complete` command.
-6. Return the exact terminal JSON printed by `complete` to the parent.
+   `design_quality.visible_candidate_gate` pass, then run the parent-provided
+   `record` command once. It atomically invokes the final `complete` validation
+   and records the accepted candidate; do not run `complete` separately.
 
 Do not accept another caller, initialize a PPT Master project, select a
 top-level route, change EY state, export PPTX, or ask the user a question inside
@@ -53,7 +60,10 @@ the complete PPT Master loop internally for every candidate:
    language at semantically appropriate positions when it improves recognition,
    scanning, or visual rhythm; omit icons that have no clear communication job.
 5. **Template application** — preserve the native Master/Layout contract while
-   exercising full freedom inside page-local content regions.
+   exercising full-page composition freedom. Placeholder bounds are native
+   PowerPoint metadata, not SVG design limits. Use the complete 1280×720 canvas;
+   do not impose a `y=650` cap, reserve a footer band, or add an EY-logo overlap
+   QA gate.
 6. **Executor** — hand-author a complete, editable SVG as an internal draft.
 7. **Art-direction refinement** — actively replace generic dashboards, unjustified
    stacked cards, equal-column defaults, repeated rounded rectangles, icon-led
@@ -64,6 +74,12 @@ the complete PPT Master loop internally for every candidate:
    scale. Review composition and craft as well as clipping, overlap, legibility,
    and template fidelity. Repair the owning SVG and recheck it before returning
    COMPLETE. The first visible candidate must never be merely the first draft.
+
+Render from a local HTTP preview with a source-hash cache key, a fresh browser
+context, completed font loading, and two animation frames before capture. If a
+browser preview omits intact XML elements, classify and retry it as a renderer
+failure before changing the SVG. Do not remove imagery, mixed formatting,
+nested emphasis, or spatial complexity merely to stabilize one preview backend.
 
 Keep internal strategy and design decisions inside PPT Master. They are not
 additional parent-workflow gates or durable EY state.
@@ -80,17 +96,18 @@ materially different communication model, information hierarchy, composition,
 or visualization when two strong alternatives exist; cosmetic-only variation
 is insufficient when a substantive alternative is available.
 
-Honor the bound search bias without weakening either option:
-
-- **A / `clarity-led-editorial`** — prioritize immediate comprehension,
-  deliberate whitespace, confident typography, and restrained editorial rhythm.
-- **B / `concept-led-spatial`** — prioritize an equally polished spatial model,
-  relationship, progression, contrast, or page-specific visual metaphor.
+Honor each request's dynamically selected search role without weakening either
+option. The adapter derives the paired roles from the page's approved content
+form and approved user intent: Narrative role, Audience outcome, and Storyline
+thesis. Treat the role as a search bias, not a prescribed layout. For a
+substantive page, use `alternative_contract` to ensure that A and B differ
+materially in their communication model, information hierarchy, or
+composition/visualization; do not fall back to one universal A/B axis.
 
 Do not make A a generic safe draft or B an ornamental experiment. Both must
 pass the same `design_quality` contract before the parent may display them.
-For an A-only structural page, apply A's clarity-led direction within the bound
-template and the page role; do not invent B or a second lifecycle branch.
+For an A-only structural page, apply its dynamically selected structural role
+within the bound template; do not invent B or a second lifecycle branch.
 
 ## Revisions
 
@@ -109,10 +126,18 @@ A later Rn may use any currently displayed candidate as its base.
   not add or rewrite audience-facing copy.
 - Begin from the exact `template.prototype`; preserve its Master/Layout identity,
   fixed atoms, and placeholder contract.
+- Honor the authoring context's `composition_space.mode: full-slide`. Do not treat the object-slot
+  rectangle or any inherited placeholder bounds as a clipping, safety, or
+  composition boundary.
 - Keep the SVG self-contained, with `viewBox="0 0 1280 720"`; do not use
   `<style>`, `<script>`, `foreignObject`, remote URLs, or runtime placeholders.
 - Hand-author the page SVG. Scripts may validate, render, or convert supporting
   assets but must not generate the page composition.
+- Author one logical PowerPoint text box as one `<text>` element. Put mixed
+  formatting and multiline content in child `<tspan>` runs; never author one
+  paragraph's visual lines as sibling `<text>` elements. Treat the quality
+  checker's fragmented-paragraph warning as blocking and repair it before
+  returning COMPLETE.
 - Inspect the complete page at slide scale and repair clipping, overlap,
   off-canvas content, unreadable text, broken hierarchy, template drift, and
   unsupported SVG before returning COMPLETE.

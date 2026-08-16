@@ -10,7 +10,7 @@ from xml.etree import ElementTree as ET
 
 from framework_lib import PageEntry, h2_section, line_fields, page_entries
 from workflow_content import content_section
-from workflow_io import atomic_write, sha256, text_sha256, write_json
+from workflow_io import atomic_write, read_json, sha256, text_sha256, write_json
 from workflow_paths import ProjectPaths
 from workflow_spec import normalize_page_type
 
@@ -18,8 +18,11 @@ from workflow_spec import normalize_page_type
 SKILL_ROOT = Path(__file__).resolve().parents[1]
 PPT_MASTER_ROOT = SKILL_ROOT / "ppt-master"
 TEMPLATE_ROOT = SKILL_ROOT / "assets" / "templates" / "ey-gradient-dark-v1"
+TEMPLATE_DESIGN_SPEC = TEMPLATE_ROOT / "templates" / "design_spec.md"
 SERVICE_CONTRACT = PPT_MASTER_ROOT / "workflows" / "page-svg-service.md"
 SERVICE_CLI = PPT_MASTER_ROOT / "scripts" / "page_svg_service.py"
+PAGE_CONTEXT_SCHEMA = "ey-deck.page-authoring-context.v1"
+REQUEST_SCHEMA = "ppt-master.page-svg-request.v3"
 IMAGE_MIME_TYPES = {
     ".gif": "image/gif",
     ".jpeg": "image/jpeg",
@@ -45,6 +48,8 @@ def design_quality_contract() -> dict[str, object]:
             "Integrate EY identity through composition and controlled accent behavior, not decoration alone.",
             "Add coherent icon elements at semantically appropriate positions when they improve recognition, scanning, or visual rhythm; omit them when they have no clear communication job.",
             "Refine alignment, spacing, optical balance, edges, connectors, and emphasis at full-slide scale.",
+            "Compose freely across the full 1280x720 slide. Placeholder bounds are native PowerPoint metadata only; do not treat y=650 or any other inset rectangle as a visual content limit.",
+            "Author each logical PowerPoint text box as one SVG <text>; use child <tspan> runs for mixed formatting and positioned <tspan> rows for multiline content, never sibling <text> elements for one paragraph's visual lines.",
         ],
         "avoid": [
             "Generic dashboards or stacked-card compositions when the content does not require them.",
@@ -63,41 +68,209 @@ def design_quality_contract() -> dict[str, object]:
     }
 
 
-def variant_direction(version: str, base_version: str | None) -> dict[str, str]:
-    """Assign a strong search direction without turning it into a fixed layout."""
-    if base_version:
+VARIANT_PAIRS = {
+    "quantitative-chart": {
+        "A": (
+            "evidence-led-analytical",
+            "Make the quantitative relationship immediately readable, with the evidence structure leading the composition.",
+        ),
+        "B": (
+            "conclusion-led-data-story",
+            "Lead with the audience-facing conclusion and make the same approved data act as its visual proof.",
+        ),
+    },
+    "exact-table": {
+        "A": (
+            "lookup-led-comparison",
+            "Optimize exact scanning and comparison while preserving the table's full approved lookup value.",
+        ),
+        "B": (
+            "decision-led-pattern",
+            "Reorganize the same approved table evidence around the pattern, exception, or decision it supports.",
+        ),
+    },
+    "sequence-process": {
+        "A": (
+            "sequence-led-flow",
+            "Make order, dependencies, and handoffs immediately traceable through a disciplined process flow.",
+        ),
+        "B": (
+            "milestone-led-journey",
+            "Express the same approved sequence through meaningful stages, transitions, or progress landmarks.",
+        ),
+    },
+    "explicit-comparison": {
+        "A": (
+            "criteria-led-comparison",
+            "Make the approved comparison easy to evaluate criterion by criterion with disciplined symmetry.",
+        ),
+        "B": (
+            "tension-led-contrast",
+            "Make the decisive difference, gap, or before-after change the dominant visual idea.",
+        ),
+    },
+    "semantic-hierarchy": {
+        "A": (
+            "architecture-led-hierarchy",
+            "Clarify the approved parent-child structure through explicit levels, grouping, and reading order.",
+        ),
+        "B": (
+            "relationship-led-system",
+            "Show how the same approved elements interact as a system rather than only as a nested hierarchy.",
+        ),
+    },
+    "general-argument": {
+        "A": (
+            "claim-led-editorial",
+            "Lead with the page claim and build a restrained editorial hierarchy around its approved support.",
+        ),
+        "B": (
+            "logic-led-visual-model",
+            "Turn the approved reasoning into a page-specific spatial or semantic model that explains how the claim works.",
+        ),
+    },
+}
+
+STRUCTURAL_DIRECTIONS = {
+    "cover": (
+        "identity-led-opening",
+        "Create a decisive opening that establishes the approved topic and EY identity with immediate executive presence.",
+    ),
+    "agenda": (
+        "navigation-led-orientation",
+        "Make the approved agenda sequence effortless to scan and remember while preserving its structural role.",
+    ),
+    "section divider": (
+        "transition-led-chapter",
+        "Create a clear chapter transition with enough visual change to reset attention without adding new content.",
+    ),
+    "divider": (
+        "transition-led-chapter",
+        "Create a clear chapter transition with enough visual change to reset attention without adding new content.",
+    ),
+    "ending": (
+        "fixed-ending-fidelity",
+        "Preserve the exact fixed ending composition and its native EY identity.",
+    ),
+    "closing": (
+        "fixed-ending-fidelity",
+        "Preserve the exact fixed ending composition and its native EY identity.",
+    ),
+    "closing page": (
+        "fixed-ending-fidelity",
+        "Preserve the exact fixed ending composition and its native EY identity.",
+    ),
+}
+
+
+def _exploration_signal(
+    approved_content: str,
+    page: PageEntry,
+    project_context: dict[str, str],
+) -> str:
+    content = approved_content.casefold()
+    if "chart purpose" in content or "| category |" in content:
+        return "quantitative-chart"
+    if "table purpose" in content:
+        return "exact-table"
+    approved_intent = " ".join(
+        (
+            page.fields.get("Narrative role", ""),
+            project_context.get("Audience outcome", ""),
+            project_context.get("Storyline thesis", ""),
+        )
+    ).casefold()
+    selection_context = f"{content}\n{approved_intent}"
+    if any(
+        marker in selection_context
+        for marker in (
+            "timeline", "process", "sequence", "roadmap", "milestone", "stage", "step",
+            "时间线", "流程", "顺序", "路径", "里程碑", "阶段", "步骤",
+        )
+    ):
+        return "sequence-process"
+    if any(
+        marker in selection_context
+        for marker in (
+            "comparison", "compare", "versus", "contrast", "before", "after", "difference", "gap",
+            "对比", "比较", "差异", "之前", "之后", "前后", "差距",
+        )
+    ):
+        return "explicit-comparison"
+    if "child logic" in content:
+        return "semantic-hierarchy"
+    return "general-argument"
+
+
+def _basis_value(value: str | None) -> str:
+    cleaned = (value or "").strip()
+    return cleaned or "Not specified"
+
+
+def independent_variant_directions(
+    page: PageEntry,
+    approved_content: str,
+    project_context: dict[str, str],
+) -> dict[str, dict[str, object]]:
+    """Select page-specific exploration directions from content and approved intent."""
+    page_type = normalize_page_type(page.fields.get("Page type", ""))
+    basis = {
+        "method": "page-content-and-approved-user-intent",
+        "content_signal": _exploration_signal(approved_content, page, project_context),
+        "page_type": _basis_value(page.fields.get("Page type")),
+        "narrative_role": _basis_value(page.fields.get("Narrative role")),
+        "audience_outcome": _basis_value(project_context.get("Audience outcome")),
+        "storyline_thesis": _basis_value(project_context.get("Storyline thesis")),
+    }
+    if page_type in STRUCTURAL_DIRECTIONS:
+        role, intent = STRUCTURAL_DIRECTIONS[page_type]
         return {
-            "role": "revision",
-            "intent": (
-                "Preserve the bound base's communication model and executive-grade finish while applying "
-                "the user's feedback and only the dependent reflow it requires."
-            ),
-            "adaptation_rule": "Do not broaden a targeted revision into an unrelated redesign.",
-            "base_version": base_version,
+            "A": {
+                "role": role,
+                "intent": intent,
+                "adaptation_rule": "Resolve a page-specific composition within the bound structural template.",
+                "selection_basis": basis,
+            }
         }
-    if version == "A":
-        return {
-            "role": "clarity-led-editorial",
-            "intent": (
-                "Create a restrained, content-first executive composition with decisive hierarchy, "
-                "deliberate whitespace, and precise typographic rhythm."
-            ),
+
+    signal = str(basis["content_signal"])
+    pair = VARIANT_PAIRS[signal]
+    pair_id = f"{page.slide_id}:{signal}:v1"
+    directions: dict[str, dict[str, object]] = {}
+    for version, counterpart in (("A", "B"), ("B", "A")):
+        role, intent = pair[version]
+        counterpart_role = pair[counterpart][0]
+        directions[version] = {
+            "role": role,
+            "intent": intent,
             "adaptation_rule": (
-                "Derive a page-specific communication model; clarity must not collapse into generic containers."
+                "Use this direction as a search bias, not a fixed layout; adapt it to the locked content, "
+                "narrative role, audience outcome, and EY identity."
             ),
+            "selection_basis": basis,
+            "alternative_contract": {
+                "pair_id": pair_id,
+                "counterpart_role": counterpart_role,
+                "required_difference_axes": [
+                    "communication_model",
+                    "information_hierarchy",
+                    "composition_or_visualization",
+                ],
+            },
         }
-    if version == "B":
-        return {
-            "role": "concept-led-spatial",
-            "intent": (
-                "Create an equally polished, more spatial or concept-driven composition that expresses "
-                "relationship, progression, contrast, or a page-specific visual metaphor."
-            ),
-            "adaptation_rule": (
-                "Use novelty only when it has a communication job; never substitute decoration for meaning."
-            ),
-        }
-    raise ValueError(f"independent design direction not found for version: {version}")
+    return directions
+
+
+def revision_direction(base_version: str) -> dict[str, str]:
+    return {
+        "role": "revision",
+        "intent": (
+            "Preserve the bound base's communication model and executive-grade finish while applying "
+            "the user's feedback and only the dependent reflow it requires."
+        ),
+        "adaptation_rule": "Do not broaden a targeted revision into an unrelated redesign.",
+        "base_version": base_version,
+    }
 
 
 def embedding_errors() -> list[str]:
@@ -110,7 +283,7 @@ def embedding_errors() -> list[str]:
         PPT_MASTER_ROOT / "references" / "executor-structured.md",
         SERVICE_CONTRACT,
         SERVICE_CLI,
-        TEMPLATE_ROOT / "templates" / "design_spec.md",
+        TEMPLATE_DESIGN_SPEC,
     )
     return [f"embedded PPT Master dependency not found: {path}" for path in required if not path.is_file()]
 
@@ -173,14 +346,10 @@ def materialize_template(prototype: Path, destination: Path) -> Path:
     return destination
 
 
-def request_payload(
+def page_context_payload(
     paths: ProjectPaths,
     framework_text: str,
     page: PageEntry,
-    version: str,
-    *,
-    base_version: str | None = None,
-    feedback: str | None = None,
 ) -> dict[str, object]:
     errors = embedding_errors()
     if errors:
@@ -191,7 +360,7 @@ def request_payload(
     source_prototype = template_path(page)
     prototype = materialize_template(
         source_prototype,
-        paths.template_prototype(page.slide_id, version),
+        paths.template_prototype(page.slide_id),
     )
     context = line_fields(h2_section(framework_text, "Project context"))
     pages = page_entries(framework_text)
@@ -217,24 +386,18 @@ def request_payload(
                 "path": str(confirmed.resolve()),
                 "sha256": sha256(confirmed),
             })
-    base_payload: dict[str, str] | None = None
-    if base_version:
-        base = paths.candidate(page.slide_id, base_version)
-        if not base.is_file():
-            raise ValueError(f"revision base not found: {base}")
-        base_payload = {
-            "version": base_version,
-            "path": str(base.resolve()),
-            "sha256": sha256(base),
-        }
     return {
-        "schema": "ppt-master.page-svg-request.v2",
+        "schema": PAGE_CONTEXT_SCHEMA,
         "caller": "ey-deck-design",
         "slide_id": page.slide_id,
-        "version": version,
-        "mode": "revision" if base_version else "independent",
-        "artifact_path": str(paths.candidate(page.slide_id, version).resolve()),
         "canvas": "0 0 1280 720",
+        "composition_space": {
+            "mode": "full-slide",
+            "canvas": "0 0 1280 720",
+            "placeholder_bounds_role": "native-metadata-only",
+            "global_content_cap": None,
+            "check_fixed_atom_overlap": False,
+        },
         "service_contract": str(SERVICE_CONTRACT.resolve()),
         "project_context": {
             "deliverable": context.get("Deliverable name", ""),
@@ -249,7 +412,6 @@ def request_payload(
             "adjacent_pages": adjacent_pages,
         },
         "design_quality": design_quality_contract(),
-        "variant_direction": variant_direction(version, base_version),
         "confirmed_pages": confirmed_pages,
         "approved_content": section.rstrip(),
         "approved_content_sha256": text_sha256(section.rstrip()),
@@ -259,7 +421,78 @@ def request_payload(
             "workspace": str(TEMPLATE_ROOT.resolve()),
             "prototype": str(prototype.resolve()),
             "prototype_sha256": sha256(prototype),
+            "design_spec": {
+                "path": str(TEMPLATE_DESIGN_SPEC.resolve()),
+                "sha256": sha256(TEMPLATE_DESIGN_SPEC),
+            },
         },
+    }
+
+
+def write_page_context(
+    paths: ProjectPaths,
+    framework_text: str,
+    page: PageEntry,
+) -> Path:
+    destination = paths.page_context(page.slide_id)
+    write_json(destination, page_context_payload(paths, framework_text, page))
+    return destination
+
+
+def request_payload(
+    paths: ProjectPaths,
+    page: PageEntry,
+    version: str,
+    *,
+    base_version: str | None = None,
+    feedback: str | None = None,
+) -> dict[str, object]:
+    context_path = paths.page_context(page.slide_id)
+    if not context_path.is_file():
+        raise ValueError(f"page authoring context not found: {context_path}")
+    context = read_json(context_path)
+    if context.get("schema") != PAGE_CONTEXT_SCHEMA or context.get("slide_id") != page.slide_id:
+        raise ValueError(f"invalid page authoring context: {context_path}")
+    current_section = content_section(
+        paths.content.read_text(encoding="utf-8"),
+        page.slide_id,
+    ).rstrip()
+    if context.get("approved_content_sha256") != text_sha256(current_section):
+        raise ValueError(f"stale page authoring context: {context_path}")
+    project_context = context.get("project_context")
+    if not isinstance(project_context, dict):
+        raise ValueError(f"page authoring context has no project context: {context_path}")
+    directions = (
+        independent_variant_directions(page, current_section, project_context)
+        if not base_version
+        else None
+    )
+    base_payload: dict[str, str] | None = None
+    if base_version:
+        base = paths.candidate(page.slide_id, base_version)
+        if not base.is_file():
+            raise ValueError(f"revision base not found: {base}")
+        base_payload = {
+            "version": base_version,
+            "path": str(base.resolve()),
+            "sha256": sha256(base),
+        }
+    return {
+        "schema": REQUEST_SCHEMA,
+        "caller": "ey-deck-design",
+        "slide_id": page.slide_id,
+        "version": version,
+        "mode": "revision" if base_version else "independent",
+        "artifact_path": str(paths.candidate(page.slide_id, version).resolve()),
+        "authoring_context": {
+            "path": str(context_path.resolve()),
+            "sha256": sha256(context_path),
+        },
+        "variant_direction": (
+            revision_direction(base_version)
+            if base_version
+            else directions[version]
+        ),
         "base": base_payload,
         "feedback": feedback if base_version else None,
     }
@@ -267,7 +500,6 @@ def request_payload(
 
 def write_packet(
     paths: ProjectPaths,
-    framework_text: str,
     page: PageEntry,
     version: str,
     *,
@@ -279,7 +511,6 @@ def write_packet(
         packet,
         request_payload(
             paths,
-            framework_text,
             page,
             version,
             base_version=base_version,

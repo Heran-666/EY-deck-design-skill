@@ -13,7 +13,7 @@ from framework_lib import duplicate_line_fields, line_fields, page_entries
 from workflow_agenda import agenda_schema_errors
 
 
-SLIDE_RE = re.compile(r"^## (S\d{2})｜", re.MULTILINE)
+SLIDE_RE = re.compile(r"^## (S\d{2})(?:｜[^\n]*)?$", re.MULTILINE)
 BLOCK_HEADING_RE = re.compile(
     r"^(#{4,6}) (S\d{2}-B\d+(?:\.\d+)*)｜(.+)$", re.MULTILINE
 )
@@ -92,7 +92,7 @@ def named_h3_section(text: str, heading: str) -> str:
 
 
 def slide_sections(text: str) -> dict[str, str]:
-    matches = list(re.finditer(r"^## (S\d{2})｜.*$", text, re.MULTILINE))
+    matches = list(SLIDE_RE.finditer(text))
     sections: dict[str, str] = {}
     for index, match in enumerate(matches):
         end = matches[index + 1].start() if index + 1 < len(matches) else len(text)
@@ -129,7 +129,7 @@ def validate_header(content: str) -> list[str]:
     ):
         if named_h2_section(content, legacy):
             errors.append(f"content.md must not duplicate global policy in {legacy}")
-    first_slide = re.search(r"^## S\d{2}｜", content, re.MULTILINE)
+    first_slide = re.search(r"^## S\d{2}(?:｜[^\n]*)?$", content, re.MULTILINE)
     prefix = content[: first_slide.start()] if first_slide else content
     unexpected_h2 = [
         heading

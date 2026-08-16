@@ -11,8 +11,12 @@ import sys
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
+from svg_quality_checker import SVGQualityChecker
 
-REQUEST_SCHEMA = "ppt-master.page-svg-request.v2"
+
+REQUEST_SCHEMA = "ppt-master.page-svg-request.v3"
+LEGACY_REQUEST_SCHEMA = "ppt-master.page-svg-request.v2"
+PAGE_CONTEXT_SCHEMA = "ey-deck.page-authoring-context.v1"
 RESULT_SCHEMA = "ppt-master.page-svg-result.v1"
 VERSION_RE = re.compile(r"(?:A|B|R[1-9]\d*)")
 DESIGN_QUALITY_PROFILE = "ey-executive-editorial-v2"
@@ -27,10 +31,26 @@ VISIBLE_CANDIDATE_GATE = [
     "full_slide_render_review",
     "source_repair_and_recheck",
 ]
-INDEPENDENT_VARIANT_ROLES = {
-    "A": "clarity-led-editorial",
-    "B": "concept-led-spatial",
+FULL_SLIDE_COMPOSITION = {
+    "mode": "full-slide",
+    "canvas": "0 0 1280 720",
+    "placeholder_bounds_role": "native-metadata-only",
+    "global_content_cap": None,
+    "check_fixed_atom_overlap": False,
 }
+STRUCTURAL_PAGE_TYPES = {
+    "cover",
+    "agenda",
+    "section divider",
+    "divider",
+    "ending",
+    "closing",
+    "closing page",
+}
+BLOCKING_TEXT_WARNING_MARKERS = (
+    "paragraph-like line run(s) split across sibling <text> elements",
+    "multi-line <text> with leading direct text that cannot be normalized into one PPT text frame",
+)
 
 
 def digest(path: Path) -> str:
@@ -72,6 +92,39 @@ def _nonempty_text_list(value: object, minimum: int) -> bool:
     )
 
 
+def _normalized_page_type(request: dict) -> str:
+    context = request.get("page_context")
+    value = context.get("page_type", "") if isinstance(context, dict) else ""
+    return " ".join(str(value).strip().lower().replace("_", " ").replace("-", " ").split())
+
+
+def _authoring_context(request: dict) -> tuple[dict, list[str]]:
+    if request.get("schema") == LEGACY_REQUEST_SCHEMA:
+        return request, []
+    descriptor = request.get("authoring_context")
+    if not isinstance(descriptor, dict):
+        return {}, ["authoring_context must be an object"]
+    errors = _bound_file(
+        descriptor,
+        "path",
+        "sha256",
+        "page authoring context",
+    )
+    if errors:
+        return {}, errors
+    try:
+        context = load_request(Path(str(descriptor["path"])))
+    except ValueError as exc:
+        return {}, [str(exc)]
+    if context.get("schema") != PAGE_CONTEXT_SCHEMA:
+        errors.append(f"page authoring context schema must be {PAGE_CONTEXT_SCHEMA}")
+    if context.get("caller") != "ey-deck-design":
+        errors.append("page authoring context caller must be ey-deck-design")
+    if context.get("slide_id") != request.get("slide_id"):
+        errors.append("page authoring context slide_id must match request slide_id")
+    return context, errors
+
+
 def design_contract_errors(request: dict, mode: object, version: object) -> list[str]:
     errors: list[str] = []
     quality = request.get("design_quality")
@@ -98,11 +151,31 @@ def design_contract_errors(request: dict, mode: object, version: object) -> list
     if not _nonempty_text(direction.get("intent")) or not _nonempty_text(direction.get("adaptation_rule")):
         errors.append("variant_direction intent and adaptation_rule must be non-empty")
     if mode == "independent" and isinstance(version, str):
-        expected = INDEPENDENT_VARIANT_ROLES.get(version)
-        if direction.get("role") != expected:
-            errors.append(f"variant_direction.role for {version} must be {expected}")
+        if not _nonempty_text(direction.get("role")):
+            errors.append("independent variant_direction.role must be non-empty")
         if "base_version" in direction:
             errors.append("independent variant_direction must not contain base_version")
+        basis = direction.get("selection_basis")
+        if not isinstance(basis, dict):
+            errors.append("independent variant_direction.selection_basis must be an object")
+        else:
+            if basis.get("method") != "page-content-and-approved-user-intent":
+                errors.append("variant direction must be selected from page content and approved user intent")
+            for field in ("content_signal", "page_type", "narrative_role", "audience_outcome", "storyline_thesis"):
+                if not _nonempty_text(basis.get(field)):
+                    errors.append(f"variant_direction.selection_basis.{field} must be non-empty")
+        if _normalized_page_type(request) not in STRUCTURAL_PAGE_TYPES:
+            alternative = direction.get("alternative_contract")
+            if not isinstance(alternative, dict):
+                errors.append("substantive independent variant requires an alternative_contract")
+            else:
+                if not _nonempty_text(alternative.get("pair_id")):
+                    errors.append("variant_direction.alternative_contract.pair_id must be non-empty")
+                counterpart = alternative.get("counterpart_role")
+                if not _nonempty_text(counterpart) or counterpart == direction.get("role"):
+                    errors.append("variant counterpart role must be non-empty and distinct")
+                if not _nonempty_text_list(alternative.get("required_difference_axes"), 2):
+                    errors.append("variant pair must require at least two material difference axes")
     elif mode == "revision":
         base = request.get("base")
         base_version = base.get("version") if isinstance(base, dict) else None
@@ -115,7 +188,7 @@ def design_contract_errors(request: dict, mode: object, version: object) -> list
 
 def request_errors(request: dict) -> list[str]:
     errors: list[str] = []
-    if request.get("schema") != REQUEST_SCHEMA:
+    if request.get("schema") not in {REQUEST_SCHEMA, LEGACY_REQUEST_SCHEMA}:
         errors.append(f"schema must be {REQUEST_SCHEMA}")
     if request.get("caller") != "ey-deck-design":
         errors.append("caller must be ey-deck-design")
@@ -125,22 +198,34 @@ def request_errors(request: dict) -> list[str]:
     version = request.get("version")
     if not isinstance(version, str) or not VERSION_RE.fullmatch(version):
         errors.append("version must be A, B, or Rn")
-    if request.get("canvas") != "0 0 1280 720":
+    context, context_errors = _authoring_context(request)
+    errors.extend(context_errors)
+    if context.get("canvas") != "0 0 1280 720":
         errors.append("canvas must be 0 0 1280 720")
+    if context.get("composition_space") != FULL_SLIDE_COMPOSITION:
+        errors.append(
+            "composition_space must enable unrestricted full-slide composition; "
+            "placeholder bounds are native metadata only and fixed-atom overlap is not a QA gate"
+        )
     artifact = Path(str(request.get("artifact_path", "")))
     if not artifact.is_absolute() or artifact.suffix.lower() != ".svg":
         errors.append("artifact_path must be an absolute .svg path")
-    content = request.get("approved_content")
+    content = context.get("approved_content")
     if not isinstance(content, str) or not content.strip():
         errors.append("approved_content must be non-empty")
-    elif request.get("approved_content_sha256") != hashlib.sha256(content.encode("utf-8")).hexdigest():
+    elif context.get("approved_content_sha256") != hashlib.sha256(content.encode("utf-8")).hexdigest():
         errors.append("approved_content SHA-256 mismatch")
-    errors.extend(_bound_file(request, "approved_content_source", "approved_content_source_sha256", "approved content source"))
-    template = request.get("template")
+    errors.extend(_bound_file(context, "approved_content_source", "approved_content_source_sha256", "approved content source"))
+    template = context.get("template")
     if not isinstance(template, dict):
         errors.append("template must be an object")
     else:
         errors.extend(_bound_file(template, "prototype", "prototype_sha256", "template prototype"))
+        design_spec = template.get("design_spec")
+        if not isinstance(design_spec, dict):
+            errors.append("template.design_spec must be an object")
+        else:
+            errors.extend(_bound_file(design_spec, "path", "sha256", "template design spec"))
     mode = request.get("mode")
     base = request.get("base")
     feedback = request.get("feedback")
@@ -160,7 +245,10 @@ def request_errors(request: dict) -> list[str]:
             errors.append("revision mode requires non-empty feedback")
     else:
         errors.append("mode must be independent or revision")
-    errors.extend(design_contract_errors(request, mode, version))
+    effective_contract = dict(context)
+    effective_contract["variant_direction"] = request.get("variant_direction")
+    effective_contract["base"] = request.get("base")
+    errors.extend(design_contract_errors(effective_contract, mode, version))
     return errors
 
 
@@ -183,6 +271,17 @@ def artifact_errors(path: Path) -> list[str]:
         href = element.attrib.get("href") or element.attrib.get("{http://www.w3.org/1999/xlink}href")
         if href and re.match(r"(?i)^(?:https?:)?//", href):
             errors.append(f"artifact contains remote URL: {href}")
+    # Page requests are bound to structured Master/Layout prototypes. Validate
+    # that contract directly; Quick Generate is reserved for the later flat
+    # export projection and would misclassify required structure metadata.
+    quality = SVGQualityChecker().check_file(str(path))
+    errors.extend(
+        f"artifact quality: {message}"
+        for message in quality.get("errors", [])
+    )
+    for warning in quality.get("warnings", []):
+        if any(marker in warning for marker in BLOCKING_TEXT_WARNING_MARKERS):
+            errors.append(f"artifact violates PPTX text-frame integrity: {warning}")
     return list(dict.fromkeys(errors))
 
 

@@ -132,6 +132,7 @@ except ImportError:
 
 try:
     from svg_to_pptx.drawingml.elements import (
+        ImageValidationDependencyError as _ImageValidationDependencyError,
         drawingml_text_frame_width_emu as _drawingml_text_frame_width_emu,
         estimate_single_line_text_frame_width as _estimate_single_line_text_frame_width,
         project_image_errors as _project_image_errors,
@@ -139,6 +140,7 @@ try:
         validate_preset_geometry_metadata as _validate_preset_geometry_metadata,
     )
 except ImportError:
+    _ImageValidationDependencyError = RuntimeError
     _drawingml_text_frame_width_emu = None
     _estimate_single_line_text_frame_width = None
     _project_image_errors = None
@@ -1413,13 +1415,18 @@ class SVGQualityChecker:
             return
         _working_root, _parent_by_id, images = self._visible_image_elements(root)
         for image in images:
-            result['errors'].extend(
-                _project_image_errors(
+            try:
+                image_errors = _project_image_errors(
                     image,
                     svg_path.parent,
                     allow_template_placeholders=self.template_mode,
                 )
-            )
+            except _ImageValidationDependencyError as exc:
+                result['errors'].append(
+                    "Image validation dependency unavailable: " + str(exc)
+                )
+                return
+            result['errors'].extend(image_errors)
 
     def _check_fonts(self, content: str, result: Dict):
         """Check font usage.

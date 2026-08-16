@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import shlex
 import subprocess
@@ -15,10 +16,17 @@ from framework_lib import PageEntry, h2_section, line_fields, page_entries, repl
 from validate_deck_blueprint import validate_collection
 from validate_framework import validate as validate_framework
 from workflow_content import content_section, promote_provisional_content, provisional_content_errors
-from workflow_io import atomic_write, command_line, now, read_json, sha256, write_json
+from workflow_io import atomic_write, command_line, now, read_json, sha256, text_sha256, write_json
 from workflow_paths import ProjectPaths
-from workflow_ppt_master import SERVICE_CLI, SERVICE_CONTRACT, embedding_errors, write_packet
-from workflow_spec import TERMINAL_PAGE_STATES
+from workflow_ppt_master import SERVICE_CLI, embedding_errors, write_packet, write_page_context
+from workflow_pptx import (
+    SERVICE_CONTRACT as PPTX_SERVICE_CONTRACT,
+    export_from_request,
+    export_valid,
+    request_valid as pptx_request_valid,
+    write_request as write_pptx_request,
+)
+from workflow_spec import READABLE_WORKFLOW_VERSIONS, TERMINAL_PAGE_STATES, WORKFLOW_VERSION
 from workflow_svg import (
     candidate_valid,
     confirm_candidate,
@@ -33,6 +41,9 @@ from workflow_svg import (
     record_presentation,
     require_version,
 )
+
+
+SVG_RUNTIME_ENV = "EY_DECK_SVG_PYTHON"
 
 
 def update_page(text: str, slide_id: str, updates: dict[str, str]) -> str:
@@ -77,9 +88,19 @@ def review_valid(paths: ProjectPaths, page: PageEntry) -> bool:
         receipt = read_json(paths.content_review)
     except ValueError:
         return False
+    scope_hash = text_sha256(
+        json.dumps(
+            review_context(paths.framework.read_text(encoding="utf-8"), page),
+            ensure_ascii=False,
+            sort_keys=True,
+        )
+    )
     return (
         receipt.get("slide_id") == page.slide_id
-        and receipt.get("framework_sha256") == sha256(paths.framework)
+        and (
+            receipt.get("review_scope_sha256") == scope_hash
+            or receipt.get("framework_sha256") == sha256(paths.framework)
+        )
         and receipt.get("provisional_sha256") == sha256(paths.provisional)
     )
 
@@ -107,18 +128,90 @@ def review_context(text: str, page: PageEntry) -> dict[str, object]:
     }
 
 
-def service_request_payload(paths: ProjectPaths, controller: Path, slide_id: str, version: str) -> dict[str, str]:
+def _svg_runtime_python() -> str:
+    configured = os.environ.get(SVG_RUNTIME_ENV, "").strip()
+    if not configured:
+        raise ValueError(
+            "Load workspace dependencies and set command-scoped "
+            f"{SVG_RUNTIME_ENV} to the returned Python executable."
+        )
+    path = Path(configured).expanduser()
+    if not path.is_absolute() or not path.is_file():
+        raise ValueError(
+            f"{SVG_RUNTIME_ENV} must be the absolute bundled Python executable"
+        )
+    probe = subprocess.run(
+        [str(path), "-c", "from PIL import Image"],
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    if probe.returncode:
+        raise ValueError(
+            "SVG validation runtime is unavailable. Load workspace dependencies "
+            f"and set {SVG_RUNTIME_ENV} to its Python executable."
+        )
+    return str(path.resolve())
+
+
+def service_request_payload(paths: ProjectPaths, controller: Path, slide_id: str, version: str) -> dict[str, object]:
     request = paths.packet(slide_id, version)
-    python = str(Path(sys.executable).resolve())
+    python = _svg_runtime_python()
+    record = command_line(
+        controller, "record-svg", paths.root,
+        "--page", slide_id, "--version", version,
+    )
     return {
         "version": version,
         "request_path": str(request),
-        "service_contract": str(SERVICE_CONTRACT),
-        "requested_artifact": str(paths.candidate(slide_id, version)),
         "validate_request": shlex.join([python, str(SERVICE_CLI), "validate-request", str(request)]),
-        "complete": shlex.join([python, str(SERVICE_CLI), "complete", str(request)]),
-        "record": command_line(controller, "record-svg", paths.root, "--page", slide_id, "--version", version),
+        "record": shlex.join(["env", f"{SVG_RUNTIME_ENV}={python}", *shlex.split(record)]),
     }
+
+
+def svg_cycle_started(paths: ProjectPaths, page: PageEntry) -> bool:
+    versions = initial_versions_for_page_type(page.fields.get("Page type", ""))
+    packets = [paths.packet(page.slide_id, version) for version in versions]
+    if any(not packet.is_file() for packet in packets):
+        return False
+    context_path = paths.page_context(page.slide_id)
+    if not context_path.is_file():
+        try:
+            legacy_requests = [read_json(packet) for packet in packets]
+        except ValueError:
+            return False
+        return all(
+            request.get("schema") == "ppt-master.page-svg-request.v2"
+            and request.get("caller") == "ey-deck-design"
+            and request.get("slide_id") == page.slide_id
+            and request.get("version") == version
+            for request, version in zip(legacy_requests, versions)
+        )
+    try:
+        context = read_json(context_path)
+        requests = [read_json(packet) for packet in packets]
+    except ValueError:
+        return False
+    current_section_hash = text_sha256(
+        content_section(paths.content.read_text(encoding="utf-8"), page.slide_id).rstrip()
+    )
+    if (
+        context.get("schema") != "ey-deck.page-authoring-context.v1"
+        or context.get("caller") != "ey-deck-design"
+        or context.get("slide_id") != page.slide_id
+        or context.get("approved_content_sha256") != current_section_hash
+    ):
+        return False
+    context_hash = sha256(context_path)
+    return all(
+        request.get("schema") == "ppt-master.page-svg-request.v3"
+        and request.get("caller") == "ey-deck-design"
+        and request.get("slide_id") == page.slide_id
+        and request.get("version") == version
+        and request.get("authoring_context")
+        == {"path": str(context_path.resolve()), "sha256": context_hash}
+        for request, version in zip(requests, versions)
+    )
 
 
 def decision_directive(
@@ -213,17 +306,47 @@ def directive_payload(project_dir: Path, text: str, controller: Path) -> dict[st
             break
     page = active_page(text)
     if page is None:
+        paths = ProjectPaths(project_dir)
+        filename = line_fields(h2_section(text, "Current position"))["Output filename"]
+        if export_valid(paths, text):
+            return {
+                "action": "PPTX_STAGE_COMPLETE",
+                "pptx": str(paths.pptx_output(filename).resolve()),
+                "postflight_report": str(paths.pptx_postflight_report(filename).resolve()),
+                "text_frame_audit": str(paths.pptx_text_audit.resolve()),
+            }
+        if pptx_request_valid(paths, text):
+            return {
+                "action": "RUN_EMBEDDED_PPT_MASTER_PPTX",
+                "request_path": str(paths.pptx_request.resolve()),
+                "service_contract": str(PPTX_SERVICE_CONTRACT.resolve()),
+                "requested_artifact": str(paths.pptx_output(filename).resolve()),
+                "conversion_contract": {
+                    "object_model": "editable-native-drawingml",
+                    "text_flow": "preserve",
+                    "text_frame_rule": "one logical SVG <text> carrier becomes one PowerPoint text box",
+                },
+                "required_environment": {
+                    "EY_DECK_PPTX_PYTHON": "Absolute Python executable returned by load_workspace_dependencies",
+                },
+                "commands": {
+                    "run": command_line(controller, "export-pptx", project_dir),
+                },
+            }
         return {
-            "action": "SVG_STAGE_COMPLETE",
+            "action": "PREPARE_PPTX_EXPORT",
             "confirmed_svgs": [
                 str((paths.svg_output / f"{item.slide_id}.svg").resolve())
                 for item in page_entries(text)
                 if item.fields.get("Status") == "SVG confirmed"
             ],
+            "commands": {
+                "run": command_line(controller, "prepare-pptx-export", project_dir),
+            },
         }
     status = page.fields.get("Status")
     if status in {"Not started", "Content reviewing"}:
-        if status == "Content reviewing" and review_valid(paths, page):
+        if review_valid(paths, page):
             return {
                 "action": "COLLECT_CONTENT_DECISION",
                 "slide_id": page.slide_id,
@@ -241,11 +364,16 @@ def directive_payload(project_dir: Path, text: str, controller: Path) -> dict[st
             "commands": {"present": command_line(controller, "present-review", project_dir)},
         }
     if status == "Content locked":
+        if svg_cycle_started(paths, page):
+            return svg_directive(paths, page, controller)
         initial_versions = initial_versions_for_page_type(page.fields.get("Page type", ""))
         return {
             "action": "PREPARE_SVG_CANDIDATES",
             "slide_id": page.slide_id,
             "versions": list(initial_versions),
+            "required_environment": {
+                SVG_RUNTIME_ENV: "Absolute Python executable returned by load_workspace_dependencies",
+            },
             "commands": {"run": command_line(controller, "prepare-svg-candidates", project_dir, "--page", page.slide_id)},
         }
     if status == "Awaiting SVG decision":
@@ -265,7 +393,7 @@ def print_next(project_dir: Path, text: str, controller: Path) -> None:
     print(json.dumps(directive_payload(project_dir, text, controller), ensure_ascii=False, indent=2))
 
 
-def handle_present_review(project_dir: Path, framework: Path, text: str, controller: Path) -> int:
+def handle_present_review(project_dir: Path, text: str, controller: Path) -> int:
     page = active_page(text)
     if page is None or page.fields.get("Status") not in {"Not started", "Content reviewing"}:
         raise ValueError("no page is waiting for content review")
@@ -273,14 +401,13 @@ def handle_present_review(project_dir: Path, framework: Path, text: str, control
     errors = provisional_content_errors(paths.provisional, [page])
     if errors:
         raise ValueError(" | ".join(errors))
-    if page.fields.get("Status") != "Content reviewing":
-        text = update_page(text, page.slide_id, {"Status": "Content reviewing"})
-        atomic_write(framework, text)
     write_json(
         paths.content_review,
         {
             "slide_id": page.slide_id,
-            "framework_sha256": sha256(framework),
+            "review_scope_sha256": text_sha256(
+                json.dumps(review_context(text, page), ensure_ascii=False, sort_keys=True)
+            ),
             "provisional_sha256": sha256(paths.provisional),
             "presented_at": now(),
         },
@@ -294,7 +421,11 @@ def handle_present_review(project_dir: Path, framework: Path, text: str, control
 def handle_approve_content(project_dir: Path, framework: Path, text: str, controller: Path) -> int:
     page = active_page(text)
     paths = ProjectPaths(project_dir)
-    if page is None or page.fields.get("Status") != "Content reviewing" or not review_valid(paths, page):
+    if (
+        page is None
+        or page.fields.get("Status") not in {"Not started", "Content reviewing"}
+        or not review_valid(paths, page)
+    ):
         raise ValueError("no current presented content review to approve")
     provisional = paths.provisional.read_text(encoding="utf-8")
     existing = paths.content.read_text(encoding="utf-8") if paths.content.is_file() else ""
@@ -311,7 +442,7 @@ def handle_approve_content(project_dir: Path, framework: Path, text: str, contro
     return 0
 
 
-def handle_prepare_candidates(project_dir: Path, framework: Path, text: str, page_id: str, controller: Path) -> int:
+def handle_prepare_candidates(project_dir: Path, text: str, page_id: str, controller: Path) -> int:
     page = page_by_id(text, page_id)
     current = active_page(text)
     if current is None or current.slide_id != page.slide_id or page.fields.get("Status") != "Content locked":
@@ -319,12 +450,12 @@ def handle_prepare_candidates(project_dir: Path, framework: Path, text: str, pag
     errors = embedding_errors()
     if errors:
         raise ValueError(" | ".join(errors))
+    _svg_runtime_python()
     paths = ProjectPaths(project_dir)
     paths.svg_dir(page_id).mkdir(parents=True, exist_ok=True)
+    write_page_context(paths, text, page)
     for version in initial_versions_for_page_type(page.fields.get("Page type", "")):
-        write_packet(paths, text, page, version)
-    text = update_page(text, page_id, {"Status": "Awaiting SVG decision"})
-    atomic_write(framework, text)
+        write_packet(paths, page, version)
     print_next(project_dir, text, controller)
     return 0
 
@@ -336,7 +467,8 @@ def handle_record_svg(project_dir: Path, text: str, page_id: str, version: str, 
     if (
         current is None
         or current.slide_id != page.slide_id
-        or page.fields.get("Status") != "Awaiting SVG decision"
+        or page.fields.get("Status") not in {"Content locked", "Awaiting SVG decision"}
+        or not svg_cycle_started(ProjectPaths(project_dir), page)
     ):
         raise ValueError(f"{page_id} is not the active page awaiting an SVG decision")
     paths = ProjectPaths(project_dir)
@@ -345,8 +477,9 @@ def handle_record_svg(project_dir: Path, text: str, page_id: str, version: str, 
     if version not in expected:
         raise ValueError(f"record-svg must use a current requested version: {','.join(expected)}")
     packet = paths.packet(page_id, version)
+    python = _svg_runtime_python()
     completed = subprocess.run(
-        [str(Path(sys.executable).resolve()), str(SERVICE_CLI), "complete", str(packet)],
+        [python, str(SERVICE_CLI), "complete", str(packet)],
         text=True,
         capture_output=True,
         check=False,
@@ -372,7 +505,10 @@ def handle_record_svg(project_dir: Path, text: str, page_id: str, version: str, 
 
 def handle_present_svg(project_dir: Path, text: str, page_id: str, versions_text: str, controller: Path) -> int:
     page = page_by_id(text, page_id)
-    if page.fields.get("Status") != "Awaiting SVG decision":
+    if (
+        page.fields.get("Status") not in {"Content locked", "Awaiting SVG decision"}
+        or not svg_cycle_started(ProjectPaths(project_dir), page)
+    ):
         raise ValueError(f"{page_id} is not awaiting an SVG decision")
     versions = [require_version(item.strip()) for item in versions_text.split(",") if item.strip()]
     if len(versions) not in {1, 2} or len(set(versions)) != len(versions):
@@ -403,16 +539,24 @@ def handle_present_svg(project_dir: Path, text: str, page_id: str, versions_text
 def handle_request_revision(project_dir: Path, text: str, page_id: str, base: str, feedback_file: Path, controller: Path) -> int:
     page = page_by_id(text, page_id)
     paths = ProjectPaths(project_dir)
-    if page.fields.get("Status") != "Awaiting SVG decision" or base not in presented_versions(paths, page_id):
+    if (
+        page.fields.get("Status") not in {"Content locked", "Awaiting SVG decision"}
+        or not svg_cycle_started(paths, page)
+        or base not in presented_versions(paths, page_id)
+    ):
         raise ValueError("revision base must be one of the currently displayed candidates")
     feedback_file = feedback_file.expanduser().resolve()
+    expected_feedback_file = paths.revision_request(page_id).resolve()
+    if feedback_file != expected_feedback_file:
+        raise ValueError(f"revision feedback must use the emitted file: {expected_feedback_file}")
     if not feedback_file.is_file():
         raise ValueError(f"revision feedback file not found: {feedback_file}")
     feedback = feedback_file.read_text(encoding="utf-8").strip()
     if not feedback:
         raise ValueError("revision feedback must be non-empty")
     version = next_revision(paths, page_id)
-    write_packet(paths, text, page, version, base_version=base, feedback=feedback)
+    write_packet(paths, page, version, base_version=base, feedback=feedback)
+    feedback_file.unlink()
     paths.presentation_receipt(page_id).unlink(missing_ok=True)
     print_next(project_dir, text, controller)
     return 0
@@ -420,7 +564,10 @@ def handle_request_revision(project_dir: Path, text: str, page_id: str, base: st
 
 def handle_confirm_svg(project_dir: Path, framework: Path, text: str, page_id: str, version: str, controller: Path) -> int:
     page = page_by_id(text, page_id)
-    if page.fields.get("Status") != "Awaiting SVG decision":
+    if (
+        page.fields.get("Status") not in {"Content locked", "Awaiting SVG decision"}
+        or not svg_cycle_started(ProjectPaths(project_dir), page)
+    ):
         raise ValueError(f"{page_id} is not awaiting an SVG decision")
     paths = ProjectPaths(project_dir)
     target = confirm_candidate(paths, page_id, require_version(version))
@@ -431,13 +578,29 @@ def handle_confirm_svg(project_dir: Path, framework: Path, text: str, page_id: s
     return 0
 
 
+def handle_prepare_pptx(project_dir: Path, text: str, controller: Path) -> int:
+    paths = ProjectPaths(project_dir)
+    request = write_pptx_request(paths, text)
+    print(f"Prepared PPTX export request: {request}")
+    print_next(project_dir, text, controller)
+    return 0
+
+
+def handle_export_pptx(project_dir: Path, text: str, controller: Path) -> int:
+    output = export_from_request(ProjectPaths(project_dir), text)
+    print(f"Exported editable PPTX: {output}")
+    print_next(project_dir, text, controller)
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser()
     sub = parser.add_subparsers(dest="command", required=True)
     commands = (
-        "bootstrap", "next", "audit", "present-review", "approve-content",
+        "bootstrap", "upgrade-workflow", "next", "audit", "present-review", "approve-content",
         "prepare-svg-candidates", "record-svg", "present-svg", "request-svg-revision",
-        "confirm-svg", "reopen-content", "reopen-svg", "set-output-filename",
+        "confirm-svg", "prepare-pptx-export", "export-pptx",
+        "reopen-content", "reopen-svg", "set-output-filename",
     )
     for name in commands:
         command = sub.add_parser(name)
@@ -463,6 +626,36 @@ def main() -> int:
     project_dir = args.project_dir.expanduser().resolve()
     controller = Path(__file__).resolve()
     try:
+        if args.command == "upgrade-workflow":
+            framework = ProjectPaths(project_dir).framework
+            if not framework.is_file():
+                raise ValueError(f"framework not found: {framework}")
+            text = framework.read_text(encoding="utf-8")
+            current = h2_section(text, "Current position")
+            version = line_fields(current).get("Workflow version", "")
+            if version not in READABLE_WORKFLOW_VERSIONS:
+                raise ValueError(
+                    "unsupported workflow version for migration: "
+                    f"{version or 'missing'}"
+                )
+            preflight_errors = validate_framework(framework, project_dir)
+            allowed_version_error = f"Workflow version must be {WORKFLOW_VERSION}"
+            blocking_errors = [
+                error for error in preflight_errors
+                if not (version != WORKFLOW_VERSION and error == allowed_version_error)
+            ]
+            if blocking_errors:
+                raise ValueError(" | ".join(blocking_errors))
+            if version != WORKFLOW_VERSION:
+                text = text.replace(
+                    current,
+                    replace_field(current, "Workflow version", WORKFLOW_VERSION),
+                    1,
+                )
+                atomic_write(framework, text)
+            print(f"Workflow upgraded to {WORKFLOW_VERSION}.")
+            print_next(project_dir, text, controller)
+            return 0
         framework, text = load_context(project_dir)
         if args.command in {"bootstrap", "next"}:
             if args.command == "bootstrap":
@@ -478,16 +671,18 @@ def main() -> int:
             for page in page_entries(text):
                 if page.fields.get("Status") == "SVG confirmed" and not confirmation_valid(paths, page.slide_id):
                     errors.append(f"{page.slide_id} has a stale SVG confirmation")
+            if active_page(text) is None and not export_valid(paths, text):
+                errors.append("editable PPTX export is missing or stale")
             if errors:
                 raise ValueError(" | ".join(errors))
-            print("EY content and SVG workflow audit passed.")
+            print("EY content, SVG, and editable PPTX workflow audit passed.")
             return 0
         if args.command == "present-review":
-            return handle_present_review(project_dir, framework, text, controller)
+            return handle_present_review(project_dir, text, controller)
         if args.command == "approve-content":
             return handle_approve_content(project_dir, framework, text, controller)
         if args.command == "prepare-svg-candidates":
-            return handle_prepare_candidates(project_dir, framework, text, args.page, controller)
+            return handle_prepare_candidates(project_dir, text, args.page, controller)
         if args.command == "record-svg":
             return handle_record_svg(project_dir, text, args.page, args.version, controller)
         if args.command == "present-svg":
@@ -496,6 +691,10 @@ def main() -> int:
             return handle_request_revision(project_dir, text, args.page, args.base, args.feedback_file, controller)
         if args.command == "confirm-svg":
             return handle_confirm_svg(project_dir, framework, text, args.page, args.version, controller)
+        if args.command == "prepare-pptx-export":
+            return handle_prepare_pptx(project_dir, text, controller)
+        if args.command == "export-pptx":
+            return handle_export_pptx(project_dir, text, controller)
         if args.command in {"reopen-content", "reopen-svg"}:
             page = page_by_id(text, args.page)
             if page.fields.get("Status") == "Protected placeholder":

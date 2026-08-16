@@ -19,7 +19,7 @@ only effective durable information into `framework.md`.
 ## Current position
 
 - Framework version: 3.1
-- Workflow version: 6.0
+- Workflow version: 7.0
 - Storyline version: 1.0
 - Output filename: <plain filename ending in .pptx>
 
@@ -65,37 +65,44 @@ substantive pages, include one Agenda at S02 and at least one Section divider.
 
 `Output filename` is one plain `.pptx` filename, never a path. Preserve an
 explicit user filename; otherwise derive it once from the deliverable name. It
-is reserved for the future `SVG_STAGE_COMPLETE → PPTX export` stage. Workflow
-6.0 does not create, rename, deliver, or record a PPTX.
+becomes the project-root output of the confirmed-SVG-to-PPTX stage. Workflow
+7.0 records the output, postflight, conversion trace, and text-frame audit
+outside `framework.md`.
 
 For `Protected placeholder`, set both Page type and Status to
 `Protected placeholder`. Put the exact approved instruction in `Content scope`;
 it must begin with `[占位：` and state that AI must not generate, rewrite, or
 supplement the page. An optional supplied literal SVG may live at
-`protected_input/<Slide ID>.svg`, but workflow 6.0 does not validate, copy, or
-include protected inputs in `SVG_STAGE_COMPLETE`; their incorporation belongs
-to the future export stage.
+`protected_input/<Slide ID>.svg`, but workflow 7.0 does not validate, confirm,
+or include protected placeholders in the PPTX roster. Only explicitly confirmed
+SVGs are exported.
 
 ## Durable states
 
 Use only:
 
 1. `Not started`
-2. `Content reviewing`
-3. `Content locked`
-4. `Awaiting SVG decision`
-5. `SVG confirmed`
-6. `Protected placeholder`
+2. `Content locked`
+3. `SVG confirmed`
+4. `Protected placeholder`
 
 The controller always selects the first page that is neither `SVG confirmed`
 nor `Protected placeholder`. Content approval sets `Content locked`; candidate
-preparation sets `Awaiting SVG decision`; explicit publication sets
+preparation leaves that durable state unchanged; explicit publication sets
 `SVG confirmed`. `Open items` must be `None` before content locks.
+
+Derive transient progress from evidence under `working/`: a current content
+review receipt means content is being reviewed, and a hash-bound page context
+plus the complete initial request set means SVG decisions are in progress. Do
+not write `Content reviewing` or `Awaiting SVG decision` into new or updated
+frameworks. Accept those legacy values only long enough to finish or reopen an
+existing workflow 7.0 cycle.
 
 Keep candidate versions and revision history out of this file. Their immutable
 request, artifact, presentation, and decision receipts live under `working/`.
 A content reopen returns to `Not started`; an SVG-only reopen returns to
-`Content locked`.
+`Content locked` and deletes the evidence from which transient SVG progress is
+derived.
 
 Keep `Narrative role`, `Next connection`, `Confirmed decisions`, and `Open
 items` within 500 characters and `Content scope` within 700. Store a substantive
@@ -104,7 +111,8 @@ items` within 500 characters and `Content scope` within 700. Store a substantive
 ## Targeted loading
 
 For content review, controller `next` emits Project context, the active
-Storyline entry, and compact adjacent context. For SVG generation, it writes a
-hash-bound request for the bundled PPT Master page service. Previously confirmed
+Storyline entry, and compact adjacent context. For SVG generation, it writes
+one hash-bound page authoring context and one shared self-contained prototype,
+then binds each candidate-specific request to that context. Previously confirmed
 pages and adjacent Storyline context may inform consistency without becoming a
 second state authority.

@@ -28,6 +28,7 @@ Output: JSON summary printed to stdout, PNGs written to <project>/.preview/.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import io
 import json
 import math
@@ -182,25 +183,38 @@ def render_pages(server_url: str, pages: list[str], preview_dir: Path) -> list[d
     records: list[dict] = []
 
     inject_js = """
-({svgContent, width, height}) => {
+async ({svgContent, width, height}) => {
     document.documentElement.innerHTML =
         '<head><style>html,body{margin:0;padding:0;background:#0E1116;overflow:hidden}'
         + ' svg{display:block;width:' + width + 'px;height:' + height + 'px}</style></head>'
         + '<body>' + svgContent + '</body>';
-    return { len: svgContent.length };
+    if (document.fonts && document.fonts.ready) {
+        await document.fonts.ready;
+    }
+    await new Promise(resolve => requestAnimationFrame(
+        () => requestAnimationFrame(resolve)
+    ));
+    const svg = document.querySelector('svg');
+    return {
+        len: svgContent.length,
+        elementCount: svg ? svg.querySelectorAll('*').length : 0,
+        textCount: svg ? svg.querySelectorAll('text').length : 0,
+    };
 }
 """
 
     with sync_playwright() as p:
         browser = _launch_browser(p)
         try:
-            context = browser.new_context()
             for page_name in pages:
                 rec: dict = {'page': page_name, 'ok': False}
                 try:
                     svg_content = fetch_slide_content(server_url, page_name)
                     canvas = parse_slide_canvas(svg_content, page_name)
                     rec['canvas'] = canvas
+                    rec['svg_sha256'] = hashlib.sha256(
+                        svg_content.encode('utf-8')
+                    ).hexdigest()
                 except urllib.error.URLError as e:
                     rec['error'] = f'server_unreachable: {e!r}'
                     records.append(rec)
@@ -214,20 +228,28 @@ def render_pages(server_url: str, pages: list[str], preview_dir: Path) -> list[d
                 out_path = preview_dir / f'{stem}.png'
 
                 pg = None
+                context = None
                 try:
+                    # Isolate every page from browser cache and prior SVG paint
+                    # state. The content hash also gives the navigation a fresh
+                    # URL without copying or altering the source SVG.
+                    context = browser.new_context()
                     pg = context.new_page()
                     pg.set_viewport_size({
                         'width': canvas['png_width'],
                         'height': canvas['png_height'],
                     })
-                    pg.goto(server_url, wait_until='domcontentloaded')
-                    pg.evaluate(inject_js, {
+                    separator = '&' if '?' in server_url else '?'
+                    render_url = (
+                        f"{server_url}{separator}ey_preview_sha="
+                        f"{rec['svg_sha256']}"
+                    )
+                    pg.goto(render_url, wait_until='domcontentloaded')
+                    rec['dom_evidence'] = pg.evaluate(inject_js, {
                         'svgContent': svg_content,
                         'width': canvas['width'],
                         'height': canvas['height'],
                     })
-                    # Wait one frame so font/text shaping settles before capture.
-                    pg.wait_for_timeout(100)
                     png_bytes = pg.screenshot(type='png', full_page=False)
 
                     out_path.write_bytes(png_bytes)
@@ -241,6 +263,11 @@ def render_pages(server_url: str, pages: list[str], preview_dir: Path) -> list[d
                     if pg is not None:
                         try:
                             pg.close()
+                        except Exception:  # noqa: BLE001 — cleanup is best-effort
+                            pass
+                    if context is not None:
+                        try:
+                            context.close()
                         except Exception:  # noqa: BLE001 — cleanup is best-effort
                             pass
                 records.append(rec)

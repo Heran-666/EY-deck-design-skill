@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import json
+import os
 import shlex
 import subprocess
 import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 from xml.etree import ElementTree as ET
 
 
@@ -15,14 +17,26 @@ sys.path.insert(0, str(ROOT / "scripts"))
 sys.path.insert(0, str(ROOT / "ppt-master" / "scripts"))
 
 from visual_review import _launch_browser  # noqa: E402
+from page_svg_service import artifact_errors  # noqa: E402
+from svg_to_pptx.drawingml.elements import (  # noqa: E402
+    ImageValidationDependencyError,
+    _valid_project_image_payload,
+)
 from validate_deck_blueprint import _emphasis_errors  # noqa: E402
 from validate_framework import validate as validate_framework  # noqa: E402
-from workflow_ppt_master import TEMPLATE_ROOT, materialize_template, template_name  # noqa: E402
+from workflow_io import sha256 as request_sha256  # noqa: E402
+from workflow_ppt_master import (  # noqa: E402
+    TEMPLATE_ROOT,
+    independent_variant_directions,
+    materialize_template,
+    template_name,
+)
 from workflow_svg import initial_versions_for_page_type  # noqa: E402
 
 
 CONTROLLER = ROOT / "scripts" / "workflow_controller.py"
 SERVICE = ROOT / "ppt-master" / "scripts" / "page_svg_service.py"
+SVG_RUNTIME = os.environ.get("EY_DECK_SVG_PYTHON", sys.executable)
 
 
 FRAMEWORK = """# Presentation Framework
@@ -30,7 +44,7 @@ FRAMEWORK = """# Presentation Framework
 ## Current position
 
 - Framework version: 3.1
-- Workflow version: 6.0
+- Workflow version: 7.0
 - Storyline version: 1.0
 - Output filename: sample.pptx
 
@@ -65,7 +79,7 @@ CONTENT = """# Presentation Build Specification
 ## Deck build profile（Build-only）
 - Language: English
 
-## S01｜Sample title
+## S01
 
 ### On-slide content
 - Title: Sample title
@@ -98,7 +112,7 @@ CONTENT_S02 = """# Presentation Build Specification
 ## Deck build profile（Build-only）
 - Language: English
 
-## S02｜A sharper title
+## S02
 
 ### On-slide content
 - Title: A sharper title
@@ -120,12 +134,37 @@ def svg(label: str) -> str:
 """
 
 
+def multiline_svg() -> str:
+    return """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720">
+  <rect width="1280" height="720" fill="#222"/>
+  <text x="80" y="120" fill="#fff" font-size="24">
+    <tspan x="80" dy="0">Editable first line</tspan>
+    <tspan x="80" dy="36">Editable second line</tspan>
+  </text>
+</svg>
+"""
+
+
+def fragmented_paragraph_svg() -> str:
+    return """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720">
+  <rect width="1280" height="720" fill="#222"/>
+  <g id="body" data-pptx-bounds="60 80 800 240">
+    <text x="80" y="120" fill="#fff" font-size="24">This sentence continues across</text>
+    <text x="80" y="156" fill="#fff" font-size="24">two sibling SVG text elements</text>
+  </g>
+</svg>
+"""
+
+
 def run(project: Path, *args: str) -> subprocess.CompletedProcess[str]:
+    env = dict(os.environ)
+    env["EY_DECK_SVG_PYTHON"] = SVG_RUNTIME
     return subprocess.run(
-        ["python3", str(CONTROLLER), *args, "--project-dir", str(project)],
+        [sys.executable, str(CONTROLLER), *args, "--project-dir", str(project)],
         text=True,
         capture_output=True,
         check=False,
+        env=env,
     )
 
 
@@ -142,6 +181,8 @@ def lock_content(project: Path) -> None:
     provisional.parent.mkdir(parents=True)
     provisional.write_text(CONTENT, encoding="utf-8")
     assert run(project, "present-review").returncode == 0
+    assert "- Status: Not started" in (project / "framework.md").read_text(encoding="utf-8")
+    assert "Content reviewing" not in (project / "framework.md").read_text(encoding="utf-8")
     approved = run(project, "approve-content")
     assert approved.returncode == 0, approved.stdout + approved.stderr
 
@@ -156,19 +197,54 @@ def complete_candidate(project: Path, version: str, label: str, page_id: str = "
     artifact = project / "svg_working" / page_id / f"{version}.svg"
     assert artifact.parent.is_dir(), f"candidate directory was not prepared: {artifact.parent}"
     artifact.write_text(svg(label), encoding="utf-8")
-    request = project / "working" / "packets" / page_id / f"{version}.json"
-    service = subprocess.run(
-        ["python3", str(SERVICE), "complete", str(request)],
-        text=True,
-        capture_output=True,
-        check=False,
-    )
-    assert service.returncode == 0, service.stdout + service.stderr
     recorded = run(project, "record-svg", "--page", page_id, "--version", version)
     assert recorded.returncode == 0, recorded.stdout + recorded.stderr
 
 
 class WorkflowTests(unittest.TestCase):
+    def test_missing_pillow_is_dependency_failure_not_invalid_raster(self) -> None:
+        original_import = __import__
+
+        def blocked_pillow(name, *args, **kwargs):
+            if name == "PIL" or name.startswith("PIL."):
+                raise ImportError("simulated missing Pillow")
+            return original_import(name, *args, **kwargs)
+
+        with mock.patch("builtins.__import__", side_effect=blocked_pillow):
+            with self.assertRaisesRegex(
+                ImageValidationDependencyError,
+                "not classified as invalid",
+            ):
+                _valid_project_image_payload("png", b"validity is intentionally unknown")
+
+    def test_phase_one_workflow_migrates_without_changing_page_state(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project = Path(tmp)
+            legacy = FRAMEWORK.replace("- Workflow version: 7.0", "- Workflow version: 6.0")
+            (project / "framework.md").write_text(legacy, encoding="utf-8")
+
+            upgraded = run(project, "upgrade-workflow")
+
+            self.assertEqual(upgraded.returncode, 0, upgraded.stdout + upgraded.stderr)
+            text = (project / "framework.md").read_text(encoding="utf-8")
+            self.assertIn("- Workflow version: 7.0", text)
+            self.assertIn("- Status: Not started", text)
+            self.assertIn('"action": "PRESENT_PAGE_REVIEW"', upgraded.stdout)
+
+    def test_phase_one_migration_does_not_mutate_an_invalid_framework(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project = Path(tmp)
+            legacy = FRAMEWORK.replace("- Workflow version: 7.0", "- Workflow version: 6.0")
+            legacy = legacy.replace("- Output filename: sample.pptx", "- Output filename: invalid.txt")
+            framework = project / "framework.md"
+            framework.write_text(legacy, encoding="utf-8")
+
+            upgraded = run(project, "upgrade-workflow")
+
+            self.assertNotEqual(upgraded.returncode, 0)
+            self.assertIn("Output filename", upgraded.stdout)
+            self.assertIn("- Workflow version: 6.0", framework.read_text(encoding="utf-8"))
+
     def test_bootstrap_creates_provisional_content_parent(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             project = Path(tmp)
@@ -182,6 +258,32 @@ class WorkflowTests(unittest.TestCase):
             provisional = Path(payload["provisional_content"]["path"])
             self.assertEqual(provisional, (project / "working" / "provisional-content.md").resolve())
             self.assertTrue(provisional.parent.is_dir())
+
+    def test_svg_runtime_is_required_before_candidate_state_changes(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project = Path(tmp)
+            lock_content(project)
+            env = dict(os.environ)
+            env.pop("EY_DECK_SVG_PYTHON", None)
+            prepared = subprocess.run(
+                [
+                    sys.executable,
+                    str(CONTROLLER),
+                    "prepare-svg-candidates",
+                    "--page",
+                    "S01",
+                    "--project-dir",
+                    str(project),
+                ],
+                text=True,
+                capture_output=True,
+                check=False,
+                env=env,
+            )
+            self.assertNotEqual(prepared.returncode, 0)
+            self.assertIn("EY_DECK_SVG_PYTHON", prepared.stdout)
+            self.assertIn("- Status: Content locked", (project / "framework.md").read_text())
+            self.assertFalse((project / "svg_working" / "S01").exists())
 
     def test_framework_enforces_navigation_shell_and_connections(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -232,38 +334,69 @@ class WorkflowTests(unittest.TestCase):
             artifact.write_text(svg("Candidate"), encoding="utf-8")
             packet = project / "working" / "packets" / "S01" / "A.json"
             request = json.loads(packet.read_text(encoding="utf-8"))
-            request["caller"] = "untrusted-caller"
+            request["mode"] = "untrusted-mode"
             packet.write_text(json.dumps(request), encoding="utf-8")
 
             recorded = run(project, "record-svg", "--page", "S01", "--version", "A")
 
             self.assertNotEqual(recorded.returncode, 0)
-            self.assertIn("caller must be ey-deck-design", recorded.stdout)
+            self.assertIn("mode must be independent or revision", recorded.stdout)
             self.assertFalse((project / "working" / "receipts" / "svg" / "S01" / "A.json").exists())
+
+    def test_stale_shared_page_context_returns_to_candidate_preparation(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project = Path(tmp)
+            lock_content(project)
+            prepare_candidates(project)
+            context_path = project / "working" / "packets" / "S01" / "context.json"
+            context = json.loads(context_path.read_text(encoding="utf-8"))
+            context["approved_content_sha256"] = "0" * 64
+            context_path.write_text(json.dumps(context), encoding="utf-8")
+
+            payload = next_payload(project)
+
+            self.assertEqual(payload["action"], "PREPARE_SVG_CANDIDATES")
+            repaired = prepare_candidates(project)
+            self.assertEqual(repaired["action"], "RUN_EMBEDDED_PPT_MASTER_SVG")
 
     def test_single_structural_revision_and_confirmation_flow(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             project = Path(tmp)
             lock_content(project)
+            self.assertIn("\n## S01\n", (project / "content.md").read_text(encoding="utf-8"))
+            self.assertNotIn("## S01｜Sample title", (project / "content.md").read_text(encoding="utf-8"))
+            self.assertIn("- Status: Content locked", (project / "framework.md").read_text(encoding="utf-8"))
             self.assertEqual(next_payload(project)["action"], "PREPARE_SVG_CANDIDATES")
 
             payload = prepare_candidates(project)
+            framework_after_prepare = (project / "framework.md").read_text(encoding="utf-8")
+            self.assertIn("- Status: Content locked", framework_after_prepare)
+            self.assertNotIn("Awaiting SVG decision", framework_after_prepare)
             self.assertEqual(payload["action"], "RUN_EMBEDDED_PPT_MASTER_SVG")
             self.assertEqual([item["version"] for item in payload["requests"]], ["A"])
             self.assertTrue((project / "svg_working" / "S01").is_dir())
-            expected_roles = {"A": "clarity-led-editorial"}
+            shared_contexts = set()
+            shared_prototypes = set()
             for item in payload["requests"]:
                 request = json.loads(Path(item["request_path"]).read_text(encoding="utf-8"))
-                self.assertEqual(request["schema"], "ppt-master.page-svg-request.v2")
+                self.assertEqual(request["schema"], "ppt-master.page-svg-request.v3")
                 self.assertEqual(request["mode"], "independent")
                 self.assertEqual(request["caller"], "ey-deck-design")
                 self.assertIsNone(request["base"])
-                self.assertEqual(request["design_quality"]["profile"], "ey-executive-editorial-v2")
+                context_path = Path(request["authoring_context"]["path"])
+                self.assertEqual(request["authoring_context"]["sha256"], request_sha256(context_path))
+                context = json.loads(context_path.read_text(encoding="utf-8"))
+                shared_contexts.add(context_path)
+                self.assertEqual(context["schema"], "ey-deck.page-authoring-context.v1")
+                self.assertEqual(context["composition_space"]["mode"], "full-slide")
+                self.assertIsNone(context["composition_space"]["global_content_cap"])
+                self.assertFalse(context["composition_space"]["check_fixed_atom_overlap"])
+                self.assertEqual(context["design_quality"]["profile"], "ey-executive-editorial-v2")
                 self.assertTrue(
-                    any("icon elements" in rule for rule in request["design_quality"]["must_have"])
+                    any("icon elements" in rule for rule in context["design_quality"]["must_have"])
                 )
                 self.assertEqual(
-                    request["design_quality"]["visible_candidate_gate"],
+                    context["design_quality"]["visible_candidate_gate"],
                     [
                         "information_design",
                         "page_composition",
@@ -272,15 +405,26 @@ class WorkflowTests(unittest.TestCase):
                         "source_repair_and_recheck",
                     ],
                 )
-                self.assertEqual(request["variant_direction"]["role"], expected_roles[item["version"]])
+                self.assertEqual(request["variant_direction"]["role"], "identity-led-opening")
+                self.assertEqual(
+                    request["variant_direction"]["selection_basis"]["method"],
+                    "page-content-and-approved-user-intent",
+                )
                 validate_python = shlex.split(item["validate_request"])[0]
-                complete_python = shlex.split(item["complete"])[0]
                 self.assertTrue(Path(validate_python).is_absolute())
-                self.assertEqual(validate_python, complete_python)
-                prototype = Path(request["template"]["prototype"])
+                self.assertNotIn("complete", item)
+                prototype = Path(context["template"]["prototype"])
+                shared_prototypes.add(prototype)
                 self.assertTrue(
                     prototype.is_relative_to((project / "working" / "template-prototypes").resolve())
                 )
+                design_spec = context["template"]["design_spec"]
+                design_spec_path = Path(design_spec["path"])
+                self.assertEqual(
+                    design_spec_path,
+                    (TEMPLATE_ROOT / "templates" / "design_spec.md").resolve(),
+                )
+                self.assertEqual(design_spec["sha256"], request_sha256(design_spec_path))
                 image_hrefs = [
                     element.attrib.get("href", "")
                     for element in ET.parse(prototype).getroot().iter()
@@ -289,27 +433,80 @@ class WorkflowTests(unittest.TestCase):
                 self.assertTrue(image_hrefs)
                 self.assertTrue(all(href.startswith("data:image/") for href in image_hrefs))
                 validated = subprocess.run(
-                    ["python3", str(SERVICE), "validate-request", item["request_path"]],
+                    [SVG_RUNTIME, str(SERVICE), "validate-request", item["request_path"]],
                     text=True,
                     capture_output=True,
                     check=False,
                 )
                 self.assertEqual(validated.returncode, 0, validated.stdout)
+            self.assertEqual(len(shared_contexts), 1)
+            self.assertEqual(len(shared_prototypes), 1)
 
             invalid_request = project / "working" / "invalid-request.json"
-            invalid_payload = json.loads(
+            original_request = json.loads(
                 (project / "working" / "packets" / "S01" / "A.json").read_text(encoding="utf-8")
             )
-            del invalid_payload["design_quality"]
-            invalid_request.write_text(json.dumps(invalid_payload), encoding="utf-8")
+            original_context = json.loads(
+                Path(original_request["authoring_context"]["path"]).read_text(encoding="utf-8")
+            )
+
+            def write_invalid_context(payload: dict, name: str) -> None:
+                context_path = project / "working" / f"{name}.json"
+                context_path.write_text(json.dumps(payload), encoding="utf-8")
+                invalid_payload = dict(original_request)
+                invalid_payload["authoring_context"] = {
+                    "path": str(context_path.resolve()),
+                    "sha256": request_sha256(context_path),
+                }
+                invalid_request.write_text(json.dumps(invalid_payload), encoding="utf-8")
+
+            missing_quality = dict(original_context)
+            del missing_quality["design_quality"]
+            write_invalid_context(missing_quality, "missing-quality")
             rejected = subprocess.run(
-                ["python3", str(SERVICE), "validate-request", str(invalid_request)],
+                [SVG_RUNTIME, str(SERVICE), "validate-request", str(invalid_request)],
                 text=True,
                 capture_output=True,
                 check=False,
             )
             self.assertNotEqual(rejected.returncode, 0)
             self.assertIn("design_quality must be an object", rejected.stdout)
+
+            missing_design_spec = json.loads(json.dumps(original_context))
+            del missing_design_spec["template"]["design_spec"]
+            write_invalid_context(missing_design_spec, "missing-design-spec")
+            rejected = subprocess.run(
+                [SVG_RUNTIME, str(SERVICE), "validate-request", str(invalid_request)],
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            self.assertNotEqual(rejected.returncode, 0)
+            self.assertIn("template.design_spec must be an object", rejected.stdout)
+
+            stale_design_spec = json.loads(json.dumps(original_context))
+            stale_design_spec["template"]["design_spec"]["sha256"] = "0" * 64
+            write_invalid_context(stale_design_spec, "stale-design-spec")
+            rejected = subprocess.run(
+                [SVG_RUNTIME, str(SERVICE), "validate-request", str(invalid_request)],
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            self.assertNotEqual(rejected.returncode, 0)
+            self.assertIn("template design spec SHA-256 mismatch", rejected.stdout)
+
+            missing_composition = dict(original_context)
+            del missing_composition["composition_space"]
+            write_invalid_context(missing_composition, "missing-composition")
+            rejected = subprocess.run(
+                [SVG_RUNTIME, str(SERVICE), "validate-request", str(invalid_request)],
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            self.assertNotEqual(rejected.returncode, 0)
+            self.assertIn("unrestricted full-slide composition", rejected.stdout)
 
             complete_candidate(project, "A", "Option A")
             self.assertEqual(next_payload(project)["action"], "PRESENT_SVG_OPTION")
@@ -333,7 +530,9 @@ class WorkflowTests(unittest.TestCase):
             request = json.loads((project / "working" / "packets" / "S01" / "R1.json").read_text())
             self.assertEqual(request["base"]["version"], "A")
             self.assertIn("Increase the contrast", request["feedback"])
-            self.assertEqual(request["design_quality"]["profile"], "ey-executive-editorial-v2")
+            self.assertFalse(feedback.exists())
+            context = json.loads(Path(request["authoring_context"]["path"]).read_text())
+            self.assertEqual(context["design_quality"]["profile"], "ey-executive-editorial-v2")
             self.assertEqual(request["variant_direction"]["role"], "revision")
             self.assertEqual(request["variant_direction"]["base_version"], "A")
 
@@ -342,7 +541,7 @@ class WorkflowTests(unittest.TestCase):
             self.assertEqual(run(project, "present-svg", "--page", "S01", "--versions", "A,R1").returncode, 0)
             confirmed = run(project, "confirm-svg", "--page", "S01", "--version", "R1")
             self.assertEqual(confirmed.returncode, 0, confirmed.stdout + confirmed.stderr)
-            self.assertEqual(next_payload(project)["action"], "SVG_STAGE_COMPLETE")
+            self.assertEqual(next_payload(project)["action"], "PREPARE_PPTX_EXPORT")
             self.assertEqual((project / "svg_output" / "S01.svg").read_text(), svg("Revised option"))
 
             reopened = run(project, "reopen-svg", "--page", "S01")
@@ -372,6 +571,43 @@ class WorkflowTests(unittest.TestCase):
                 ]
                 self.assertTrue(hrefs, name)
                 self.assertTrue(all(href.startswith("data:image/") for href in hrefs), name)
+
+    def test_content_template_and_service_allow_full_slide_composition(self) -> None:
+        template_root = ET.parse(
+            TEMPLATE_ROOT / "templates" / "content.svg"
+        ).getroot()
+        content_region = next(
+            element for element in template_root
+            if element.attrib.get("id") == "content-region"
+        )
+        self.assertEqual(content_region.attrib["data-pptx-bounds"], "0 0 1280 720")
+        structure_errors = artifact_errors(
+            TEMPLATE_ROOT / "templates" / "content.svg"
+        )
+        self.assertEqual(structure_errors, [])
+        self.assertFalse(any("Quick Generate" in error for error in structure_errors))
+
+        with tempfile.TemporaryDirectory() as tmp:
+            project = Path(tmp)
+            lock_content(project)
+            prepare_candidates(project)
+            artifact = project / "svg_working" / "S01" / "A.svg"
+            artifact.write_text(
+                """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720">
+  <rect width="1280" height="720" fill="#000000"/>
+  <text x="48" y="690" fill="#FFFFFF" font-size="18">Content below the former y=650 cap</text>
+</svg>
+""",
+                encoding="utf-8",
+            )
+            request = project / "working" / "packets" / "S01" / "A.json"
+            completed = subprocess.run(
+                [SVG_RUNTIME, str(SERVICE), "complete", str(request)],
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            self.assertEqual(completed.returncode, 0, completed.stdout + completed.stderr)
 
     def test_emphasis_accepts_same_block_visible_text_and_rejects_build_only_text(self) -> None:
         valid = """#### S01-B1｜调整或升级
@@ -444,6 +680,107 @@ class WorkflowTests(unittest.TestCase):
             payload = next_payload(project)
             self.assertEqual(payload["action"], "REPAIR_STALE_SVG_CONFIRMATION")
 
+    def test_confirmed_svg_roster_prepares_hash_bound_pptx_request(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project = Path(tmp)
+            lock_content(project)
+            prepare_candidates(project)
+            complete_candidate(project, "A", "Export source")
+            self.assertEqual(run(project, "present-svg", "--page", "S01", "--versions", "A").returncode, 0)
+            self.assertEqual(run(project, "confirm-svg", "--page", "S01", "--version", "A").returncode, 0)
+
+            prepared = run(project, "prepare-pptx-export")
+
+            self.assertEqual(prepared.returncode, 0, prepared.stdout + prepared.stderr)
+            payload = next_payload(project)
+            self.assertEqual(payload["action"], "RUN_EMBEDDED_PPT_MASTER_PPTX")
+            self.assertEqual(payload["conversion_contract"]["text_flow"], "preserve")
+            request = json.loads((project / "working" / "packets" / "pptx" / "export.json").read_text())
+            self.assertEqual(request["schema"], "ppt-master.svg-deck-pptx-request.v1")
+            self.assertEqual(request["slides"][0]["slide_id"], "S01")
+            self.assertEqual(request["conversion"]["text_flow"], "preserve")
+            self.assertTrue(request["quality_policy"]["require_text_frame_parity"])
+            self.assertEqual(Path(request["output_path"]), (project / "sample.pptx").resolve())
+
+            renamed = run(project, "set-output-filename", "--filename", "renamed.pptx")
+            self.assertEqual(renamed.returncode, 0, renamed.stdout + renamed.stderr)
+            self.assertEqual(next_payload(project)["action"], "PREPARE_PPTX_EXPORT")
+
+    def test_embedded_ppt_master_exports_editable_text_with_frame_parity(self) -> None:
+        runtime = os.environ.get("EY_DECK_PPTX_PYTHON")
+        if not runtime:
+            self.skipTest("PPTX runtime is not available; set EY_DECK_PPTX_PYTHON")
+        available = subprocess.run(
+            [runtime, "-c", "import pptx"],
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        if available.returncode:
+            self.skipTest("PPTX runtime is not available; set EY_DECK_PPTX_PYTHON")
+        with tempfile.TemporaryDirectory() as tmp:
+            project = Path(tmp)
+            lock_content(project)
+            prepare_candidates(project)
+            artifact = project / "svg_working" / "S01" / "A.svg"
+            artifact.write_text(multiline_svg(), encoding="utf-8")
+            request = project / "working" / "packets" / "S01" / "A.json"
+            service = subprocess.run(
+                [SVG_RUNTIME, str(SERVICE), "complete", str(request)],
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            self.assertEqual(service.returncode, 0, service.stdout + service.stderr)
+            recorded = run(project, "record-svg", "--page", "S01", "--version", "A")
+            self.assertEqual(recorded.returncode, 0, recorded.stdout + recorded.stderr)
+            self.assertEqual(run(project, "present-svg", "--page", "S01", "--versions", "A").returncode, 0)
+            self.assertEqual(run(project, "confirm-svg", "--page", "S01", "--version", "A").returncode, 0)
+            self.assertEqual(run(project, "prepare-pptx-export").returncode, 0)
+
+            exported = run(project, "export-pptx")
+
+            self.assertEqual(exported.returncode, 0, exported.stdout + exported.stderr)
+            payload = next_payload(project)
+            self.assertEqual(payload["action"], "PPTX_STAGE_COMPLETE")
+            self.assertTrue((project / "sample.pptx").is_file())
+            audit = json.loads((project / "working" / "receipts" / "pptx" / "text-frames.json").read_text())
+            self.assertEqual(audit["status"], "passed")
+            self.assertEqual(audit["text_flow"], "preserve")
+            self.assertEqual(audit["slides"][0]["svg_text_frames"], 1)
+            self.assertEqual(audit["slides"][0]["pptx_text_boxes"], 1)
+            trace = json.loads(
+                (project / "validation" / "sample.trace.json").read_text(encoding="utf-8")
+            )
+            bridge = trace["slides"][0]["source_bridge"]
+            self.assertEqual(bridge["transform"], "strip-structure-metadata/v1")
+            self.assertEqual(bridge["confirmed_svg"], str((project / "svg_output" / "S01.svg").resolve()))
+            self.assertEqual(bridge["confirmed_sha256"], request_sha256(project / "svg_output" / "S01.svg"))
+            self.assertGreaterEqual(bridge["removed_structure_attributes"], 0)
+            audited = run(project, "audit")
+            self.assertEqual(audited.returncode, 0, audited.stdout + audited.stderr)
+            self.assertIn("editable PPTX workflow audit passed", audited.stdout)
+
+    def test_page_service_blocks_one_paragraph_split_into_sibling_text_boxes(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project = Path(tmp)
+            lock_content(project)
+            prepare_candidates(project)
+            artifact = project / "svg_working" / "S01" / "A.svg"
+            artifact.write_text(fragmented_paragraph_svg(), encoding="utf-8")
+            request = project / "working" / "packets" / "S01" / "A.json"
+
+            completed = subprocess.run(
+                [SVG_RUNTIME, str(SERVICE), "complete", str(request)],
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+
+            self.assertNotEqual(completed.returncode, 0)
+            self.assertIn("PPTX text-frame integrity", completed.stdout)
+            self.assertIn("sibling <text> elements", completed.stdout)
+
     def test_service_rejects_remote_svg_dependencies(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             project = Path(tmp)
@@ -455,7 +792,7 @@ class WorkflowTests(unittest.TestCase):
                 encoding="utf-8",
             )
             result = subprocess.run(
-                ["python3", str(SERVICE), "complete", str(project / "working" / "packets" / "S01" / "A.json")],
+                [SVG_RUNTIME, str(SERVICE), "complete", str(project / "working" / "packets" / "S01" / "A.json")],
                 text=True,
                 capture_output=True,
                 check=False,
@@ -484,10 +821,29 @@ class WorkflowTests(unittest.TestCase):
             self.assertEqual(next_payload(project)["slide_id"], "S02")
             payload = prepare_candidates(project, "S02")
             self.assertEqual([item["version"] for item in payload["requests"]], ["A", "B"])
-            expected_roles = {"A": "clarity-led-editorial", "B": "concept-led-spatial"}
+            requests = {}
+            context_descriptors = set()
+            prototype_paths = set()
             for item in payload["requests"]:
                 request = json.loads(Path(item["request_path"]).read_text(encoding="utf-8"))
-                self.assertEqual(request["variant_direction"]["role"], expected_roles[item["version"]])
+                requests[item["version"]] = request
+                descriptor = request["authoring_context"]
+                context_descriptors.add((descriptor["path"], descriptor["sha256"]))
+                context = json.loads(Path(descriptor["path"]).read_text(encoding="utf-8"))
+                prototype_paths.add(context["template"]["prototype"])
+            self.assertEqual(len(context_descriptors), 1)
+            self.assertEqual(len(prototype_paths), 1)
+            a_direction = requests["A"]["variant_direction"]
+            b_direction = requests["B"]["variant_direction"]
+            self.assertEqual(a_direction["role"], "claim-led-editorial")
+            self.assertEqual(b_direction["role"], "logic-led-visual-model")
+            self.assertNotEqual(a_direction["role"], b_direction["role"])
+            self.assertEqual(
+                a_direction["alternative_contract"]["pair_id"],
+                b_direction["alternative_contract"]["pair_id"],
+            )
+            self.assertEqual(a_direction["alternative_contract"]["counterpart_role"], b_direction["role"])
+            self.assertEqual(b_direction["alternative_contract"]["counterpart_role"], a_direction["role"])
             complete_candidate(project, "A", "Content A", page_id="S02")
             complete_candidate(project, "B", "Content B", page_id="S02")
             self.assertEqual(next_payload(project)["action"], "PRESENT_SVG_OPTIONS")
@@ -502,12 +858,70 @@ class WorkflowTests(unittest.TestCase):
         self.assertEqual(initial_versions_for_page_type("Standard content"), ("A", "B"))
         self.assertEqual(template_name("Ending"), "ending.svg")
 
+    def test_variant_directions_adapt_to_page_content_and_approved_intent(self) -> None:
+        page = type("Page", (), {
+            "slide_id": "S03",
+            "fields": {
+                "Page type": "Standard content",
+                "Narrative role": "Compare the options",
+            },
+        })()
+        context = {
+            "Audience outcome": "Select the preferred option",
+            "Storyline thesis": "Option B has the stronger value case",
+        }
+        chart_content = """### On-slide content
+- Title: Performance comparison
+- Chart purpose（Build-only）: Show the ranking
+| Category | Score |
+|---|---:|
+| A | 10 |
+"""
+        comparison_content = """### On-slide content
+- Title: Before and after
+#### S03-B1｜Before
+#### S03-B2｜After
+"""
+        intent_only_comparison = """### On-slide content
+- Title: Available paths
+#### S03-B1｜Path one
+#### S03-B2｜Path two
+"""
+
+        chart = independent_variant_directions(page, chart_content, context)
+        comparison = independent_variant_directions(page, comparison_content, context)
+        intent_driven = independent_variant_directions(
+            page,
+            intent_only_comparison,
+            {
+                "Audience outcome": "Compare the available options and select one",
+                "Storyline thesis": "One path offers the stronger fit",
+            },
+        )
+
+        self.assertEqual(chart["A"]["role"], "evidence-led-analytical")
+        self.assertEqual(chart["B"]["role"], "conclusion-led-data-story")
+        self.assertEqual(comparison["A"]["role"], "criteria-led-comparison")
+        self.assertEqual(comparison["B"]["role"], "tension-led-contrast")
+        self.assertEqual(intent_driven["A"]["role"], "criteria-led-comparison")
+        self.assertEqual(intent_driven["B"]["role"], "tension-led-contrast")
+        self.assertNotEqual(chart["A"]["role"], comparison["A"]["role"])
+        self.assertEqual(
+            chart["A"]["selection_basis"]["audience_outcome"],
+            "Select the preferred option",
+        )
+
     def test_full_design_service_contract_is_registered(self) -> None:
         contract = (ROOT / "ppt-master" / "workflows" / "page-svg-service.md").read_text(encoding="utf-8")
         for capability in ("Strategist", "chart", "table", "imagery", "semantic SVG", "Review and repair"):
             self.assertIn(capability, contract)
         internal = (ROOT / "ppt-master" / "INTERNAL.md").read_text(encoding="utf-8")
-        self.assertIn("ppt-master.page-svg-request.v2", internal)
+        self.assertIn("ppt-master.page-svg-request.v3", internal)
+        self.assertIn("ppt-master.svg-deck-pptx-request.v1", internal)
+        export_contract = (ROOT / "ppt-master" / "workflows" / "svg-deck-pptx-service.md").read_text(encoding="utf-8")
+        self.assertIn("preserve", export_contract)
+        self.assertIn("text box", export_contract)
+        self.assertIn("postflight", export_contract)
         self.assertFalse((ROOT / "ppt-master" / "SKILL.md").exists())
         self.assertFalse((ROOT / "ppt-master" / "agents" / "openai.yaml").exists())
 

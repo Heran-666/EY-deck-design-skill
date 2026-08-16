@@ -46,8 +46,11 @@ class ProjectPaths:
     def packet(self, slide_id: str, version: str) -> Path:
         return self.working / "packets" / slide_id / f"{version}.json"
 
-    def template_prototype(self, slide_id: str, version: str) -> Path:
-        return self.working / "template-prototypes" / slide_id / f"{version}.svg"
+    def page_context(self, slide_id: str) -> Path:
+        return self.working / "packets" / slide_id / "context.json"
+
+    def template_prototype(self, slide_id: str) -> Path:
+        return self.working / "template-prototypes" / slide_id / "prototype.svg"
 
     def candidate_receipt(self, slide_id: str, version: str) -> Path:
         return self.working / "receipts" / "svg" / slide_id / f"{version}.json"
@@ -60,3 +63,28 @@ class ProjectPaths:
 
     def revision_request(self, slide_id: str) -> Path:
         return self.working / "revision-requests" / f"{slide_id}.md"
+
+    @property
+    def pptx_request(self) -> Path:
+        return self.working / "packets" / "pptx" / "export.json"
+
+    @property
+    def pptx_receipt(self) -> Path:
+        return self.working / "receipts" / "pptx" / "export.json"
+
+    @property
+    def pptx_text_audit(self) -> Path:
+        return self.working / "receipts" / "pptx" / "text-frames.json"
+
+    @property
+    def svg_quality_report(self) -> Path:
+        return self.root / "validation" / "svg_quality_report.json"
+
+    def pptx_output(self, filename: str) -> Path:
+        return self.root / filename
+
+    def pptx_postflight_report(self, filename: str) -> Path:
+        return self.root / "validation" / f"{Path(filename).stem}.report.json"
+
+    def pptx_conversion_trace(self, filename: str) -> Path:
+        return self.root / "validation" / f"{Path(filename).stem}.trace.json"

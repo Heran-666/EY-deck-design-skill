@@ -125,6 +125,10 @@ _PIL_IMAGE_FORMATS = {
 }
 
 
+class ImageValidationDependencyError(RuntimeError):
+    """Raised when raster bytes cannot be decoded in the active runtime."""
+
+
 def _normalize_project_image_format(raw: str) -> str | None:
     return _PROJECT_IMAGE_FORMATS.get(raw.strip().lower().lstrip('.'))
 
@@ -279,8 +283,10 @@ def _valid_project_image_payload(img_format: str, img_data: bytes) -> bool:
         return False
     try:
         from PIL import Image, UnidentifiedImageError  # type: ignore
-    except ImportError:
-        return False
+    except ImportError as exc:
+        raise ImageValidationDependencyError(
+            "Pillow is unavailable; raster image bytes were not classified as invalid"
+        ) from exc
     try:
         with Image.open(io.BytesIO(img_data)) as image:
             actual = (image.format or '').upper()

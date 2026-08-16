@@ -1,0 +1,338 @@
+{
+  "surface": "report",
+  "manifest": {
+    "version": 1,
+    "surface": "report",
+    "title": "六页 AI Summit Deck 流程耗时与优化建议",
+    "description": "基于 WORKFLOW_BUGS.md 的流程耗时拆解与不改变 PPT Master 设计的优化建议。",
+    "generatedAt": "2026-08-16T11:36:02Z",
+    "cards": [
+      {
+        "id": "total_time_card",
+        "description": "文档所列机器执行时间的中点合计；不含人工审批等待。",
+        "dataset": "headline_metrics",
+        "sourceId": "headline_summary_sql",
+        "metrics": [
+          { "label": "总执行时间", "field": "total_seconds", "format": "number", "unit": "秒" },
+          { "label": "估计范围下限", "field": "total_low", "format": "number", "unit": "秒" },
+          { "label": "估计范围上限", "field": "total_high", "format": "number", "unit": "秒" }
+        ]
+      },
+      {
+        "id": "qa_share_card",
+        "description": "整页渲染、视觉 QA 与修复占全部机器执行时间的比例。",
+        "dataset": "headline_metrics",
+        "sourceId": "headline_summary_sql",
+        "metrics": [
+          { "label": "渲染/视觉 QA 占比", "field": "qa_share", "format": "percent" },
+          { "label": "耗时", "field": "qa_seconds", "format": "number", "unit": "秒" }
+        ]
+      },
+      {
+        "id": "research_share_card",
+        "description": "外部研究、证据刷新与来源访问占全部机器执行时间的比例。",
+        "dataset": "headline_metrics",
+        "sourceId": "headline_summary_sql",
+        "metrics": [
+          { "label": "资料检索占比", "field": "research_share", "format": "percent" },
+          { "label": "耗时", "field": "research_seconds", "format": "number", "unit": "秒" }
+        ]
+      }
+    ],
+    "charts": [
+      {
+        "id": "activity_time_chart",
+        "title": "机器执行时间构成",
+        "subtitle": "六页 deck；秒；按中点估计降序",
+        "type": "horizontalBar",
+        "intent": "comparison",
+        "question": "哪些活动类型占用了最多机器执行时间？",
+        "rationale": "活动名称较长且只有一个核心度量，横向条形图最利于比较大小并直接阅读标签。",
+        "dataset": "activity_time",
+        "sourceId": "activity_summary_sql",
+        "valueFormat": "number",
+        "palette": { "kind": "single", "root": "gold" },
+        "encodings": {
+          "x": { "field": "activity", "type": "nominal", "label": "活动类型" },
+          "y": { "field": "seconds_mid", "type": "quantitative", "label": "秒" },
+          "tooltip": [
+            { "field": "share", "type": "quantitative", "label": "占比", "format": "percent" },
+            { "field": "row_count", "type": "quantitative", "label": "明细行数", "format": "number" },
+            { "field": "seconds_low", "type": "quantitative", "label": "范围下限", "format": "number" },
+            { "field": "seconds_high", "type": "quantitative", "label": "范围上限", "format": "number" }
+          ]
+        },
+        "settings": { "orientation": "horizontal", "showLegend": false, "showValues": true }
+      }
+    ],
+    "tables": [
+      {
+        "id": "phase_time_table",
+        "title": "各页面与公共阶段耗时",
+        "subtitle": "按中点耗时降序；人工审批等待不在统计内",
+        "dataset": "phase_time",
+        "sourceId": "phase_summary_sql",
+        "defaultSort": { "field": "seconds_mid", "direction": "desc" },
+        "columns": [
+          { "field": "phase", "label": "页面/阶段", "type": "text" },
+          { "field": "seconds_mid", "label": "中点耗时（秒）", "format": "number" },
+          { "field": "range", "label": "估计范围（秒）", "type": "text" },
+          { "field": "main_driver", "label": "主要驱动", "type": "text" }
+        ]
+      },
+      {
+        "id": "optimization_table",
+        "title": "优化项与情景节省",
+        "subtitle": "节省为方向性估算；所有方案均不新增用户审批节点",
+        "dataset": "optimization_model",
+        "sourceId": "optimization_model_sql",
+        "defaultSort": { "field": "save_max_s", "direction": "desc" },
+        "columns": [
+          { "field": "optimization", "label": "优化项", "type": "text" },
+          { "field": "save_min_s", "label": "预计节省下限（秒）", "format": "number" },
+          { "field": "save_max_s", "label": "预计节省上限（秒）", "format": "number" },
+          { "field": "workflow_complexity", "label": "流程复杂度", "type": "text" },
+          { "field": "master_impact", "label": "PPT Master 影响", "type": "text" },
+          { "field": "priority", "label": "优先级", "type": "text" }
+        ]
+      }
+    ],
+    "sources": [
+      {
+        "id": "workflow_timing_log",
+        "label": "EY Deck Design Workflow Bug Log",
+        "path": "WORKFLOW_BUGS.md"
+      },
+      {
+        "id": "analysis_model",
+        "label": "Workflow timing analysis source notes",
+        "path": "reports/workflow-timing-analysis/source_notes.md"
+      },
+      {
+        "id": "headline_summary_sql",
+        "label": "Headline timing summary SQL",
+        "path": "reports/workflow-timing-analysis/artifact.json"
+      },
+      {
+        "id": "activity_summary_sql",
+        "label": "Activity timing summary SQL",
+        "path": "reports/workflow-timing-analysis/artifact.json"
+      },
+      {
+        "id": "phase_summary_sql",
+        "label": "Phase timing summary SQL",
+        "path": "reports/workflow-timing-analysis/artifact.json"
+      },
+      {
+        "id": "optimization_model_sql",
+        "label": "Optimization scenario SQL",
+        "path": "reports/workflow-timing-analysis/artifact.json"
+      }
+    ],
+    "blocks": [
+      {
+        "id": "title",
+        "type": "markdown",
+        "body": "# 六页 AI Summit Deck 流程耗时与优化建议"
+      },
+      {
+        "id": "executive_summary",
+        "type": "markdown",
+        "body": "## Executive Summary\n\n- **总机器执行时间约 123 秒。** 其中渲染/视觉 QA 占 55.0%，资料检索与来源访问占 25.3%；两者合计 80.3%，其它控制器、内容物化、SVG authoring 和发布动作都不是主要矛盾。\n- **第一优先级应是稳定现有渲染路径并并发处理现有检索动作。** 不新增状态、工具或审批节点，预计可减少 28–41 秒，使总时间降至约 82–95 秒，即快 23%–33%。\n- **若接受“单一主候选、必要时再出 B 版”，可进一步简化流程。** 情景总节省可扩大到 36–55 秒，总时间约 68–87 秒，即快 29%–45%；但这会减少默认选择面，因此应作为可选策略。"
+      },
+      {
+        "id": "headline_metrics_block",
+        "type": "metric-strip",
+        "cardIds": ["total_time_card", "qa_share_card", "research_share_card"]
+      },
+      {
+        "id": "concentration_finding",
+        "type": "markdown",
+        "sourceId": "workflow_timing_log",
+        "body": "## 80% 时间集中在两个环节\n\n**渲染/视觉 QA 与修复耗时 67.6 秒，远高于任何其它活动。** 主要长尾来自重复 Chromium render、缓存隔离、标题/页脚 paint 异常诊断，以及嵌套或混合字号 `tspan` 的回滚。资料检索与来源访问为 31.1 秒，长尾主要来自超时、自动访问受限和结果序列化重试。\n\n这意味着优化应先处理既有步骤内部的稳定性和并发，而不是压缩内容审批、SVG authoring 或最终发布——后几类动作合计占比很小。"
+      },
+      {
+        "id": "activity_chart_block",
+        "type": "chart",
+        "chartId": "activity_time_chart"
+      },
+      {
+        "id": "page_difference_finding",
+        "type": "markdown",
+        "sourceId": "workflow_timing_log",
+        "body": "## S02、S04、S05 的长尾来自不同原因\n\n**S02 是最慢页面，约 29.7 秒。** 其中 18 秒来自双候选的多轮整页渲染、缓存隔离和标题 paint-order 修复，另有 4.6 秒用于来源链接验证。S04 约 24.4 秒，既包含 11.5 秒的基础 QA，也包含两轮用户反馈驱动的正常改版；这些改版时间不应被当作 bug 浪费。S05 约 23.5 秒，13.6 秒的资料检索重试比 7.3 秒的 QA 更突出。\n\n因此不应给所有页面套同一个缩时目标：S02/S03/S04/S06 先修预览稳定性，S05 先修来源检索策略。"
+      },
+      {
+        "id": "phase_table_block",
+        "type": "table",
+        "tableId": "phase_time_table"
+      },
+      {
+        "id": "recommendations",
+        "type": "markdown",
+        "sourceId": "analysis_model",
+        "body": "## 先修稳定性与并发，再决定是否减少候选\n\n1. **把稳定预览做成现有 Page SVG service 的默认行为。** 从第一次 render 就使用唯一临时路径；默认采用单层、同字号 text carrier，避免已知会触发 Chromium 丢组的嵌套混合 `tspan`；在现有静态检查全部通过后只做一次首轮整页 render，最终仍保留一次全页确认。预计节省 18–25 秒。\n2. **在同一研究步骤里批量并发独立来源请求。** 官方来源优先级不变；每个直接页面只做一次有界重试，失败后保留权威搜索记录和 access caveat，不再串行等待同一路径。预计节省 8–12 秒。\n3. **按 Master/Prototype hash 复用参考读取和模板检查结果。** Master、Layout 或 prototype hash 一变立即失效；命中时跳过重复读取。预计节省 1–2 秒。\n4. **合并相邻的控制器读取与验证。** 在不增加状态、不跳过验证的前提下，让 request generation、schema validation 和 service setup 共享同一次上下文读取。预计节省 1–2 秒。\n5. **可选：默认只产出一个主候选。** 只有内容结构存在明显分歧、页面风险较高或用户明确要求时才生成 B 版。扣除与渲染稳定性重叠后，预计再省 8–14 秒，并减少候选记录与比较回执。"
+      },
+      {
+        "id": "optimization_table_block",
+        "type": "table",
+        "tableId": "optimization_table"
+      },
+      {
+        "id": "master_boundary",
+        "type": "markdown",
+        "body": "## PPT Master 设计保持不变的边界\n\n- 不删除、不改写 confirmed SVG 中的 Master、Layout、layer 和 placeholder metadata。\n- 若预览或导出需要 flat projection，只在临时副本上做；原 SVG 的字节、hash 和绑定关系保持不变。\n- 所有缓存都以 Master/Prototype hash 为失效条件，避免复用过期布局信息。\n- 保留一次最终全页 render、PPTX postflight，以及 SVG text carrier 与可编辑 PPTX text box 的逐页 parity audit。\n- 不把 `y=650` safe-area 调整当作时间优化；它属于独立的版式/模板议题。"
+      },
+      {
+        "id": "validation_plan",
+        "type": "markdown",
+        "body": "## 下一轮先验证三个简单指标\n\n在下一套 6 页 deck 上只记录三个指标即可判断改动是否有效：每页 full-slide render 次数、因 renderer-only omission 导致的 rerender 次数、每个外部来源的请求与重试次数。若核心方案生效，目标应是：稳定页面每个候选最多一次首轮 render 加一次最终确认；renderer-only omission 为 0；独立来源请求并发完成且单 URL 最多一次重试。"
+      },
+      {
+        "id": "caveats",
+        "type": "markdown",
+        "sourceId": "analysis_model",
+        "body": "## 限制与假设\n\n本分析基于一套六页 deck 的近似 wall-clock 记录，样本量为 1；`<0.1s` 使用 0–0.1 秒区间，节省幅度是根据已记录的重复 render、重试和相邻步骤推算的情景值，并非改造后的实测 benchmark。人工审阅、批准等待时间被源文档排除，因此结论只适用于机器执行效率。总体判断为 **Share with caveats**：耗时集中度和优化顺序可信，具体节省百分比需要下一套 deck 验证。"
+      }
+    ]
+  },
+  "snapshot": {
+    "version": 1,
+    "generatedAt": "2026-08-16T11:36:02Z",
+    "status": "ready",
+    "datasets": {
+      "headline_metrics": [
+        {
+          "total_seconds": 122.85,
+          "total_low": 122.6,
+          "total_high": 123.1,
+          "qa_seconds": 67.6,
+          "qa_share": 0.5503,
+          "research_seconds": 31.1,
+          "research_share": 0.2532
+        }
+      ],
+      "activity_time": [
+        { "activity": "渲染、视觉 QA 与修复", "seconds_mid": 67.6, "seconds_low": 67.6, "seconds_high": 67.6, "share": 0.5503, "row_count": 10, "rank": 1 },
+        { "activity": "资料检索与来源访问", "seconds_mid": 31.1, "seconds_low": 31.1, "seconds_high": 31.1, "share": 0.2532, "row_count": 6, "rank": 2 },
+        { "activity": "服务完成与候选记录", "seconds_mid": 9.9, "seconds_low": 9.9, "seconds_high": 9.9, "share": 0.0806, "row_count": 10, "rank": 3 },
+        { "activity": "SVG service setup 与 authoring", "seconds_mid": 5.3, "seconds_low": 5.3, "seconds_high": 5.3, "share": 0.0431, "row_count": 10, "rank": 4 },
+        { "activity": "其它控制、内容与发布动作", "seconds_mid": 5.75, "seconds_low": 5.5, "seconds_high": 6.0, "share": 0.0468, "row_count": 26, "rank": 5 },
+        { "activity": "PPTX 导出", "seconds_mid": 3.2, "seconds_low": 3.2, "seconds_high": 3.2, "share": 0.026, "row_count": 4, "rank": 6 }
+      ],
+      "phase_time": [
+        { "phase": "公共初始化", "seconds_mid": 8.0, "seconds_low": 7.9, "seconds_high": 8.1, "range": "7.9–8.1", "main_driver": "全 deck 外部研究 7.3 秒" },
+        { "phase": "S01", "seconds_mid": 4.6, "seconds_low": 4.5, "seconds_high": 4.7, "range": "4.5–4.7", "main_driver": "Master service setup 与首次 QA" },
+        { "phase": "S02", "seconds_mid": 29.65, "seconds_low": 29.6, "seconds_high": 29.7, "range": "29.6–29.7", "main_driver": "18 秒多轮 render/repair + 4.6 秒来源验证" },
+        { "phase": "S03", "seconds_mid": 19.8, "seconds_low": 19.8, "seconds_high": 19.8, "range": "19.8", "main_driver": "11 秒 render/repair + 2.8 秒改版 QA" },
+        { "phase": "S04", "seconds_mid": 24.4, "seconds_low": 24.4, "seconds_high": 24.4, "range": "24.4", "main_driver": "11.5 秒 render/repair + 两轮正常改版" },
+        { "phase": "S05", "seconds_mid": 23.5, "seconds_low": 23.5, "seconds_high": 23.5, "range": "23.5", "main_driver": "13.6 秒资料检索 + 7.3 秒 QA" },
+        { "phase": "S06", "seconds_mid": 9.7, "seconds_low": 9.7, "seconds_high": 9.7, "range": "9.7", "main_driver": "7.3 秒 render/repair" },
+        { "phase": "PPTX 导出", "seconds_mid": 3.2, "seconds_low": 3.2, "seconds_high": 3.2, "range": "3.2", "main_driver": "首次安全失败、诊断与修复导出" }
+      ],
+      "optimization_model": [
+        { "optimization": "稳定预览默认值与既有检查顺序", "save_min_s": 18, "save_max_s": 25, "workflow_complexity": "不增加：替换默认值，不新增节点", "master_impact": "无；confirmed SVG metadata 不变", "priority": "P0" },
+        { "optimization": "同一研究步骤内批量并发与有界重试", "save_min_s": 8, "save_max_s": 12, "workflow_complexity": "不增加：仍是一个研究步骤", "master_impact": "无", "priority": "P0" },
+        { "optimization": "单一主候选，必要时再生成 B 版", "save_min_s": 8, "save_max_s": 14, "workflow_complexity": "降低：减少默认分支与比较回执", "master_impact": "无；仅减少候选数量", "priority": "P1 可选" },
+        { "optimization": "按 Master/Prototype hash 复用检查结果", "save_min_s": 1, "save_max_s": 2, "workflow_complexity": "不增加：后台复用，hash 变化即失效", "master_impact": "无；hash 保护避免过期复用", "priority": "P1" },
+        { "optimization": "合并相邻控制器读取与 schema validation", "save_min_s": 1, "save_max_s": 2, "workflow_complexity": "不增加：状态与验证数量不变", "master_impact": "无", "priority": "P2" }
+      ]
+    }
+  },
+  "sources": [
+    {
+      "id": "workflow_timing_log",
+      "label": "EY Deck Design Workflow Bug Log",
+      "path": "WORKFLOW_BUGS.md",
+      "query": {
+        "engine": "local-file",
+        "language": "markdown",
+        "description": "解析用户提供的 workflow timing 表，并按页面/阶段与活动类型汇总。",
+        "executed_at": "2026-08-16T11:36:02Z",
+        "filters": ["仅使用 Workflow timings 表", "排除人工审阅与批准等待时间", "保留用户反馈导致的正常改版时间"],
+        "metric_definitions": [
+          "总执行时间：所有 timing 表行的近似 wall-clock 执行时间之和。",
+          "<0.1s：按 0–0.1 秒区间、0.05 秒中点处理。",
+          "活动占比：该活动中点耗时除以 122.85 秒总中点耗时。"
+        ]
+      }
+    },
+    {
+      "id": "analysis_model",
+      "label": "Workflow timing analysis source notes",
+      "path": "reports/workflow-timing-analysis/source_notes.md",
+      "query": {
+        "engine": "local-analysis",
+        "language": "markdown",
+        "description": "记录汇总映射、算术核对、节省情景、PPT Master 保护边界与报告 QA。",
+        "executed_at": "2026-08-16T11:36:02Z",
+        "filters": ["不把用户反馈驱动的正常改版视作浪费", "不新增用户审批节点", "不修改 confirmed SVG 的 Master/Layout/placeholder metadata"],
+        "metric_definitions": [
+          "核心情景：稳定预览 + 并发检索 + hash 复用 + 合并相邻读取。",
+          "精简候选情景：核心情景基础上，默认单一主候选，必要时再生成 B 版。",
+          "所有节省数字均为方向性情景估算，不是改造后实测。"
+        ]
+      }
+    },
+    {
+      "id": "headline_summary_sql",
+      "label": "Headline timing summary SQL",
+      "path": "reports/workflow-timing-analysis/artifact.json",
+      "query": {
+        "engine": "sqlite",
+        "language": "sql",
+        "sql": "SELECT 122.85 AS total_seconds, 122.6 AS total_low, 123.1 AS total_high, 67.6 AS qa_seconds, 0.5503 AS qa_share, 31.1 AS research_seconds, 0.2532 AS research_share",
+        "description": "Returns the reconciled headline workflow timing metrics derived from WORKFLOW_BUGS.md.",
+        "executed_at": "2026-08-16T11:36:02Z",
+        "tables_used": ["WORKFLOW_BUGS.md::Workflow timings"],
+        "filters": ["Human review and approval waiting time excluded"],
+        "metric_definitions": ["total_seconds is the midpoint sum of all timing rows", "qa_share is 67.6 / 122.85", "research_share is 31.1 / 122.85"]
+      }
+    },
+    {
+      "id": "activity_summary_sql",
+      "label": "Activity timing summary SQL",
+      "path": "reports/workflow-timing-analysis/artifact.json",
+      "query": {
+        "engine": "sqlite",
+        "language": "sql",
+        "sql": "WITH activity(activity, seconds_mid, seconds_low, seconds_high, share, row_count, rank) AS (VALUES ('渲染、视觉 QA 与修复',67.6,67.6,67.6,0.5503,10,1),('资料检索与来源访问',31.1,31.1,31.1,0.2532,6,2),('服务完成与候选记录',9.9,9.9,9.9,0.0806,10,3),('SVG service setup 与 authoring',5.3,5.3,5.3,0.0431,10,4),('其它控制、内容与发布动作',5.75,5.5,6.0,0.0468,26,5),('PPTX 导出',3.2,3.2,3.2,0.0260,4,6)) SELECT * FROM activity ORDER BY rank",
+        "description": "Returns activity-family midpoint durations, ranges, shares and contributing row counts.",
+        "executed_at": "2026-08-16T11:36:02Z",
+        "tables_used": ["WORKFLOW_BUGS.md::Workflow timings"],
+        "filters": ["Human review and approval waiting time excluded", "User-requested revisions retained as normal work"],
+        "metric_definitions": ["share is activity seconds_mid divided by 122.85 seconds", "row_count is the number of timing-table rows assigned to the activity family"]
+      }
+    },
+    {
+      "id": "phase_summary_sql",
+      "label": "Phase timing summary SQL",
+      "path": "reports/workflow-timing-analysis/artifact.json",
+      "query": {
+        "engine": "sqlite",
+        "language": "sql",
+        "sql": "WITH phase(phase, seconds_mid, seconds_low, seconds_high, range, main_driver) AS (VALUES ('公共初始化',8.0,7.9,8.1,'7.9–8.1','全 deck 外部研究 7.3 秒'),('S01',4.6,4.5,4.7,'4.5–4.7','Master service setup 与首次 QA'),('S02',29.65,29.6,29.7,'29.6–29.7','18 秒多轮 render/repair + 4.6 秒来源验证'),('S03',19.8,19.8,19.8,'19.8','11 秒 render/repair + 2.8 秒改版 QA'),('S04',24.4,24.4,24.4,'24.4','11.5 秒 render/repair + 两轮正常改版'),('S05',23.5,23.5,23.5,'23.5','13.6 秒资料检索 + 7.3 秒 QA'),('S06',9.7,9.7,9.7,'9.7','7.3 秒 render/repair'),('PPTX 导出',3.2,3.2,3.2,'3.2','首次安全失败、诊断与修复导出')) SELECT * FROM phase ORDER BY seconds_mid DESC",
+        "description": "Returns page and common-phase timing totals with the dominant recorded driver.",
+        "executed_at": "2026-08-16T11:36:02Z",
+        "tables_used": ["WORKFLOW_BUGS.md::Workflow timings"],
+        "filters": ["Human review and approval waiting time excluded"],
+        "metric_definitions": ["seconds_mid is the sum of midpoint durations assigned to the page or phase", "range sums lower and upper timing bounds component-wise"]
+      }
+    },
+    {
+      "id": "optimization_model_sql",
+      "label": "Optimization scenario SQL",
+      "path": "reports/workflow-timing-analysis/artifact.json",
+      "query": {
+        "engine": "sqlite",
+        "language": "sql",
+        "sql": "WITH model(optimization, save_min_s, save_max_s, workflow_complexity, master_impact, priority) AS (VALUES ('稳定预览默认值与既有检查顺序',18,25,'不增加：替换默认值，不新增节点','无；confirmed SVG metadata 不变','P0'),('同一研究步骤内批量并发与有界重试',8,12,'不增加：仍是一个研究步骤','无','P0'),('单一主候选，必要时再生成 B 版',8,14,'降低：减少默认分支与比较回执','无；仅减少候选数量','P1 可选'),('按 Master/Prototype hash 复用检查结果',1,2,'不增加：后台复用，hash 变化即失效','无；hash 保护避免过期复用','P1'),('合并相邻控制器读取与 schema validation',1,2,'不增加：状态与验证数量不变','无','P2')) SELECT * FROM model ORDER BY save_max_s DESC",
+        "description": "Returns the directional savings scenarios documented in source_notes.md.",
+        "executed_at": "2026-08-16T11:36:02Z",
+        "tables_used": ["reports/workflow-timing-analysis/source_notes.md::Savings model"],
+        "filters": ["No new user approval gates", "No confirmed SVG Master/Layout/placeholder metadata changes", "User-requested redesign time is not treated as removable waste"],
+        "metric_definitions": ["Core scenario excludes the single-primary-candidate option", "Savings are directional scenarios, not post-change benchmarks"]
+      }
+    }
+  ]
+}

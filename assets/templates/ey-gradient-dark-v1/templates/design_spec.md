@@ -65,9 +65,11 @@ scale, wrapping, and density. Preserve literal approved wording.
 - Agenda, Divider, and Content share the EY Dark Master and authentic fixed mark.
 - The complete Ending remains a fixed full-slide image and must not be reflowed,
   restyled, translated, cleaned, or overlaid.
-- Open composite content regions are technical carriers, not composition boxes;
-  native PPT Master may create the best page-local composition while preserving
-  Master/Layout identity and literal fixed atoms.
+- Open composite content regions are technical carriers, not composition boxes.
+  For Content pages, compose freely across the complete 1280×720 slide; do not
+  infer a bottom safety line, reserve a footer band, or treat placeholder bounds
+  as visual limits. Preserve Master/Layout identity and literal fixed atoms, but
+  do not run a separate overlap gate against the EY mark.
 
 ## V. Page Roster
 
@@ -92,5 +94,8 @@ scale, wrapping, and density. Preserve literal approved wording.
 
 - Composite Agenda and Content object slots are editable authoring regions; their
   stored bounds carry native placeholder metadata and do not limit composition.
+- Content uses a full-slide proxy slot. The entire 1280×720 canvas is available
+  for page composition, with no special rule at `y=650` and no EY-logo overlap
+  QA check.
 - Cover and Divider text slots retain their declared role and bounds.
 - Ending has zero slots and remains literal.

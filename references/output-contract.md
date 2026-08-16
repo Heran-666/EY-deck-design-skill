@@ -36,7 +36,7 @@ questions, or assumptions register.
 Use this structure for each locked page:
 
 ````markdown
-## S03｜<exact audience-facing title>
+## S03
 
 ### On-slide content
 - Title: <exact copy>
@@ -76,16 +76,18 @@ Use this structure for each locked page:
 - Source details: <organization, title, date, URL or local path, access date, and supported IDs; or No external sources>
 ````
 
-The page heading after `## <Slide ID>｜` must equal the exact `Title:` field. The
-PPT Master request adapter obtains Page type from the matching `framework.md`
-entry and selects the required template independently of `content.md`.
+The page heading contains only the stable Slide ID. `Title:` is the sole exact
+audience-facing title within `content.md`; after approval, the controller also
+synchronizes it to the matching overview heading in `framework.md`. The PPT
+Master request adapter obtains Page type from that framework entry and selects
+the required template independently of `content.md`.
 
 Do not add a Visual Direction, design brief, wireframe, coordinates,
 measurements, element table, spatial zones, named composition, or specific
 layout. Text, table, and chart blocks are approved content forms, not page
 composition instructions. Protected pages live in `framework.md` and optional
 `protected_input/`; do not add them to provisional or canonical `content.md`.
-Workflow 6.0 does not process protected inputs into the confirmed SVG list.
+Workflow 7.0 does not process protected inputs into the confirmed SVG or PPTX roster.
 
 Choose a table block only when the audience must inspect exact values across
 multiple fields. Choose a chart block when approved values support a trend,
@@ -120,9 +122,11 @@ Treat every on-slide sentence and visible character as final. Page authoring may
 wrap text but must not add, remove, shorten, or rewrite approved wording without
 reopening the page in conversation.
 
-Each PPT Master request carries the exact approved page section and its SHA-256.
-Candidate validation checks that hash against the current page in `content.md`.
-Workflow 6.0 does not create a separate visible-copy manifest or copy-ID graph;
+Each page authoring context carries the exact approved page section and its
+SHA-256 once; every PPT Master candidate request binds that context by path and
+hash. Candidate validation checks the approved-section hash against the current
+page in `content.md`.
+Workflow 7.0 does not create a separate visible-copy manifest or copy-ID graph;
 bundled PPT Master remains responsible for reproducing all audience-facing
 headings, Title, Subtitle, Core insight, Detail, table/chart cells, Unit, Period,
 visible notes, and On-slide source while excluding Build-only instructions from
