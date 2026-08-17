@@ -1,23 +1,17 @@
 # EY build-spec contract
 
-## Contents
+## File boundary
 
-1. Boundary and IDs
-2. Deck build profile
-3. Page schema
-4. Content rules
-5. Sources
-6. Validation
+Replace `working/provisional-content.md` with exactly the controller-listed
+active pages; never append. After approval, the controller promotes those exact
+sections to canonical `content.md`. Keep project memory in `framework.md`,
+workflow evidence in receipts, and analysis/design alternatives out of both.
 
-## 1. Boundary and IDs
+Use stable slide IDs (`S01`) and content IDs (`S03-B1`). Decimal children are
+allowed only under a meaningful parent with at least two children; normally
+stop at three levels. IDs encode semantic hierarchy, never layout.
 
-Replace the entire `working/provisional-content.md` with exactly the active pages listed by the controller, in order, using the same lean build-spec schema; never append to a previous review batch. After explicit approval, the controller promotes those exact sections into the single canonical `content.md` and removes the handled provisional file; do not rewrite them during promotion. `content.md` owns approved visible copy, data, page-local sources, and emphasis. Keep project memory in `framework.md`, workflow evidence in receipts, and analysis, design directions, or rejected alternatives out of both files.
-
-Use stable slide IDs (`S01`, `S02`) and content IDs (`S03-B1`, `S03-B2`). Use decimal children only under a meaningful parent with at least two children and keep normal hierarchy to three levels. IDs express semantic hierarchy, not visual placement, reading sequence, or card count.
-
-## 2. Deck build profile
-
-Begin both provisional and canonical files with only the deck language:
+Begin provisional and canonical files with:
 
 ```markdown
 # Presentation Build Specification
@@ -26,14 +20,10 @@ Begin both provisional and canonical files with only the deck language:
 - Language: <Chinese | English>
 ```
 
-Template identity and visual decisions belong to the bundled PPT Master page
-service and its explicit workspace. Do not copy them into `content.md`. Do not add a
-Storyline table, intake-analysis register, coverage matrix, review log, open
-questions, or assumptions register.
+Do not add template identity, visual decisions, Storyline tables, analysis
+registers, review logs, open questions, or assumptions.
 
-## 3. Page schema
-
-Use this structure for each locked page:
+## Page schema
 
 ````markdown
 ## S03
@@ -47,21 +37,21 @@ Use this structure for each locked page:
 - Child logic（Build-only）: <only for a genuine parent>
 
 ##### S03-B1.1｜<child title>
-- Detail: <exact visible copy; omit only when the heading is complete>
+- Detail: <exact visible copy; optional only when heading is complete>
 - Emphasis:
-  - “<exact substring>”｜<关键重点 | 次级重点 | 对比重点 | 普通加粗>
+  - “<exact visible substring>”｜<关键重点 | 次级重点 | 对比重点 | 普通加粗>
 
 #### S03-B2｜<table block title>
-- Table purpose（Build-only）: <what exact multi-field lookup or comparison the table must support>
+- Table purpose（Build-only）: <required lookup/comparison>
 
 | <exact header> | <exact header> |
 |---|---|
-| <exact row label> | <exact cell content> |
+| <exact row label> | <exact cell> |
 
 - Table note: <optional exact copy>
 
 #### S03-B3｜<chart block title>
-- Chart purpose（Build-only）: <the relationship and audience-facing conclusion the chart must make visible>
+- Chart purpose（Build-only）: <relationship and intended conclusion>
 - Unit: <exact visible unit>
 - Period: <optional exact period>
 
@@ -73,32 +63,26 @@ Use this structure for each locked page:
 
 ### Sources
 - On-slide source: <exact footer or None>
-- Source details: <organization, title, date, URL or local path, access date, and supported IDs; or No external sources>
+- Source details: <provenance and supported IDs; or No external sources>
 ````
 
-The page heading contains only the stable Slide ID. `Title:` is the sole exact
-audience-facing title within `content.md`; after approval, the controller also
-synchronizes it to the matching overview heading in `framework.md`. The PPT
-Master request adapter obtains Page type from that framework entry and selects
-the required template independently of `content.md`.
+The page heading contains only the Slide ID. `Title` is the sole exact page
+title and is synchronized to `framework.md` after approval. Page type and
+template come from `framework.md`, not `content.md`.
 
-Do not add a Visual Direction, design brief, wireframe, coordinates,
-measurements, element table, spatial zones, named composition, or specific
-layout. Text, table, and chart blocks are approved content forms, not page
-composition instructions. Protected pages live in `framework.md` and optional
-`protected_input/`; do not add them to provisional or canonical `content.md`.
-Workflow 7.0 does not process protected inputs into the confirmed SVG or PPTX roster.
+Do not add Visual Direction, design briefs, wireframes, coordinates,
+measurements, element maps, zones, named compositions, or layouts. Content
+forms describe approved information, not composition. Protected pages remain in
+`framework.md` and optional `protected_input/`; workflow 7.0 excludes them from
+the authored SVG/PPTX roster.
 
-Choose a table block only when the audience must inspect exact values across
-multiple fields. Choose a chart block when approved values support a trend,
-ranking, gap, part-to-whole, range, threshold, or another quantitative
-relationship that should be understood visually. Do not duplicate the same
-complete dataset as both a table and a chart on one page unless each has a
-separate approved argumentative role.
+Use a table only for exact multi-field inspection and a chart only for approved
+quantitative relationships. Do not duplicate one dataset as both unless each
+form has a separate approved purpose.
 
-`Agenda` is the one page-type-specific exception to the general content forms.
-Its `On-slide content` contains `Title` only, followed by one or more sequential
-top-level blocks whose headings are the exact directory labels:
+## Agenda exception
+
+Agenda contains `Title` plus sequential top-level block headings only:
 
 ```markdown
 ### On-slide content
@@ -109,58 +93,32 @@ top-level blocks whose headings are the exact directory labels:
 #### S02-B2｜核心方法与路径
 ```
 
-Do not add `Subtitle`, `Core insight`, `Detail`, Child logic, Emphasis,
-table/chart content, description, or supporting detail to an Agenda item. Do
-not prefix the label with a number. During SVG authoring, bundled PPT Master may
-render zero-padded visible numbering (`01`, `02`, ...) from the approved block
-order without changing the approved labels. Invalid Agenda fields fail
-provisional-content validation before page authoring.
+Do not add Subtitle, Core insight, Detail, Child logic, Emphasis, tables,
+charts, or descriptions. Do not number labels in content; PPT Master may derive
+visible numbering from block order.
 
-## 4. Content rules
+## Visible-content rules
 
-Treat every on-slide sentence and visible character as final. Page authoring may
-wrap text but must not add, remove, shorten, or rewrite approved wording without
-reopening the page in conversation.
+- Every audience-facing character is final. SVG authoring may wrap but may not
+  add, remove, shorten, or rewrite it without reopening content.
+- Build-only fields stay invisible. PPT Master must reproduce headings, Title,
+  Subtitle, Core insight, Detail, table/chart cells, Unit, Period, visible notes,
+  and On-slide source.
+- `Emphasis` quotes an exact visible substring from the same block. Use only
+  `关键重点`, `次级重点`, `对比重点`, or `普通加粗`; use `对比重点` only for an explicit
+  approved contrast. Emphasis is a required semantic priority, not a complete
+  style map.
+- Keep titles on one line and within 36 Chinese-width characters; resolve
+  crowding during content review.
 
-Each page authoring context carries the exact approved page section and its
-SHA-256 once; every PPT Master candidate request binds that context by path and
-hash. Candidate validation checks the approved-section hash against the current
-page in `content.md`.
-Workflow 7.0 does not create a separate visible-copy manifest or copy-ID graph;
-bundled PPT Master remains responsible for reproducing all audience-facing
-headings, Title, Subtitle, Core insight, Detail, table/chart cells, Unit, Period,
-visible notes, and On-slide source while excluding Build-only instructions from
-the visible SVG.
+## Sources and validation
 
-Use Emphasis to mark semantic priorities that the content author explicitly
-requires to stand out. Quote an exact target substring from visible text in the
-same content block: its heading, Detail, table cells, Unit, Period, or visible
-table/chart note. Build-only fields and neighboring blocks are not valid
-targets. Emphasis is not an exhaustive visual-style manifest: PPT Master may
-create visual hierarchy among other existing text according to composition and
-information hierarchy, but must not add or rewrite audience-facing copy. Icons,
-shapes, color fields, dividers, and other non-text visual elements are not
-limited by Emphasis annotations. Use only `关键重点`, `次级重点`, `对比重点`, and
-`普通加粗`. Use `对比重点` only when the approved on-slide content itself makes
-an explicit comparison or contrast; otherwise use yellow, pale yellow, or white
-emphasis.
+`On-slide source` is exact footer copy or `None`. `Source details` records
+authoritative provenance and supported IDs. Identify user/internal material and
+never invent URLs, dates, licenses, or approval status. Do not record
+construction-only visual assets here.
 
-Keep titles on one line and within 36 Chinese-width characters. Shorten crowded
-titles during content review; bundled PPT Master owns later typography and page
-composition.
-
-## 5. Sources
-
-Keep factual sourcing with the page that uses it. `On-slide source` is exact visible footer copy or `None`. `Source details` records authoritative provenance needed to verify or rebuild the page. Do not create a separate complete source register or record construction-only visual assets selected during page authoring.
-
-For user-provided or internal material, state that status and the supported IDs. Never invent a URL, publication date, license, or approval status.
-
-## 6. Validation
-
-Use controller `present-review` as the normal validation-and-presentation gate.
-For direct diagnostics, run `scripts/validate_deck_blueprint.py` with
-`--content`, `--framework`, and repeatable `--page` options. It checks schema,
-IDs, duplicate fields, emphasis targets, page types, and cross-page rules. Human
-review remains responsible for semantic sufficiency: approved wording, evidence
-quality, complete table/chart inputs, correct hierarchy, and faithful meaning.
-Do not use character-count heuristics as a substitute for that review.
+Use controller `present-review` for the normal validation and review gate.
+`scripts/validate_deck_blueprint.py` is the direct diagnostic for schema, IDs,
+duplicates, emphasis targets, page types, and cross-page rules. Human review
+owns meaning, evidence quality, hierarchy, and buildability.

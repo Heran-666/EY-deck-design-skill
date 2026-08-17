@@ -1,102 +1,67 @@
 # SVG candidate workflow
 
-## State machine
+## Lifecycle and authority
 
 ```text
-Content locked
-  -> EY controller writes adaptive candidate_plan
-  -> structural/default page: prepare, generate, and present A
-  -> verified dual-design need: prepare, generate, and present A/B
-  -> confirm one displayed version, or request R1 from a displayed base
-  -> present Base/R1
-  -> confirm one displayed version, or request R2 from a displayed base
-  -> repeat
-  -> SVG confirmed
+Content locked -> plan A or A/B -> author -> present -> confirm or revise -> SVG confirmed
 ```
 
-The controller owns transitions and receipts. PPT Master owns candidate design
-and technical completion. The user owns selection, feedback, and confirmation.
+The controller owns state, requests, receipts, presentation, and publication.
+PPT Master owns design and technical completion. The user owns selection,
+feedback, and confirmation.
 
-## Candidate identity
+## Candidate contract
 
-- Cover, Agenda, Section divider, and Ending bind only A. Substantive pages also
-  default to A. The EY controller upgrades the plan to A/B only when locked
-  content exposes chart/table evidence, explicit comparison or hierarchy, a
-  high-stakes selection, or `Confirmed decisions` explicitly requests alternatives.
-  An explicit single-candidate decision wins over automatic triggers.
-- Persist the decision as `candidate_plan` in the shared hash-bound page context.
-  Do not add a user gate and do not let PPT Master change the plan.
-- Every request binds the same executive-grade `design_quality` floor. EY does
-  not classify candidate design roles, generate adaptation rules, or prescribe
-  an A/B difference axis. PPT Master derives the strongest page-specific design
-  direction directly from the complete approved content and project/page
-  context. For A/B, PPT Master chooses two complete, meaningfully distinct
-  solutions according to its own design judgment.
-- Rn binds one displayed base by path and SHA-256 plus one non-empty feedback
-  file. Never rewrite an earlier candidate in place.
-- A candidate is usable only when its request, SVG, and receipt hashes agree.
-- A presentation receipt binds the exact one or two SVG hashes the user saw.
-- Confirmation accepts only a currently displayed version and copies its exact
-  bytes to `svg_output/<Slide ID>.svg`.
+- Cover, Agenda, Section divider, and Ending use A only. Substantive pages
+  default to A; upgrade to A/B only for chart/table evidence, explicit
+  comparison or hierarchy, a high-stakes choice, or an explicit request for
+  alternatives. An explicit single-candidate decision wins.
+- Persist `candidate_plan` in the hash-bound page context. PPT Master must
+  follow it and may not add a gate or version.
+- EY supplies one quality floor, not candidate roles, adaptation rules, layouts,
+  or a universal difference axis. PPT Master chooses the strongest solution for
+  A and, when requested, two complete and meaningfully distinct solutions for
+  A/B.
+- Materialize one page context and one self-contained template prototype per
+  Slide ID. The context holds approved content, project/page and confirmed-page
+  context, candidate plan, design quality, template, and service contract.
+  Candidate requests hold only identity, artifact, context path/hash, and, for
+  revisions, base and feedback.
+- Rn binds one displayed base by path and SHA-256 plus non-empty user feedback.
+  Never overwrite an earlier version.
+- A candidate is usable only when request, SVG, and receipt hashes agree.
+  Presentation binds the exact displayed hashes. Confirmation accepts only a
+  displayed version and copies its bytes to `svg_output/<Slide ID>.svg`.
+- After re-entry or compaction, recover through the controller and reread the
+  bound request and context; never reconstruct direction from chat memory.
 
-Materialize one hash-bound page authoring context and one self-contained
-template prototype per Slide ID. Put approved content, project/page context,
-confirmed-page coherence inputs, candidate plan, design quality, template, and service contract
-there once. Make A, B, and every Rn request contain only candidate-specific
-identity, artifact, base, feedback, and the page-context path/hash.
-On re-entry or after compaction, use the controller to recover the current work
-unit, then reread that request and context; do not reconstruct the direction
-from conversation memory.
+## Authoring and QA
 
-## PPT Master service
-
-The page authoring context's `service_contract` is the authoritative child entrypoint. Service
-composition does not limit design scope: PPT Master must perform its full
-Strategist, specialist, template, Executor, and source-SVG completion loop internally. It may use
+Enter through `service_contract` and run PPT Master's full Strategist,
+specialist, template, Executor, and source-SVG completion loop. It may use
 chart, table, qualitative structure, imagery, icons, typography, semantic SVG,
-and effects capabilities as the page requires.
+and effects as needed.
 
-Use previously confirmed SVGs and adjacent-page context to maintain deck-wide
-coherence. Do not copy a previous composition merely for consistency.
+Use confirmed pages and adjacent-page context for coherence without copying
+their compositions. Content pages may use the complete 1280×720 canvas;
+placeholder bounds are PowerPoint metadata, not a safe area. There is no
+`y=650` cap, reserved footer band, or EY-logo overlap gate.
 
-For Content pages, use the complete 1280×720 canvas. Placeholder bounds exist
-only for native PowerPoint structure and do not define a visual safe area;
-there is no `y=650` limit, reserved footer band, or EY-logo overlap QA gate.
+Treat the first SVG as an internal draft. Complete information design,
+composition, art direction, direct full-slide source-SVG review, repair, and
+reinspection before presentation. Use icons only when they aid communication.
+Do not use Chromium, Playwright, or another browser renderer for candidate QA.
 
-Treat the first authored SVG as an internal draft. Before any candidate becomes
-visible, complete the request's ordered information-design, page-composition,
-art-direction, direct source-SVG full-slide review, and source-repair gate. Add coherent icons at semantically
-appropriate positions when they improve recognition, scanning, or visual
-rhythm; omit them when they have no clear communication job. Reinspect the
-source SVG after repair.
+## User interaction and recovery
 
-Do not invoke Chromium, Playwright, or another browser renderer to QA candidate
-content or appearance. Browser output is not completion evidence and must not
-block, simplify, or trigger repair of an otherwise valid source SVG.
-
-## User interaction
-
-Display every emitted candidate at review scale and label it with the exact
-version. An A-only initial review displays A; an A/B initial review displays
-both; every revision review displays Base/Rn.
-Do not recommend a winner unless the user asks. Translate natural-language
-choices to the exact emitted command only when the intended displayed version
-is unambiguous.
-
-For revision, preserve the user's words in the emitted feedback file. After the
-controller embeds them in the immutable Rn request, delete that transient file.
-Do not silently
-convert vague advice into a broad redesign; ask a concise question only when no
-concrete executable change can be inferred.
-
-## Recovery
-
-- Invalid request -> regenerate it with `prepare-svg-candidates` or the owning
-  revision command.
-- Invalid or incomplete candidate -> repair the same requested artifact and run
-  `record` again; it performs the final service `complete` check atomically.
-- Stale presentation -> present the current valid candidate or pair again.
-- Stale confirmation -> run the emitted `reopen-svg` command; never repair the
-  published file directly.
-- Content change -> `reopen-content`; all downstream candidate evidence becomes
-  invalid and is deleted before a fresh request.
+- Present A, A/B, or Base/Rn at review scale with exact version labels. Do not
+  recommend a winner unless asked.
+- Preserve revision feedback verbatim. Delete its transient file after the
+  controller embeds it in the immutable request. Ask only when no executable
+  change can be inferred.
+- Invalid request: regenerate it through the owning prepare/revision command.
+- Invalid candidate: repair the requested artifact and run `record` again.
+- Stale presentation: present the current valid version(s) again.
+- Stale confirmation: use the emitted `reopen-svg` command.
+- Content change: use `reopen-content`; downstream candidate evidence is
+  invalidated before a new cycle.

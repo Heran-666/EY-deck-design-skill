@@ -6,9 +6,9 @@
   <path id="dark-template-ey-e" data-pptx-layer="layout" data-pptx-editable="false" d="M1189.547290 693.5 L1195.377593 693.5 L1195.377593 690.166667 L1189.547290 690.166667 L1189.547290 687.5 L1195.877334 687.5 L1193.711792 683.833333 L1184.549887 683.833333 L1184.549887 700 L1197.543134 700 L1197.543134 696.166667 L1189.547290 696.166667 Z" fill="#FFFFFF"/>
   <path id="dark-template-ey-y" data-pptx-layer="layout" data-pptx-editable="false" d="M1206.038719 683.833333 L1203.373438 689.166667 L1200.708156 683.833333 L1195.377593 683.833333 L1200.874736 693.5 L1200.874736 700 L1205.705559 700 L1205.705559 693.5 L1211.369282 683.833333 Z" fill="#FFFFFF"/>
   <g id="divider-section-label" data-pptx-placeholder="subtitle" data-pptx-idx="1" data-pptx-bounds="64 225 220 32">
-    <text data-pptx-carrier="true" x="64" y="249" fill="#FFE600" font-family="EYInterstate, Microsoft YaHei, Calibri, sans-serif" font-size="18.6667" font-weight="700">Section label</text>
+    <text data-pptx-carrier="true" x="64" y="249" fill="#FFE600" font-family="Calibri, Microsoft YaHei, sans-serif" font-size="18.6667" font-weight="700">Section label</text>
   </g>
   <g id="divider-title" data-pptx-placeholder="title" data-pptx-idx="2" data-pptx-bounds="64 296 716 124">
-    <text data-pptx-carrier="true" x="64" y="365" fill="#FFFFFF" font-family="EYInterstate, Microsoft YaHei, Calibri, sans-serif" font-size="53.3333" font-weight="700">Section title</text>
+    <text data-pptx-carrier="true" x="64" y="365" fill="#FFFFFF" font-family="Calibri, Microsoft YaHei, sans-serif" font-size="53.3333" font-weight="700">Section title</text>
   </g>
 </svg>

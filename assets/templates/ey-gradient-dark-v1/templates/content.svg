@@ -4,10 +4,10 @@
   <path id="dark-template-ey-e" data-pptx-layer="layout" data-pptx-editable="false" d="M1189.547290 693.5 L1195.377593 693.5 L1195.377593 690.166667 L1189.547290 690.166667 L1189.547290 687.5 L1195.877334 687.5 L1193.711792 683.833333 L1184.549887 683.833333 L1184.549887 700 L1197.543134 700 L1197.543134 696.166667 L1189.547290 696.166667 Z" fill="#FFFFFF"/>
   <path id="dark-template-ey-y" data-pptx-layer="layout" data-pptx-editable="false" d="M1206.038719 683.833333 L1203.373438 689.166667 L1200.708156 683.833333 L1195.377593 683.833333 L1200.874736 693.5 L1200.874736 700 L1205.705559 700 L1205.705559 693.5 L1211.369282 683.833333 Z" fill="#FFFFFF"/>
   <g id="content-title" data-pptx-placeholder="title" data-pptx-idx="1" data-pptx-bounds="48 50 1128 43">
-    <text data-pptx-carrier="true" x="48" y="82" fill="#FFFFFF" font-family="EYInterstate, Microsoft YaHei, Calibri, sans-serif" font-size="32" font-weight="700">Page title</text>
+    <text data-pptx-carrier="true" x="48" y="82" fill="#FFFFFF" font-family="Calibri, Microsoft YaHei, sans-serif" font-size="32" font-weight="700">Page title</text>
   </g>
   <g id="content-subtitle" data-pptx-placeholder="subtitle" data-pptx-idx="2" data-pptx-bounds="48 93 1128 40">
-    <text data-pptx-carrier="true" x="48" y="119" fill="#D9D9D9" font-family="EYInterstate, Microsoft YaHei, Calibri, sans-serif" font-size="16">Subtitle</text>
+    <text data-pptx-carrier="true" x="48" y="119" fill="#D9D9D9" font-family="Calibri, Microsoft YaHei, sans-serif" font-size="16">Subtitle</text>
   </g>
   <g id="content-region" data-pptx-placeholder="object" data-pptx-binding="proxy" data-pptx-idx="3" data-pptx-bounds="0 0 1280 720">
     <rect x="0" y="0" width="1280" height="720" fill="none" stroke="none"/>

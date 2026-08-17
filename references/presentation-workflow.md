@@ -42,8 +42,10 @@ SVGs, decisions, or receipts.
   executable. A missing or incapable runtime must fail before page state or
   candidate files change; do not install an alternate environment.
 - `prepare-svg-candidates` creates only A for an active Cover, Agenda, Section
-  divider, or Ending page; it creates A and B for every other active
-  content-locked page.
+  divider, or Ending page. Substantive pages default to A and upgrade to A/B
+  only when the hash-bound adaptive candidate plan detects approved chart/table
+  evidence, explicit comparison or hierarchy, a high-stakes selection, or an
+  explicit alternatives decision. An explicit single-candidate decision wins.
 - A missing/invalid candidate remains in `RUN_EMBEDDED_PPT_MASTER_SVG`; repair
   the same requested artifact and rerun `record`, which performs the service
   completion check and candidate recording atomically.
@@ -54,9 +56,9 @@ SVGs, decisions, or receipts.
   emitted feedback file is transient and is deleted after its exact text is
   embedded in the Rn request.
 - Use `reopen-svg --page <Slide ID>` to delete the current page's A/B/Rn,
-  receipts, and confirmed output, then restart with the page type's one- or
-  two-candidate policy from unchanged approved content. Reopen does not archive
-  the deleted visual cycle.
+  receipts, and confirmed output, then recompute the adaptive candidate plan
+  from unchanged approved content and confirmed decisions. Reopen does not
+  archive the deleted visual cycle.
 
 ## Confirmation recovery
 

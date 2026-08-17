@@ -19,89 +19,70 @@ page_count: 5
 
 # EY Gradient Dark — Design Specification
 
-## I. Template Overview
+## Purpose
 
-| Application context | Definition |
+Use for EY proposals, executive sharing, training, interpretations, and
+client-facing reports. The template supplies authentic identity and editable
+native structure; it does not prescribe page-local composition, information
+models, or density. PPT Master retains design judgment within the fixed
+identity and structure below.
+
+## Identity
+
+| Role | Value | Use |
+|---|---|---|
+| EY yellow | `#FFE600` | Identity accent and decisive emphasis |
+| Black | `#000000` | Main background and maximum contrast |
+| White | `#FFFFFF` | Primary dark-page text and negative space |
+| Neutral gray | `#A6A6A6` | Secondary copy, dividers, metadata |
+| Pale yellow | `#FFF4B3` | Restrained supporting emphasis |
+
+Add hues only to encode a meaningful category, state, threshold, or comparison.
+
+| Text | Font stack |
 |---|---|
-| Recurring presentation family | EY proposals, executive sharing decks, training materials, interpretations, and client-facing reports |
-| Intended audiences and outcomes | Help client, leadership, stakeholder, or learner audiences understand an argument, trust its evidence, and take the intended next step |
-| Delivery and reading assumptions | Supports live presentation and later independent reading; pages should preserve decisive headlines, evidence, and source context |
-| Representative narrative/page roles | Cover, Agenda, Section divider, open Content, and fixed Ending; native PPT Master decides which prototypes to use, repeat, or adapt for the approved content |
+| Latin | `Calibri, sans-serif` |
+| Chinese | `Microsoft YaHei, sans-serif` |
 
-The workspace supplies authentic EY identity and reusable native structure. It
-does not impose a page-local composition catalog, information model, or density
-target. Native PPT Master retains complete communication and visual-design
-judgment within the resolved identity and structure contract.
+PPT Master determines hierarchy, scale, wrapping, and density while preserving
+approved wording.
 
-## II. Color Scheme
+## Fixed and adaptive boundaries
 
-| Role | Color | Application |
-|---|---|---|
-| EY yellow | #FFE600 | Primary identity accent and decisive emphasis |
-| Black | #000000 | Main background and maximum-contrast text |
-| White | #FFFFFF | Primary text on dark pages and open negative space |
-| Neutral gray | #A6A6A6 | Secondary copy, dividers, and metadata |
-| Pale yellow | #FFF4B3 | Restrained supporting emphasis |
+- Preserve the authentic EY mark and Cover lockup as fixed atoms.
+- Cover retains its gradient frame and EY tagline.
+- Agenda, Divider, and Content share the EY Dark Master and fixed mark.
+- Ending is a fixed full-slide image: do not reflow, restyle, translate, clean,
+  or overlay it.
+- Open composite regions are technical carriers, not composition boxes.
+  Content may use the complete 1280×720 canvas. Placeholder bounds do not
+  impose a safe area, footer reserve, `y=650` cap, or EY-logo overlap gate.
+- Preserve Master/Layout identity and literal fixed atoms.
 
-Use additional hues only when they encode an audience-relevant category,
-state, threshold, or comparison. Do not create decorative rainbow coding.
+## Page roster
 
-## III. Typography
-
-| Role | Font stack | Application |
-|---|---|---|
-| Latin title and body | `EYInterstate, Arial, sans-serif` | EY-facing Latin display and body copy |
-| Chinese title and body | `Microsoft YaHei, PingFang SC, Arial, sans-serif` | Chinese display and body copy |
-
-Use the native PPT Master typography system to resolve page-specific hierarchy,
-scale, wrapping, and density. Preserve literal approved wording.
-
-## IV. Signature Design Elements
-
-- Keep the authentic EY mark and cover lockup as fixed template atoms.
-- Use dark editorial fields, confident negative space, and EY yellow as the
-  principal identity accent.
-- The Cover preserves the supplied gradient frame and EY tagline.
-- Agenda, Divider, and Content share the EY Dark Master and authentic fixed mark.
-- The complete Ending remains a fixed full-slide image and must not be reflowed,
-  restyled, translated, cleaned, or overlaid.
-- Open composite content regions are technical carriers, not composition boxes.
-  For Content pages, compose freely across the complete 1280×720 slide; do not
-  infer a bottom safety line, reserve a footer band, or treat placeholder bounds
-  as visual limits. Preserve Master/Layout identity and literal fixed atoms, but
-  do not run a separate overlap gate against the EY mark.
-
-## V. Page Roster
-
-| File | Master | Layout key | PowerPoint picker name | Visual character | Reusable slots |
+| File | Master | Layout | Picker name | Fixed character | Editable content |
 |---|---|---|---|---|---|
-| `cover.svg` | EY Cover | cover | EY Cover | Gradient frame, authentic EY mark/lockup, fixed tagline | Project type, title, subtitle |
-| `agenda.svg` | EY Dark | agenda | EY Agenda | Open dark navigation canvas; no sample item composition | Title and blank composite agenda region |
-| `divider.svg` | EY Dark | divider | EY Section Divider | Dark chapter transition with controlled glow | Section label and title |
-| `content.svg` | EY Dark | content | EY Content | Open black content canvas with fixed EY mark | Title, subtitle, and composite content region |
-| `ending.svg` | EY Dark | ending | EY Ending | Exact supplied legal/brand closing page | None |
+| `cover.svg` | EY Cover | cover | EY Cover | Gradient, mark/lockup, tagline | Project type, title, subtitle |
+| `agenda.svg` | EY Dark | agenda | EY Agenda | Dark canvas, mark, glow | Title, blank agenda region |
+| `divider.svg` | EY Dark | divider | EY Section Divider | Dark transition, glow, mark | Section label, title |
+| `content.svg` | EY Dark | content | EY Content | Black canvas, mark | Title, subtitle, composite region |
+| `ending.svg` | EY Dark | ending | EY Ending | Exact closing page | None |
 
-## VI. Assets
+## Assets
 
-| File | Intended usage |
+| File | Use |
 |---|---|
-| `cover-gradient.png` | Cover gradient frame source |
-| `divider-glow.png` | Divider glow source |
+| `cover-gradient.png` | Cover gradient |
+| `divider-glow.png` | Divider glow |
 | `ending-background.png` | Ending background source |
-| `ending-slide.png` | Exact fixed Ending page |
+| `ending-slide.png` | Exact Ending page |
 
-## VII. Placeholder Overrides
+## Authoring overrides
 
-- Composite Agenda and Content object slots are editable authoring regions; their
-  stored bounds carry native placeholder metadata and do not limit composition.
-- Agenda contains no protected item layout. PPT Master may replace the complete
-  agenda-item composition and independently choose ordering treatment,
-  grouping, numbering, typography, geometry, and use of the canvas. Only the EY
-  Dark Master/Layout identity, authentic fixed mark, and layout glow are fixed;
-  the title placeholder retains its semantic role, not a mandatory agenda-item
-  composition.
-- Content uses a full-slide proxy slot. The entire 1280×720 canvas is available
-  for page composition, with no special rule at `y=650` and no EY-logo overlap
-  QA check.
-- Cover and Divider text slots retain their declared role and bounds.
-- Ending has zero slots and remains literal.
+- Agenda has no protected item layout. PPT Master owns ordering treatment,
+  grouping, numbering, typography, geometry, and canvas use. Only its
+  Master/Layout, fixed mark, glow, and title's semantic role are fixed.
+- Content uses a full-slide proxy slot; its stored bounds are metadata only.
+- Cover and Divider text slots retain their declared roles and bounds.
+- Ending has no slots and remains literal.
