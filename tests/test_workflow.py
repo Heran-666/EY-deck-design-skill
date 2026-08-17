@@ -178,8 +178,8 @@ def multiline_svg() -> str:
     return """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720">
   <rect width="1280" height="720" fill="#222"/>
   <text x="80" y="120" fill="#fff" font-size="24">
-    <tspan x="80" dy="0">Editable first </tspan><tspan font-weight="700">line</tspan>
-    <tspan x="80" dy="36">Editable second line</tspan>
+    <tspan x="80" dy="0">同一段</tspan><tspan font-weight="700">文字应该</tspan>
+    <tspan x="80" dy="36">连续呈现</tspan>
   </text>
 </svg>
 """
@@ -864,12 +864,12 @@ class WorkflowTests(unittest.TestCase):
             self.assertEqual(prepared.returncode, 0, prepared.stdout + prepared.stderr)
             payload = next_payload(project)
             self.assertEqual(payload["action"], "RUN_EMBEDDED_PPT_MASTER_PPTX")
-            self.assertEqual(payload["conversion_contract"]["text_flow"], "preserve")
+            self.assertEqual(payload["conversion_contract"]["text_flow"], "reflow")
             request = json.loads((project / "working" / "packets" / "pptx" / "export.json").read_text())
             self.assertEqual(request["schema"], "ppt-master.svg-deck-pptx-request.v2")
             self.assertEqual(request["slides"][0]["slide_id"], "S01")
             self.assertEqual(request["slides"][0]["source_kind"], "confirmed-svg")
-            self.assertEqual(request["conversion"]["text_flow"], "preserve")
+            self.assertEqual(request["conversion"]["text_flow"], "reflow")
             self.assertTrue(request["quality_policy"]["require_text_frame_parity"])
             self.assertEqual(Path(request["output_path"]), (project / "sample.pptx").resolve())
 
@@ -998,7 +998,7 @@ class WorkflowTests(unittest.TestCase):
             self.assertTrue((project / "sample.pptx").is_file())
             audit = json.loads((project / "working" / "receipts" / "pptx" / "text-frames.json").read_text())
             self.assertEqual(audit["status"], "passed")
-            self.assertEqual(audit["text_flow"], "preserve")
+            self.assertEqual(audit["text_flow"], "reflow")
             self.assertEqual(audit["slides"][0]["source_svg_text_carriers"], 1)
             self.assertEqual(audit["slides"][0]["conversion_text_events"], 1)
             self.assertEqual(audit["slides"][0]["pptx_text_boxes"], 1)
@@ -1011,7 +1011,13 @@ class WorkflowTests(unittest.TestCase):
                     "{http://schemas.openxmlformats.org/drawingml/2006/main}t"
                 )
             )
-            self.assertIn("Editable first line", exported_text)
+            self.assertEqual(exported_text, "同一段文字应该连续呈现")
+            self.assertFalse(
+                any(
+                    node.tag == "{http://schemas.openxmlformats.org/drawingml/2006/main}br"
+                    for node in slide_root.iter()
+                )
+            )
             trace = json.loads(
                 (project / "validation" / "sample.trace.json").read_text(encoding="utf-8")
             )
@@ -1129,14 +1135,14 @@ class WorkflowTests(unittest.TestCase):
             self.assertTrue(any("positional dx" in item for item in errors))
             self.assertTrue(any("literal whitespace" in item for item in errors))
 
-    def test_safe_absolute_y_rows_normalize_to_one_preserve_text_carrier(self) -> None:
+    def test_safe_absolute_y_rows_normalize_to_one_reflow_text_carrier(self) -> None:
         root = ET.fromstring(safe_absolute_y_svg())
 
         self.assertEqual(text_carrier_integrity_errors(root), [])
         changed = flatten_text_with_tspans(
             ET.ElementTree(root),
             merge_paragraphs=True,
-            preserve_line_breaks=True,
+            preserve_line_breaks=False,
         )
 
         self.assertTrue(changed)
@@ -1145,7 +1151,7 @@ class WorkflowTests(unittest.TestCase):
         rows = list(texts[0])
         self.assertTrue(all(row.get("y") is None for row in rows))
         self.assertEqual(texts[0].get("data-paragraph-line-height"), "36")
-        self.assertEqual(rows[1].get("data-paragraph-line-break"), "1")
+        self.assertEqual(rows[1].get("data-paragraph-soft-break"), "1")
 
     def test_preserve_preflight_blocks_source_carrier_that_would_split_one_to_many(self) -> None:
         root = ET.fromstring(nonmergeable_relative_dy_svg())
@@ -1386,7 +1392,7 @@ class WorkflowTests(unittest.TestCase):
         self.assertIn("ppt-master.page-svg-request.v3", internal)
         self.assertIn("ppt-master.svg-deck-pptx-request.v2", internal)
         export_contract = (ROOT / "ppt-master" / "workflows" / "svg-deck-pptx-service.md").read_text(encoding="utf-8")
-        self.assertIn("preserve", export_contract)
+        self.assertIn("reflow", export_contract)
         self.assertIn("text box", export_contract)
         self.assertIn("postflight", export_contract)
         self.assertFalse((ROOT / "ppt-master" / "SKILL.md").exists())

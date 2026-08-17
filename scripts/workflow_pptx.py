@@ -33,7 +33,7 @@ PPTX_EXPORTER = PPT_MASTER_ROOT / "scripts" / "svg_to_pptx.py"
 REQUEST_SCHEMA = "ppt-master.svg-deck-pptx-request.v2"
 RECEIPT_SCHEMA = "ey-deck.pptx-export.v1"
 TEXT_AUDIT_SCHEMA = "ey-deck.pptx-text-frame-audit.v2"
-TEXT_FLOW = "preserve"
+TEXT_FLOW = "reflow"
 TEXT_FAILURE_SCHEMA = "ey-deck.pptx-text-failure.v1"
 RUNTIME_PYTHON_ENV = "EY_DECK_PPTX_PYTHON"
 PRESENTATION_NS = "http://schemas.openxmlformats.org/presentationml/2006/main"
@@ -438,7 +438,7 @@ def audit_text_frames(request: dict, output_path: Path, trace_path: Path) -> dic
             if isinstance(item, dict) and item.get("action") == "flatten-positional-tspans"
         ]
         if any(item.get("text_flow") != TEXT_FLOW for item in text_flow_steps):
-            fail(f"slide {index} was not converted with preserve text flow")
+            fail(f"slide {index} was not converted with reflow text flow")
         events = traced.get("events")
         if not isinstance(events, list):
             fail(f"conversion trace has no element ledger for slide {index}")
@@ -489,6 +489,11 @@ def audit_text_frames(request: dict, output_path: Path, trace_path: Path) -> dic
                     f"slide {index} carrier {carrier_id} has no conversion text sequence"
                 )
             actual_sequence = pptx_boxes[shape_id]
+            if any(token.get("kind") == "hard-break" for token in actual_sequence):
+                fail(
+                    f"slide {index} carrier {carrier_id} contains a DrawingML hard "
+                    "break; visual SVG wrap rows must reflow as continuous text"
+                )
             if expected_sequence != actual_sequence:
                 fail(
                     f"slide {index} carrier {carrier_id} text continuity failed: "
@@ -590,7 +595,7 @@ def _export_from_request_impl(paths: ProjectPaths, text: str) -> Path:
                 str(output_path),
                 "--quick-generate",
                 "--no-notes",
-                "--preserve-text",
+                "--reflow-text",
                 "--conversion-trace",
                 str(trace_path),
             ],

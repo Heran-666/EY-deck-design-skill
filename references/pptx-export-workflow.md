@@ -17,15 +17,19 @@ or create a second PPTX implementation in the controller.
 - One logical PowerPoint text box equals one SVG `<text>` carrier.
 - Use non-positional `<tspan>` children for inline mixed formatting. Word spaces
   must be literal characters; never use `dx` as semantic whitespace.
-- Use same-x child `<tspan>` rows for multiline text: first `dy="0"`, then
-  positive relative `dy`. Only unambiguous transform-free absolute-y stacks may
-  be deterministically normalized.
+- Use same-x child `<tspan>` rows for visual wrapping: first `dy="0"`, then
+  positive relative `dy`. These rows are layout hints, not authored newlines;
+  export must rejoin them into the original continuous paragraph and let the
+  PowerPoint text frame wrap. Only unambiguous transform-free absolute-y stacks
+  may be deterministically normalized.
 - Keep semantically independent labels in separate `<text>` carriers.
-- Export with explicit `preserve` text flow. Never use split/`--no-merge`.
+- Export with explicit `reflow` text flow. Never use preserve, split, or
+  `--no-merge` for EY-authored pages.
 - Treat the quality checker's high-confidence fragmented-paragraph warning as
   blocking even though it is advisory in generic PPT Master workflows.
 - Require source-carrier-to-trace-to-OOXML count conservation and per-carrier
-  character, literal-space, paragraph, and hard-break parity on every slide.
+  character, literal-space, and semantic-paragraph parity on every slide.
+  Reject DrawingML hard breaks introduced from visual wrap rows.
 
 ## Controller actions
 

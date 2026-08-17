@@ -114,10 +114,12 @@ template only here and retain its original Slide ID position. For
 `EY_DECK_PPTX_PYTHON` from workspace dependencies, and run the emitted command.
 
 Export through editable native DrawingML with flat Quick Generate structure,
-`preserve` text flow, no notes, final SVG validation, conversion trace,
+`reflow` text flow, no notes, final SVG validation, conversion trace,
 postflight, and text-frame parity. One logical text box is one SVG `<text>`;
-inline `<tspan>` runs are non-positional with literal spaces, while multiline
-rows use same-x `dy` positioning. Export requires source/trace/PPTX carrier
+inline `<tspan>` runs are non-positional with literal spaces, while visual
+wrap rows use same-x `dy` positioning and must rejoin as continuous text rather
+than DrawingML hard breaks. Use a real paragraph boundary only when the approved
+copy is semantically separate. Export requires source/trace/PPTX carrier
 conservation and per-carrier OOXML text continuity. On failure, reopen and
 reconfirm the source SVG.
 Deliver only after `PPTX_STAGE_COMPLETE`.

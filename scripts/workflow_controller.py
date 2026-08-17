@@ -373,7 +373,7 @@ def directive_payload(project_dir: Path, text: str, controller: Path) -> dict[st
                 "requested_artifact": str(paths.pptx_output(filename).resolve()),
                 "conversion_contract": {
                     "object_model": "editable-native-drawingml",
-                    "text_flow": "preserve",
+                    "text_flow": "reflow",
                     "text_frame_rule": "one logical SVG <text> carrier becomes one PowerPoint text box",
                 },
                 "required_environment": {
