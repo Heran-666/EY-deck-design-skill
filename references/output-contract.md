@@ -72,9 +72,11 @@ template come from `framework.md`, not `content.md`.
 
 Do not add Visual Direction, design briefs, wireframes, coordinates,
 measurements, element maps, zones, named compositions, or layouts. Content
-forms describe approved information, not composition. Protected pages remain in
-`framework.md` and optional `protected_input/`; workflow 7.0 excludes them from
-the authored SVG/PPTX roster.
+forms describe approved information, not composition. Do not create sections
+for `Deferred template` pages; they remain ordered in `framework.md` and are
+materialized only for PPTX export. Protected pages remain in `framework.md` and
+optional `protected_input/`; workflow 8.0 excludes protected pages from the
+authored SVG/PPTX roster.
 
 Use a table only for exact multi-field inspection and a chart only for approved
 quantitative relationships. Do not duplicate one dataset as both unless each

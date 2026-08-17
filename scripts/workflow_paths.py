@@ -69,6 +69,13 @@ class ProjectPaths:
         return self.working / "packets" / "pptx" / "export.json"
 
     @property
+    def pptx_template_dir(self) -> Path:
+        return self.working / "packets" / "pptx" / "templates"
+
+    def pptx_template(self, slide_id: str) -> Path:
+        return self.pptx_template_dir / f"{slide_id}.svg"
+
+    @property
     def pptx_receipt(self) -> Path:
         return self.working / "receipts" / "pptx" / "export.json"
 

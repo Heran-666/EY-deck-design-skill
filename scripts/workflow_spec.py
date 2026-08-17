@@ -5,13 +5,14 @@ from __future__ import annotations
 
 
 FRAMEWORK_VERSION = "3.1"
-WORKFLOW_VERSION = "7.0"
-READABLE_WORKFLOW_VERSIONS = {"6.0", WORKFLOW_VERSION}
+WORKFLOW_VERSION = "8.0"
+READABLE_WORKFLOW_VERSIONS = {"6.0", "7.0", WORKFLOW_VERSION}
 
 PAGE_STATES = {
     "Not started",
     "Content locked",
     "SVG confirmed",
+    "Deferred template",
     "Protected placeholder",
 }
 
@@ -22,9 +23,13 @@ LEGACY_TRANSIENT_PAGE_STATES = {
 
 READABLE_PAGE_STATES = PAGE_STATES | LEGACY_TRANSIENT_PAGE_STATES
 
-TERMINAL_PAGE_STATES = {"SVG confirmed", "Protected placeholder"}
+TERMINAL_PAGE_STATES = {
+    "SVG confirmed",
+    "Deferred template",
+    "Protected placeholder",
+}
 
-STRUCTURAL_PAGE_TYPES = frozenset(
+DEFERRED_TEMPLATE_PAGE_TYPES = frozenset(
     {
         "cover",
         "agenda",
@@ -33,8 +38,11 @@ STRUCTURAL_PAGE_TYPES = frozenset(
         "ending",
         "closing",
         "closing page",
-        "protected placeholder",
     }
+)
+
+STRUCTURAL_PAGE_TYPES = frozenset(
+    {*DEFERRED_TEMPLATE_PAGE_TYPES, "protected placeholder"}
 )
 
 
@@ -44,3 +52,7 @@ def normalize_page_type(value: str) -> str:
 
 def is_substantive_page_type(value: str) -> bool:
     return normalize_page_type(value) not in STRUCTURAL_PAGE_TYPES
+
+
+def is_deferred_template_page_type(value: str) -> bool:
+    return normalize_page_type(value) in DEFERRED_TEMPLATE_PAGE_TYPES

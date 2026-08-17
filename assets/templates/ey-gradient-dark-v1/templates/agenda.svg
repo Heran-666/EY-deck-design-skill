@@ -9,5 +9,11 @@
   </g>
   <g id="agenda-content-region" data-pptx-placeholder="object" data-pptx-binding="proxy" data-pptx-idx="2" data-pptx-bounds="48 145 1152 510">
     <rect x="48" y="145" width="1152" height="510" fill="none" stroke="none"/>
+    <text id="agenda-items" data-pptx-carrier="true" x="72" y="210" fill="#FFFFFF" font-family="Calibri, Microsoft YaHei, sans-serif" font-size="26.6667">
+      <tspan x="72" dy="0">01  Section title</tspan>
+      <tspan x="72" dy="84">02  Section title</tspan>
+      <tspan x="72" dy="84">03  Section title</tspan>
+      <tspan x="72" dy="84">04  Section title</tspan>
+    </text>
   </g>
 </svg>

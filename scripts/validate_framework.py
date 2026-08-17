@@ -12,6 +12,7 @@ from workflow_spec import (
     FRAMEWORK_VERSION,
     READABLE_PAGE_STATES,
     WORKFLOW_VERSION,
+    is_deferred_template_page_type,
     is_substantive_page_type,
     normalize_page_type,
 )
@@ -145,7 +146,15 @@ def validate(framework: Path, project_dir: Path | None = None) -> list[str]:
         if status not in READABLE_PAGE_STATES:
             errors.append(f"{page.slide_id} has unsupported Status: {status}")
         page_type = page.fields.get("Page type", "").strip().lower()
-        if status == "Protected placeholder":
+        if status == "Deferred template":
+            if not is_deferred_template_page_type(page_type):
+                errors.append(
+                    f"{page.slide_id} Deferred template status requires Cover, Agenda, "
+                    "Section divider, or Ending Page type"
+                )
+            if page.fields.get("Open items") != "None":
+                errors.append(f"{page.slide_id} must clear Open items before deferring its template")
+        elif status == "Protected placeholder":
             if page_type != "protected placeholder":
                 errors.append(f"{page.slide_id} protected status requires Page type Protected placeholder")
             if not page.fields.get("Content scope", "").startswith("[占位："):

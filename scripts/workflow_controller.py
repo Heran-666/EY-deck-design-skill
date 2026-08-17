@@ -112,8 +112,14 @@ def review_valid(paths: ProjectPaths, page: PageEntry) -> bool:
 
 
 def content_validation_errors(paths: ProjectPaths, text: str) -> list[str]:
-    pages = [page for page in page_entries(text) if page.fields.get("Status") != "Protected placeholder"]
+    pages = [
+        page
+        for page in page_entries(text)
+        if page.fields.get("Status") not in {"Deferred template", "Protected placeholder"}
+    ]
     if not paths.content.is_file():
+        if not pages:
+            return []
         return [f"content not found: {paths.content}"]
     return validate_collection(
         paths.content,
@@ -358,10 +364,18 @@ def directive_payload(project_dir: Path, text: str, controller: Path) -> dict[st
             }
         return {
             "action": "PREPARE_PPTX_EXPORT",
-            "confirmed_svgs": [
-                str((paths.svg_output / f"{item.slide_id}.svg").resolve())
+            "ordered_slides": [
+                {
+                    "slide_id": item.slide_id,
+                    "page_type": item.fields.get("Page type", ""),
+                    "source_kind": (
+                        "confirmed-svg"
+                        if item.fields.get("Status") == "SVG confirmed"
+                        else "deferred-template"
+                    ),
+                }
                 for item in page_entries(text)
-                if item.fields.get("Status") == "SVG confirmed"
+                if item.fields.get("Status") != "Protected placeholder"
             ],
             "commands": {
                 "run": command_line(controller, "prepare-pptx-export", project_dir),
@@ -725,6 +739,13 @@ def main() -> int:
             page = page_by_id(text, args.page)
             if page.fields.get("Status") == "Protected placeholder":
                 raise ValueError(f"page cannot be reopened: {args.page}")
+            if (
+                args.command == "reopen-svg"
+                and page.fields.get("Status") == "Deferred template"
+            ):
+                raise ValueError(
+                    f"{args.page} has no SVG cycle; use reopen-content to activate custom design"
+                )
             discard_cycle(ProjectPaths(project_dir), args.page)
             target = "Not started" if args.command == "reopen-content" else "Content locked"
             text = update_page(text, args.page, {"Status": target})

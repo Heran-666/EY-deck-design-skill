@@ -1,10 +1,11 @@
 ---
 name: ey-deck-design
 description: >
-  Create and approve EY Storylines and exact slide content, generate page SVGs
-  through the bundled PPT Master, iterate from user feedback, publish only
-  confirmed candidates, and export the confirmed roster as editable DrawingML
-  PPTX. Use only when the user explicitly invokes $ey-deck-design.
+  Create and approve EY Storylines and exact substantive slide content, defer
+  Cover, Agenda, Section divider, and Ending pages to editable export templates,
+  generate and confirm substantive page SVGs through the bundled PPT Master,
+  and export the ordered roster as editable DrawingML PPTX. Use only when the
+  user explicitly invokes $ey-deck-design.
 ---
 
 # EY Deck Design
@@ -44,9 +45,11 @@ Confirm the deliverable type and complete Storyline before creating
 `framework.md`. Each substantive page normally contains three to five specific
 planned units supporting one claim; structural pages stay concise. S01 is Cover;
 at six or more substantive pages, S02 is Agenda and at least one Section divider
-is required.
+is required. Set Cover, Agenda, Section divider, and Ending pages to `Deferred
+template` unless the user explicitly requests custom design. Keep their Page
+type and Slide ID; do not author exact copy for them.
 
-Create framework 3.1 / workflow 7.0 with one plain `.pptx` output filename, then
+Create framework 3.1 / workflow 8.0 with one plain `.pptx` output filename, then
 run:
 
 ```bash
@@ -63,7 +66,8 @@ the controller requests migration from workflow 6.0.
 
 ## Content gate
 
-For `PRESENT_PAGE_REVIEW`, replace `working/provisional-content.md` with exactly
+Never create `content.md` sections for `Deferred template` pages. For
+`PRESENT_PAGE_REVIEW`, replace `working/provisional-content.md` with exactly
 the active page. Include final visible copy, complete data, emphasis, and
 sources; exclude visual/layout direction. Run `present-review`, show the whole
 page, and wait for explicit approval before `approve-content`.
@@ -75,9 +79,11 @@ schedule, tool, approval, learning, or business-outcome facts.
 
 For `PREPARE_SVG_CANDIDATES`, load workspace dependencies, set
 `EY_DECK_SVG_PYTHON` to the returned absolute Python executable, and run the
-emitted command. Structural pages receive A. Substantive pages default to A and
-upgrade to A/B only under the hash-bound adaptive plan; explicit single/dual
-decisions override automatic triggers. EY controls count, not design direction.
+emitted command. Deferred template pages never enter this gate. A structural
+page explicitly activated with `reopen-content` receives A; substantive pages
+default to A and upgrade to A/B only under the hash-bound adaptive plan.
+Explicit single/dual decisions override automatic triggers. EY controls count,
+not design direction.
 
 For each `RUN_EMBEDDED_PPT_MASTER_SVG` request:
 
@@ -101,10 +107,11 @@ for a design restart.
 
 ## PPTX export
 
-After all SVGs are confirmed, run `PREPARE_PPTX_EXPORT` to freeze the ordered
-roster and hashes. For `RUN_EMBEDDED_PPT_MASTER_PPTX`, read its request and
-service contract, set `EY_DECK_PPTX_PYTHON` from workspace dependencies, and run
-the emitted command.
+After all authored pages are SVG-confirmed, run `PREPARE_PPTX_EXPORT` to freeze
+the ordered mixed roster and hashes. It must materialize each deferred structural
+template only here and retain its original Slide ID position. For
+`RUN_EMBEDDED_PPT_MASTER_PPTX`, read its request and service contract, set
+`EY_DECK_PPTX_PYTHON` from workspace dependencies, and run the emitted command.
 
 Export through editable native DrawingML with flat Quick Generate structure,
 `preserve` text flow, no notes, final SVG validation, conversion trace,

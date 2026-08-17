@@ -1,4 +1,4 @@
-# Confirmed SVG to editable PPTX
+# Ordered slide roster to editable PPTX
 
 Read this file only for `PREPARE_PPTX_EXPORT`,
 `RUN_EMBEDDED_PPT_MASTER_PPTX`, or PPTX recovery.
@@ -8,8 +8,9 @@ Read this file only for `PREPARE_PPTX_EXPORT`,
 The controller owns lifecycle and paths. `scripts/workflow_pptx.py` owns the
 EY-to-PPT-Master adapter, hashes, invocation, and receipts. Bundled PPT Master
 owns final SVG validation, editable DrawingML conversion, conversion trace, and
-package postflight. Do not call the converter directly or create a second PPTX
-implementation in the controller.
+package postflight. The ordered roster may contain confirmed authored SVGs and
+export-time structural template snapshots. Do not call the converter directly
+or create a second PPTX implementation in the controller.
 
 ## Text-frame contract
 
@@ -24,14 +25,17 @@ implementation in the controller.
 
 ## Controller actions
 
-1. Run `PREPARE_PPTX_EXPORT`'s command once. It creates a hash-bound request;
-   it does not create the deck.
+1. Run `PREPARE_PPTX_EXPORT`'s command once. It materializes self-contained
+   Cover, Agenda, Section divider, and Ending template snapshots only for pages
+   with `Deferred template`, then creates a hash-bound ordered request. It does
+   not create the deck or enter page design.
 2. On `RUN_EMBEDDED_PPT_MASTER_PPTX`, read the request and its service contract,
    call `load_workspace_dependencies`, set command-scoped
    `EY_DECK_PPTX_PYTHON` to the returned absolute Python executable, then run
    the exact emitted command. Do not install or discover alternate packages.
 3. On failure, do not modify `svg_output/`. Reopen and reconfirm an affected
-   page when source SVG structure is wrong; otherwise repair the environment
+   authored page when source SVG structure is wrong. Repair a bundled template
+   upstream when a deferred snapshot is wrong; otherwise repair the environment
    and rerun.
 4. On `PPTX_STAGE_COMPLETE`, deliver only the `.pptx`. The JSON postflight,
    trace, and text audit remain project-local evidence.

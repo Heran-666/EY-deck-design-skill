@@ -12,18 +12,19 @@ run:
 python3 <controller> bootstrap --project-dir <absolute-project-directory>
 ```
 
-Bootstrap validates framework 3.1 / workflow 7.0 and prints one next action. It
+Bootstrap validates framework 3.1 / workflow 8.0 and prints one next action. It
 does not generate a candidate or infer approval.
 
-For a workflow 6.0 project created before the PPTX stage existed, run:
+For a readable pre-8.0 project, run:
 
 ```bash
 python3 <controller> upgrade-workflow --project-dir <absolute-project-directory>
 ```
 
-This command changes only `Workflow version` to 7.0, validates the complete
+This command changes only `Workflow version` to 8.0, validates the complete
 framework, and prints the next action. It does not change content, page states,
-SVGs, decisions, or receipts.
+SVGs, decisions, or receipts. Existing structural pages therefore keep their
+current authored lifecycle; only new frameworks default them to template deferral.
 
 ## Content recovery
 
@@ -41,8 +42,9 @@ SVGs, decisions, or receipts.
   command-scoped `EY_DECK_SVG_PYTHON` to the returned absolute Python
   executable. A missing or incapable runtime must fail before page state or
   candidate files change; do not install an alternate environment.
-- `prepare-svg-candidates` creates only A for an active Cover, Agenda, Section
-  divider, or Ending page. Substantive pages default to A and upgrade to A/B
+- Deferred template pages never reach `prepare-svg-candidates`. A Cover, Agenda,
+  Section divider, or Ending page explicitly reopened for custom design creates
+  only A. Substantive pages default to A and upgrade to A/B
   only when the hash-bound adaptive candidate plan detects approved chart/table
   evidence, explicit comparison or hierarchy, a high-stakes selection, or an
   explicit alternatives decision. An explicit single-candidate decision wins.
@@ -69,8 +71,9 @@ hand-edit a confirmed artifact or receipt.
 
 ## PPTX recovery
 
-- `PREPARE_PPTX_EXPORT` snapshots the ordered confirmed SVG roster. Any SVG,
-  framework, content, or output-filename change makes that request stale.
+- `PREPARE_PPTX_EXPORT` snapshots the ordered roster of confirmed SVGs and
+  deferred structural templates. Any source, framework, content, or
+  output-filename change makes that request stale.
 - A failed `RUN_EMBEDDED_PPT_MASTER_PPTX` leaves confirmed SVGs unchanged. Fix
   environment or package failures and rerun the same request.
 - A fragmented-paragraph or text-frame failure is upstream design evidence:

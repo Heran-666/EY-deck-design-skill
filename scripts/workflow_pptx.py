@@ -16,6 +16,7 @@ from xml.etree import ElementTree as ET
 from framework_lib import h2_section, line_fields, page_entries
 from workflow_io import now, read_json, sha256, write_json
 from workflow_paths import ProjectPaths
+from workflow_ppt_master import materialize_template, template_path
 from workflow_svg import confirmation_valid
 
 
@@ -24,7 +25,7 @@ PPT_MASTER_ROOT = SKILL_ROOT / "ppt-master"
 SERVICE_CONTRACT = PPT_MASTER_ROOT / "workflows" / "svg-deck-pptx-service.md"
 SVG_QUALITY_CHECKER = PPT_MASTER_ROOT / "scripts" / "svg_quality_checker.py"
 PPTX_EXPORTER = PPT_MASTER_ROOT / "scripts" / "svg_to_pptx.py"
-REQUEST_SCHEMA = "ppt-master.svg-deck-pptx-request.v1"
+REQUEST_SCHEMA = "ppt-master.svg-deck-pptx-request.v2"
 RECEIPT_SCHEMA = "ey-deck.pptx-export.v1"
 TEXT_AUDIT_SCHEMA = "ey-deck.pptx-text-frame-audit.v1"
 TEXT_FLOW = "preserve"
@@ -62,31 +63,58 @@ def _slide_roster(paths: ProjectPaths, text: str) -> list[dict[str, str]]:
         status = page.fields.get("Status")
         if status == "Protected placeholder":
             continue
-        if status != "SVG confirmed" or not confirmation_valid(paths, page.slide_id):
-            raise ValueError(f"{page.slide_id} does not have a current confirmed SVG")
-        svg_path = (paths.svg_output / f"{page.slide_id}.svg").resolve()
-        roster.append(
-            {
-                "slide_id": page.slide_id,
-                "path": str(svg_path),
-                "sha256": sha256(svg_path),
-            }
-        )
+        if status == "Deferred template":
+            svg_path = paths.pptx_template(page.slide_id).resolve()
+            source = template_path(page).resolve()
+            if not svg_path.is_file():
+                raise ValueError(f"deferred template snapshot is missing for {page.slide_id}")
+            roster.append(
+                {
+                    "slide_id": page.slide_id,
+                    "source_kind": "deferred-template",
+                    "page_type": page.fields.get("Page type", ""),
+                    "path": str(svg_path),
+                    "sha256": sha256(svg_path),
+                    "template_source_path": str(source),
+                    "template_source_sha256": sha256(source),
+                }
+            )
+            continue
+        if status == "SVG confirmed" and confirmation_valid(paths, page.slide_id):
+            svg_path = (paths.svg_output / f"{page.slide_id}.svg").resolve()
+            roster.append(
+                {
+                    "slide_id": page.slide_id,
+                    "source_kind": "confirmed-svg",
+                    "page_type": page.fields.get("Page type", ""),
+                    "path": str(svg_path),
+                    "sha256": sha256(svg_path),
+                }
+            )
+            continue
+        raise ValueError(f"{page.slide_id} has no exportable confirmed SVG or deferred template")
     if not roster:
-        raise ValueError("no confirmed authored SVGs are available for PPTX export")
+        raise ValueError("no exportable slides are available for PPTX export")
     return roster
+
+
+def _materialize_deferred_templates(paths: ProjectPaths, text: str) -> None:
+    for page in page_entries(text):
+        if page.fields.get("Status") == "Deferred template":
+            materialize_template(template_path(page), paths.pptx_template(page.slide_id))
 
 
 def request_payload(paths: ProjectPaths, text: str) -> dict[str, object]:
     filename = _output_filename(text)
+    content_path = paths.content.resolve()
     return {
         "schema": REQUEST_SCHEMA,
         "caller": "ey-deck-design",
         "project_dir": str(paths.root.resolve()),
         "framework_path": str(paths.framework.resolve()),
         "framework_sha256": sha256(paths.framework),
-        "content_path": str(paths.content.resolve()),
-        "content_sha256": sha256(paths.content),
+        "content_path": str(content_path),
+        "content_sha256": sha256(content_path) if content_path.is_file() else None,
         "slides": _slide_roster(paths, text),
         "output_path": str(paths.pptx_output(filename).resolve()),
         "quality_report_path": str(paths.svg_quality_report.resolve()),
@@ -100,7 +128,7 @@ def request_payload(paths: ProjectPaths, text: str) -> dict[str, object]:
             "pptx_structure": "flat-quick-generate",
         },
         "quality_policy": {
-            "require_current_confirmed_svg_hashes": True,
+            "require_current_slide_source_hashes": True,
             "require_final_svg_quality_gate": True,
             "block_fragmented_paragraph_warnings": True,
             "require_conversion_trace": True,
@@ -111,6 +139,7 @@ def request_payload(paths: ProjectPaths, text: str) -> dict[str, object]:
 
 
 def write_request(paths: ProjectPaths, text: str) -> Path:
+    _materialize_deferred_templates(paths, text)
     payload = request_payload(paths, text)
     payload["prepared_at"] = now()
     write_json(paths.pptx_request, payload)
@@ -194,7 +223,12 @@ def _visual_fingerprint(root: ET.Element) -> str:
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
-def _write_flat_projection(source: Path, destination: Path) -> dict[str, object]:
+def _write_flat_projection(
+    source: Path,
+    destination: Path,
+    *,
+    source_kind: str,
+) -> dict[str, object]:
     """Write and attest a visual-equivalent flat SVG projection."""
     root = ET.parse(source).getroot()
     source_visual_fingerprint = _visual_fingerprint(root)
@@ -213,6 +247,9 @@ def _write_flat_projection(source: Path, destination: Path) -> dict[str, object]
         raise ValueError("flat projection changed visual SVG content")
     return {
         "transform": "strip-structure-metadata/v1",
+        "source_kind": source_kind,
+        "source_path": str(source.resolve()),
+        "source_sha256": sha256(source),
         "confirmed_svg": str(source.resolve()),
         "confirmed_sha256": sha256(source),
         "conversion_svg": str(destination.resolve()),
@@ -241,6 +278,8 @@ def _annotate_trace_sources(
             raise ValueError("invalid conversion trace entry during source restoration")
         if projection.get("confirmed_sha256") != expected.get("sha256"):
             raise ValueError("flat projection authority hash does not match export request")
+        if projection.get("source_kind") != expected.get("source_kind"):
+            raise ValueError("flat projection source kind does not match export request")
         traced["svg"] = expected["path"]
         traced["source_bridge"] = projection
     write_json(trace_path, trace)
@@ -271,7 +310,7 @@ def audit_text_frames(request: dict, output_path: Path, trace_path: Path) -> dic
     if not isinstance(trace_slides, list) or not isinstance(slides, list):
         raise ValueError("conversion trace or export request has no slide roster")
     if len(trace_slides) != len(slides):
-        raise ValueError("conversion trace slide count does not match the confirmed SVG roster")
+        raise ValueError("conversion trace slide count does not match the ordered slide roster")
     pptx_counts = _pptx_text_box_counts(output_path, len(slides))
     audited: list[dict[str, object]] = []
     for index, (expected, traced, pptx_count) in enumerate(
@@ -340,7 +379,11 @@ def export_from_request(paths: ProjectPaths, text: str) -> Path:
                 raise ValueError("invalid slide entry in PPTX export request")
             source = Path(str(slide["path"]))
             projections.append(
-                _write_flat_projection(source, staging_svg_output / source.name)
+                _write_flat_projection(
+                    source,
+                    staging_svg_output / f"{slide['slide_id']}.svg",
+                    source_kind=str(slide.get("source_kind", "confirmed-svg")),
+                )
             )
 
         _run(

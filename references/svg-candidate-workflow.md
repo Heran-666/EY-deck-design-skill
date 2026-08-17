@@ -12,8 +12,9 @@ feedback, and confirmation.
 
 ## Candidate contract
 
-- Cover, Agenda, Section divider, and Ending use A only. Substantive pages
-  default to A; upgrade to A/B only for chart/table evidence, explicit
+- Deferred template pages never enter this workflow. A Cover, Agenda, Section
+  divider, or Ending page explicitly activated for custom design uses A only.
+  Substantive pages default to A; upgrade to A/B only for chart/table evidence, explicit
   comparison or hierarchy, a high-stakes choice, or an explicit request for
   alternatives. An explicit single-candidate decision wins.
 - Persist `candidate_plan` in the hash-bound page context. PPT Master must

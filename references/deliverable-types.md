@@ -118,4 +118,7 @@ Use this page block unless a compact table can preserve the bullet hierarchy and
 Obtain explicit approval before creating `framework.md` or `content.md`, unless
 the user expressly waives the Storyline gate. After approval, all types use the
 same page-by-page content-review controller and bundled PPT Master SVG candidate
-loop. The current workflow ends after every authored page has one confirmed SVG.
+loop for substantive pages. Mark Cover, Agenda, Section divider, and Ending as
+`Deferred template` in the framework unless custom design is explicitly
+requested. Export after every authored page has one confirmed SVG and every
+deferred structural page has a known template type.

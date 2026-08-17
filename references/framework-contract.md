@@ -19,7 +19,7 @@ only effective durable information into `framework.md`.
 ## Current position
 
 - Framework version: 3.1
-- Workflow version: 7.0
+- Workflow version: 8.0
 - Storyline version: 1.0
 - Output filename: <plain filename ending in .pptx>
 
@@ -62,20 +62,25 @@ scope for later content authoring, not exact on-slide copy.
 
 Every new Storyline starts with exactly one Cover at S01. At six or more
 substantive pages, include one Agenda at S02 and at least one Section divider.
+Give Cover, Agenda, Section divider, and Ending pages their normal Page type and
+`Deferred template` Status by default. Preserve their Slide IDs and positions,
+but do not draft exact on-slide copy; the user fills their editable template
+fields after PPTX export. Use `reopen-content` only when the user explicitly
+requests a custom-designed structural page.
 
 `Output filename` is one plain `.pptx` filename, never a path. Preserve an
 explicit user filename; otherwise derive it once from the deliverable name. It
-becomes the project-root output of the confirmed-SVG-to-PPTX stage. Workflow
-7.0 records the output, postflight, conversion trace, and text-frame audit
+becomes the project-root output of the ordered-roster-to-PPTX stage. Workflow
+8.0 records the output, postflight, conversion trace, and text-frame audit
 outside `framework.md`.
 
 For `Protected placeholder`, set both Page type and Status to
 `Protected placeholder`. Put the exact approved instruction in `Content scope`;
 it must begin with `[占位：` and state that AI must not generate, rewrite, or
 supplement the page. An optional supplied literal SVG may live at
-`protected_input/<Slide ID>.svg`, but workflow 7.0 does not validate, confirm,
-or include protected placeholders in the PPTX roster. Only explicitly confirmed
-SVGs are exported.
+`protected_input/<Slide ID>.svg`, but workflow 8.0 does not validate, confirm,
+or include protected placeholders in the PPTX roster. Export only explicitly
+confirmed authored SVGs plus hash-bound `Deferred template` snapshots.
 
 ## Durable states
 
@@ -84,19 +89,22 @@ Use only:
 1. `Not started`
 2. `Content locked`
 3. `SVG confirmed`
-4. `Protected placeholder`
+4. `Deferred template`
+5. `Protected placeholder`
 
 The controller always selects the first page that is neither `SVG confirmed`
-nor `Protected placeholder`. Content approval sets `Content locked`; candidate
-preparation leaves that durable state unchanged; explicit publication sets
-`SVG confirmed`. `Open items` must be `None` before content locks.
+nor `Deferred template` nor `Protected placeholder`. Content approval sets
+`Content locked`; candidate preparation leaves that durable state unchanged;
+explicit publication sets `SVG confirmed`. `Deferred template` is valid only
+for Cover, Agenda, Section divider, and Ending page types. `Open items` must be
+`None` before content locks or template deferral.
 
 Derive transient progress from evidence under `working/`: a current content
 review receipt means content is being reviewed, and a hash-bound page context
 plus the complete initial request set means SVG decisions are in progress. Do
 not write `Content reviewing` or `Awaiting SVG decision` into new or updated
 frameworks. Accept those legacy values only long enough to finish or reopen an
-existing workflow 7.0 cycle.
+existing pre-8.0 cycle.
 
 Keep candidate versions and revision history out of this file. Their immutable
 request, artifact, presentation, and decision receipts live under `working/`.

@@ -7,6 +7,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+import zipfile
 from pathlib import Path
 from unittest import mock
 from xml.etree import ElementTree as ET
@@ -45,7 +46,7 @@ FRAMEWORK = """# Presentation Framework
 ## Current position
 
 - Framework version: 3.1
-- Workflow version: 7.0
+- Workflow version: 8.0
 - Storyline version: 1.0
 - Output filename: sample.pptx
 
@@ -103,6 +104,35 @@ SECOND_PAGE = """
 - Content scope: Recommendation detail
 - Next connection: None
 - Status: Not started
+- Confirmed decisions: None
+- Open items: None
+"""
+
+
+DEFERRED_FRAMEWORK = FRAMEWORK.replace(
+    "- Status: Not started",
+    "- Status: Deferred template",
+    1,
+) + """
+### S02｜Content page
+
+- Chapter: Main
+- Page type: Standard content
+- Narrative role: Explain the recommendation
+- Content scope: Recommendation detail
+- Next connection: None
+- Status: Not started
+- Confirmed decisions: None
+- Open items: None
+
+### S03｜Closing
+
+- Chapter: Closing
+- Page type: Ending
+- Narrative role: Close the presentation
+- Content scope: User fills the closing fields after export
+- Next connection: None
+- Status: Deferred template
 - Confirmed decisions: None
 - Open items: None
 """
@@ -188,6 +218,17 @@ def lock_content(project: Path) -> None:
     assert approved.returncode == 0, approved.stdout + approved.stderr
 
 
+def lock_deferred_deck_content(project: Path) -> None:
+    (project / "framework.md").write_text(DEFERRED_FRAMEWORK, encoding="utf-8")
+    provisional = project / "working" / "provisional-content.md"
+    provisional.parent.mkdir(parents=True)
+    provisional.write_text(CONTENT_S02, encoding="utf-8")
+    presented = run(project, "present-review")
+    assert presented.returncode == 0, presented.stdout + presented.stderr
+    approved = run(project, "approve-content")
+    assert approved.returncode == 0, approved.stdout + approved.stderr
+
+
 def prepare_candidates(project: Path, page_id: str = "S01") -> dict:
     prepared = run(project, "prepare-svg-candidates", "--page", page_id)
     assert prepared.returncode == 0, prepared.stdout + prepared.stderr
@@ -221,21 +262,21 @@ class WorkflowTests(unittest.TestCase):
     def test_phase_one_workflow_migrates_without_changing_page_state(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             project = Path(tmp)
-            legacy = FRAMEWORK.replace("- Workflow version: 7.0", "- Workflow version: 6.0")
+            legacy = FRAMEWORK.replace("- Workflow version: 8.0", "- Workflow version: 6.0")
             (project / "framework.md").write_text(legacy, encoding="utf-8")
 
             upgraded = run(project, "upgrade-workflow")
 
             self.assertEqual(upgraded.returncode, 0, upgraded.stdout + upgraded.stderr)
             text = (project / "framework.md").read_text(encoding="utf-8")
-            self.assertIn("- Workflow version: 7.0", text)
+            self.assertIn("- Workflow version: 8.0", text)
             self.assertIn("- Status: Not started", text)
             self.assertIn('"action": "PRESENT_PAGE_REVIEW"', upgraded.stdout)
 
     def test_phase_one_migration_does_not_mutate_an_invalid_framework(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             project = Path(tmp)
-            legacy = FRAMEWORK.replace("- Workflow version: 7.0", "- Workflow version: 6.0")
+            legacy = FRAMEWORK.replace("- Workflow version: 8.0", "- Workflow version: 6.0")
             legacy = legacy.replace("- Output filename: sample.pptx", "- Output filename: invalid.txt")
             framework = project / "framework.md"
             framework.write_text(legacy, encoding="utf-8")
@@ -245,6 +286,19 @@ class WorkflowTests(unittest.TestCase):
             self.assertNotEqual(upgraded.returncode, 0)
             self.assertIn("Output filename", upgraded.stdout)
             self.assertIn("- Workflow version: 6.0", framework.read_text(encoding="utf-8"))
+
+    def test_workflow_seven_is_readable_for_non_mutating_upgrade(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project = Path(tmp)
+            legacy = FRAMEWORK.replace("- Workflow version: 8.0", "- Workflow version: 7.0")
+            (project / "framework.md").write_text(legacy, encoding="utf-8")
+
+            upgraded = run(project, "upgrade-workflow")
+
+            self.assertEqual(upgraded.returncode, 0, upgraded.stdout + upgraded.stderr)
+            text = (project / "framework.md").read_text(encoding="utf-8")
+            self.assertIn("- Workflow version: 8.0", text)
+            self.assertIn("- Status: Not started", text)
 
     def test_bootstrap_creates_provisional_content_parent(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -259,6 +313,49 @@ class WorkflowTests(unittest.TestCase):
             provisional = Path(payload["provisional_content"]["path"])
             self.assertEqual(provisional, (project / "working" / "provisional-content.md").resolve())
             self.assertTrue(provisional.parent.is_dir())
+
+    def test_deferred_structural_pages_skip_content_and_svg_gates(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project = Path(tmp)
+            (project / "framework.md").write_text(DEFERRED_FRAMEWORK, encoding="utf-8")
+
+            first = next_payload(project)
+
+            self.assertEqual(first["action"], "PRESENT_PAGE_REVIEW")
+            self.assertEqual(first["slide_id"], "S02")
+            self.assertFalse((project / "svg_working" / "S01").exists())
+            self.assertFalse((project / "svg_working" / "S03").exists())
+
+    def test_deferred_template_status_rejects_substantive_page_type(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project = Path(tmp)
+            invalid = FRAMEWORK.replace("- Page type: Cover", "- Page type: Standard content")
+            invalid = invalid.replace("- Status: Not started", "- Status: Deferred template")
+            framework = project / "framework.md"
+            framework.write_text(invalid, encoding="utf-8")
+
+            errors = validate_framework(framework, project)
+
+            self.assertTrue(any("Deferred template status requires" in item for item in errors))
+
+    def test_all_deferred_deck_prepares_export_without_content_file(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project = Path(tmp)
+            deferred_only = FRAMEWORK.replace(
+                "- Status: Not started",
+                "- Status: Deferred template",
+            )
+            (project / "framework.md").write_text(deferred_only, encoding="utf-8")
+
+            self.assertEqual(next_payload(project)["action"], "PREPARE_PPTX_EXPORT")
+            prepared = run(project, "prepare-pptx-export")
+
+            self.assertEqual(prepared.returncode, 0, prepared.stdout + prepared.stderr)
+            request = json.loads(
+                (project / "working" / "packets" / "pptx" / "export.json").read_text()
+            )
+            self.assertIsNone(request["content_sha256"])
+            self.assertEqual(request["slides"][0]["source_kind"], "deferred-template")
 
     def test_svg_runtime_is_required_before_candidate_state_changes(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -694,8 +791,9 @@ class WorkflowTests(unittest.TestCase):
             self.assertEqual(payload["action"], "RUN_EMBEDDED_PPT_MASTER_PPTX")
             self.assertEqual(payload["conversion_contract"]["text_flow"], "preserve")
             request = json.loads((project / "working" / "packets" / "pptx" / "export.json").read_text())
-            self.assertEqual(request["schema"], "ppt-master.svg-deck-pptx-request.v1")
+            self.assertEqual(request["schema"], "ppt-master.svg-deck-pptx-request.v2")
             self.assertEqual(request["slides"][0]["slide_id"], "S01")
+            self.assertEqual(request["slides"][0]["source_kind"], "confirmed-svg")
             self.assertEqual(request["conversion"]["text_flow"], "preserve")
             self.assertTrue(request["quality_policy"]["require_text_frame_parity"])
             self.assertEqual(Path(request["output_path"]), (project / "sample.pptx").resolve())
@@ -703,6 +801,49 @@ class WorkflowTests(unittest.TestCase):
             renamed = run(project, "set-output-filename", "--filename", "renamed.pptx")
             self.assertEqual(renamed.returncode, 0, renamed.stdout + renamed.stderr)
             self.assertEqual(next_payload(project)["action"], "PREPARE_PPTX_EXPORT")
+
+    def test_pptx_roster_injects_deferred_templates_in_framework_order(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project = Path(tmp)
+            lock_deferred_deck_content(project)
+            self.assertEqual(next_payload(project)["slide_id"], "S02")
+            prepare_candidates(project, page_id="S02")
+            complete_candidate(project, "A", "Authored content", page_id="S02")
+            self.assertEqual(
+                run(project, "present-svg", "--page", "S02", "--versions", "A").returncode,
+                0,
+            )
+            confirmed = run(project, "confirm-svg", "--page", "S02", "--version", "A")
+            self.assertEqual(confirmed.returncode, 0, confirmed.stdout + confirmed.stderr)
+            directive = next_payload(project)
+            self.assertEqual(directive["action"], "PREPARE_PPTX_EXPORT")
+            self.assertEqual(
+                [item["source_kind"] for item in directive["ordered_slides"]],
+                ["deferred-template", "confirmed-svg", "deferred-template"],
+            )
+
+            prepared = run(project, "prepare-pptx-export")
+
+            self.assertEqual(prepared.returncode, 0, prepared.stdout + prepared.stderr)
+            request = json.loads(
+                (project / "working" / "packets" / "pptx" / "export.json").read_text()
+            )
+            self.assertEqual([item["slide_id"] for item in request["slides"]], ["S01", "S02", "S03"])
+            self.assertEqual(
+                [item["source_kind"] for item in request["slides"]],
+                ["deferred-template", "confirmed-svg", "deferred-template"],
+            )
+            for slide_id in ("S01", "S03"):
+                snapshot = project / "working" / "packets" / "pptx" / "templates" / f"{slide_id}.svg"
+                self.assertTrue(snapshot.is_file())
+                hrefs = [
+                    element.attrib.get("href", "")
+                    for element in ET.parse(snapshot).getroot().iter()
+                    if element.tag.rsplit("}", 1)[-1] == "image"
+                ]
+                self.assertTrue(hrefs)
+                self.assertTrue(all(href.startswith("data:image/") for href in hrefs))
+                self.assertFalse((project / "svg_working" / slide_id).exists())
 
     def test_embedded_ppt_master_exports_editable_text_with_frame_parity(self) -> None:
         runtime = os.environ.get("EY_DECK_PPTX_PYTHON")
@@ -758,6 +899,54 @@ class WorkflowTests(unittest.TestCase):
             audited = run(project, "audit")
             self.assertEqual(audited.returncode, 0, audited.stdout + audited.stderr)
             self.assertIn("editable PPTX workflow audit passed", audited.stdout)
+
+    def test_deferred_templates_export_in_order_with_editable_text(self) -> None:
+        runtime = os.environ.get("EY_DECK_PPTX_PYTHON")
+        if not runtime:
+            self.skipTest("PPTX runtime is not available; set EY_DECK_PPTX_PYTHON")
+        with tempfile.TemporaryDirectory() as tmp:
+            project = Path(tmp)
+            lock_deferred_deck_content(project)
+            prepare_candidates(project, page_id="S02")
+            complete_candidate(project, "A", "Editable content", page_id="S02")
+            self.assertEqual(
+                run(project, "present-svg", "--page", "S02", "--versions", "A").returncode,
+                0,
+            )
+            self.assertEqual(
+                run(project, "confirm-svg", "--page", "S02", "--version", "A").returncode,
+                0,
+            )
+            self.assertEqual(run(project, "prepare-pptx-export").returncode, 0)
+
+            exported = run(project, "export-pptx")
+
+            self.assertEqual(exported.returncode, 0, exported.stdout + exported.stderr)
+            output = project / "sample.pptx"
+            self.assertTrue(output.is_file())
+            with zipfile.ZipFile(output) as archive:
+                slide_xml = sorted(
+                    name
+                    for name in archive.namelist()
+                    if name.startswith("ppt/slides/slide") and name.endswith(".xml")
+                )
+            self.assertEqual(len(slide_xml), 3)
+            audit = json.loads(
+                (project / "working" / "receipts" / "pptx" / "text-frames.json").read_text()
+            )
+            self.assertEqual(
+                [item["slide_id"] for item in audit["slides"]],
+                ["S01", "S02", "S03"],
+            )
+            self.assertGreater(audit["slides"][0]["pptx_text_boxes"], 0)
+            self.assertGreater(audit["slides"][2]["pptx_text_boxes"], 0)
+            trace = json.loads(
+                (project / "validation" / "sample.trace.json").read_text(encoding="utf-8")
+            )
+            self.assertEqual(
+                [item["source_bridge"]["source_kind"] for item in trace["slides"]],
+                ["deferred-template", "confirmed-svg", "deferred-template"],
+            )
 
     def test_page_service_blocks_one_paragraph_split_into_sibling_text_boxes(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -966,15 +1155,27 @@ class WorkflowTests(unittest.TestCase):
         ):
             self.assertNotIn(removed_aesthetic_rule, quality_text)
 
-    def test_agenda_template_has_blank_replaceable_composite_region(self) -> None:
+    def test_agenda_and_ending_templates_have_editable_fill_in_text(self) -> None:
         agenda = TEMPLATE_ROOT / "templates" / "agenda.svg"
         source = agenda.read_text(encoding="utf-8")
         root = ET.parse(agenda).getroot()
         region = next(element for element in root.iter() if element.attrib.get("id") == "agenda-content-region")
         self.assertEqual(region.attrib.get("data-pptx-binding"), "proxy")
-        self.assertNotIn("agenda-sample", source)
-        self.assertNotIn("Agenda item", source)
+        self.assertIn("Section title", source)
         self.assertTrue(any(child.tag.rsplit("}", 1)[-1] == "rect" for child in region))
+        agenda_text = [
+            element
+            for element in region.iter()
+            if element.tag.rsplit("}", 1)[-1] == "text"
+        ]
+        self.assertEqual(len(agenda_text), 1)
+
+        ending = TEMPLATE_ROOT / "templates" / "ending.svg"
+        ending_source = ending.read_text(encoding="utf-8")
+        self.assertIn("Thank you", ending_source)
+        self.assertIn("Name | Role", ending_source)
+        self.assertIn("ending-background.png", ending_source)
+        self.assertNotIn("data-ey-fixed-ending", ending_source)
 
     def test_full_design_service_contract_is_registered(self) -> None:
         contract = (ROOT / "ppt-master" / "workflows" / "page-svg-service.md").read_text(encoding="utf-8")
@@ -982,7 +1183,7 @@ class WorkflowTests(unittest.TestCase):
             self.assertIn(capability, contract)
         internal = (ROOT / "ppt-master" / "INTERNAL.md").read_text(encoding="utf-8")
         self.assertIn("ppt-master.page-svg-request.v3", internal)
-        self.assertIn("ppt-master.svg-deck-pptx-request.v1", internal)
+        self.assertIn("ppt-master.svg-deck-pptx-request.v2", internal)
         export_contract = (ROOT / "ppt-master" / "workflows" / "svg-deck-pptx-service.md").read_text(encoding="utf-8")
         self.assertIn("preserve", export_contract)
         self.assertIn("text box", export_contract)
