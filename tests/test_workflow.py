@@ -27,6 +27,7 @@ from validate_framework import validate as validate_framework  # noqa: E402
 from workflow_io import sha256 as request_sha256  # noqa: E402
 from workflow_ppt_master import (  # noqa: E402
     TEMPLATE_ROOT,
+    candidate_plan,
     independent_variant_directions,
     materialize_template,
     template_name,
@@ -391,7 +392,7 @@ class WorkflowTests(unittest.TestCase):
                 self.assertEqual(context["composition_space"]["mode"], "full-slide")
                 self.assertIsNone(context["composition_space"]["global_content_cap"])
                 self.assertFalse(context["composition_space"]["check_fixed_atom_overlap"])
-                self.assertEqual(context["design_quality"]["profile"], "ey-executive-editorial-v2")
+                self.assertEqual(context["design_quality"]["profile"], "ey-executive-editorial-v3")
                 self.assertTrue(
                     any("icon elements" in rule for rule in context["design_quality"]["must_have"])
                 )
@@ -401,7 +402,7 @@ class WorkflowTests(unittest.TestCase):
                         "information_design",
                         "page_composition",
                         "art_direction_refinement",
-                        "full_slide_render_review",
+                        "source_svg_full_slide_review",
                         "source_repair_and_recheck",
                     ],
                 )
@@ -532,7 +533,7 @@ class WorkflowTests(unittest.TestCase):
             self.assertIn("Increase the contrast", request["feedback"])
             self.assertFalse(feedback.exists())
             context = json.loads(Path(request["authoring_context"]["path"]).read_text())
-            self.assertEqual(context["design_quality"]["profile"], "ey-executive-editorial-v2")
+            self.assertEqual(context["design_quality"]["profile"], "ey-executive-editorial-v3")
             self.assertEqual(request["variant_direction"]["role"], "revision")
             self.assertEqual(request["variant_direction"]["base_version"], "A")
 
@@ -817,10 +818,13 @@ class WorkflowTests(unittest.TestCase):
             provisional.write_text(CONTENT_S02, encoding="utf-8")
             self.assertEqual(run(project, "present-review").returncode, 0)
             self.assertEqual(run(project, "approve-content").returncode, 0)
-            self.assertEqual(next_payload(project)["action"], "PREPARE_SVG_CANDIDATES")
-            self.assertEqual(next_payload(project)["slide_id"], "S02")
+            planning = next_payload(project)
+            self.assertEqual(planning["action"], "PREPARE_SVG_CANDIDATES")
+            self.assertEqual(planning["slide_id"], "S02")
+            self.assertEqual(planning["versions"], ["A"])
+            self.assertEqual(planning["candidate_plan"]["reason"], "default-single-candidate")
             payload = prepare_candidates(project, "S02")
-            self.assertEqual([item["version"] for item in payload["requests"]], ["A", "B"])
+            self.assertEqual([item["version"] for item in payload["requests"]], ["A"])
             requests = {}
             context_descriptors = set()
             prototype_paths = set()
@@ -834,29 +838,116 @@ class WorkflowTests(unittest.TestCase):
             self.assertEqual(len(context_descriptors), 1)
             self.assertEqual(len(prototype_paths), 1)
             a_direction = requests["A"]["variant_direction"]
-            b_direction = requests["B"]["variant_direction"]
             self.assertEqual(a_direction["role"], "claim-led-editorial")
-            self.assertEqual(b_direction["role"], "logic-led-visual-model")
-            self.assertNotEqual(a_direction["role"], b_direction["role"])
-            self.assertEqual(
-                a_direction["alternative_contract"]["pair_id"],
-                b_direction["alternative_contract"]["pair_id"],
-            )
-            self.assertEqual(a_direction["alternative_contract"]["counterpart_role"], b_direction["role"])
-            self.assertEqual(b_direction["alternative_contract"]["counterpart_role"], a_direction["role"])
+            self.assertNotIn("alternative_contract", a_direction)
+            context = json.loads(Path(payload["requests"][0]["request_path"]).read_text())["authoring_context"]
+            plan = json.loads(Path(context["path"]).read_text())["candidate_plan"]
+            self.assertEqual(plan["versions"], ["A"])
+            self.assertEqual(plan["reason"], "default-single-candidate")
             complete_candidate(project, "A", "Content A", page_id="S02")
-            complete_candidate(project, "B", "Content B", page_id="S02")
-            self.assertEqual(next_payload(project)["action"], "PRESENT_SVG_OPTIONS")
-            presented = run(project, "present-svg", "--page", "S02", "--versions", "A,B")
+            self.assertEqual(next_payload(project)["action"], "PRESENT_SVG_OPTION")
+            presented = run(project, "present-svg", "--page", "S02", "--versions", "A")
             self.assertEqual(presented.returncode, 0, presented.stdout + presented.stderr)
-            self.assertIn("Both SVGs are displayed at the same scale", presented.stdout)
+            self.assertIn("The SVG is displayed at review scale", presented.stdout)
 
-    def test_structural_page_types_use_one_initial_candidate(self) -> None:
-        for page_type in ("Cover", "Agenda", "Section divider", "Ending"):
+    def test_default_initial_candidate_is_single(self) -> None:
+        for page_type in ("Cover", "Agenda", "Section divider", "Ending", "Standard content"):
             with self.subTest(page_type=page_type):
                 self.assertEqual(initial_versions_for_page_type(page_type), ("A",))
-        self.assertEqual(initial_versions_for_page_type("Standard content"), ("A", "B"))
         self.assertEqual(template_name("Ending"), "ending.svg")
+
+    def test_adaptive_candidate_plan_uses_bounded_dual_triggers(self) -> None:
+        page = type("Page", (), {
+            "slide_id": "S03",
+            "fields": {
+                "Page type": "Standard content",
+                "Narrative role": "Explain the recommendation",
+                "Confirmed decisions": "None",
+            },
+        })()
+        context = {
+            "Audience outcome": "Understand the recommendation",
+            "Storyline thesis": "One clear recommendation",
+        }
+        general = """### On-slide content
+- Title: Recommendation
+#### S03-B1｜Recommendation
+- Detail: Proceed with the selected path.
+"""
+        chart = """### On-slide content
+- Title: Performance comparison
+- Chart purpose（Build-only）: Show the ranking
+| Category | Score |
+|---|---:|
+| A | 10 |
+"""
+
+        self.assertEqual(candidate_plan(page, general, context)["versions"], ["A"])
+        chart_plan = candidate_plan(page, chart, context)
+        self.assertEqual(chart_plan["versions"], ["A", "B"])
+        self.assertEqual(chart_plan["reason"], "distinct-communication-models:quantitative-chart")
+
+        page.fields["Narrative role"] = "Support selection of the preferred option"
+        decision_plan = candidate_plan(
+            page,
+            general,
+            {**context, "Audience outcome": "Select the preferred option"},
+        )
+        self.assertEqual(decision_plan["versions"], ["A", "B"])
+        self.assertEqual(decision_plan["reason"], "high-stakes-decision")
+
+        page.fields["Confirmed decisions"] = "Single candidate only"
+        self.assertEqual(candidate_plan(page, chart, context)["versions"], ["A"])
+        page.fields["Confirmed decisions"] = "Provide two design options"
+        self.assertEqual(candidate_plan(page, general, context)["versions"], ["A", "B"])
+
+    def test_explicit_dual_candidate_plan_generates_a_and_b_requests(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project = Path(tmp)
+            second_page = SECOND_PAGE.replace(
+                "- Confirmed decisions: None",
+                "- Confirmed decisions: Provide two design options",
+            )
+            (project / "framework.md").write_text(
+                FRAMEWORK.rstrip() + "\n\n" + second_page.lstrip(),
+                encoding="utf-8",
+            )
+            provisional = project / "working" / "provisional-content.md"
+            provisional.parent.mkdir(parents=True)
+            provisional.write_text(CONTENT, encoding="utf-8")
+            self.assertEqual(run(project, "present-review").returncode, 0)
+            self.assertEqual(run(project, "approve-content").returncode, 0)
+            prepare_candidates(project)
+            complete_candidate(project, "A", "Cover")
+            self.assertEqual(run(project, "present-svg", "--page", "S01", "--versions", "A").returncode, 0)
+            self.assertEqual(run(project, "confirm-svg", "--page", "S01", "--version", "A").returncode, 0)
+
+            provisional.write_text(CONTENT_S02, encoding="utf-8")
+            self.assertEqual(run(project, "present-review").returncode, 0)
+            self.assertEqual(run(project, "approve-content").returncode, 0)
+            planning = next_payload(project)
+            self.assertEqual(planning["versions"], ["A", "B"])
+            self.assertEqual(planning["candidate_plan"]["reason"], "explicit-alternatives")
+
+            payload = prepare_candidates(project, "S02")
+            self.assertEqual([item["version"] for item in payload["requests"]], ["A", "B"])
+            requests = {
+                item["version"]: json.loads(Path(item["request_path"]).read_text())
+                for item in payload["requests"]
+            }
+            for item in payload["requests"]:
+                validated = subprocess.run(
+                    [SVG_RUNTIME, str(SERVICE), "validate-request", item["request_path"]],
+                    text=True,
+                    capture_output=True,
+                    check=False,
+                )
+                self.assertEqual(validated.returncode, 0, validated.stdout + validated.stderr)
+            context_path = Path(requests["A"]["authoring_context"]["path"])
+            plan = json.loads(context_path.read_text())["candidate_plan"]
+            self.assertEqual(plan["reason"], "explicit-alternatives")
+            self.assertIn("alternative_contract", requests["A"]["variant_direction"])
+            self.assertIn("alternative_contract", requests["B"]["variant_direction"])
 
     def test_variant_directions_adapt_to_page_content_and_approved_intent(self) -> None:
         page = type("Page", (), {

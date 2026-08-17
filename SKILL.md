@@ -2,8 +2,8 @@
 name: ey-deck-design
 description: >
   Create and approve EY presentation Storylines and exact slide content, then
-  use the bundled PPT Master to generate one complete SVG for Cover, Agenda,
-  Section divider, and Ending pages and two alternatives for substantive pages,
+  use the bundled PPT Master to generate one complete SVG candidate by default
+  and bounded A/B alternatives only for pages with a verified dual-design need,
   iterate from user-selected bases and feedback, publish only explicitly
   confirmed SVGs, and compile the confirmed SVG roster into an editable native
   DrawingML PPTX with text-frame integrity checks. Use only when the user
@@ -14,7 +14,7 @@ description: >
 
 Own the deck workflow, approved content, candidate lifecycle, and user gates.
 Use the bundled PPT Master page-SVG service for all page strategy, visual design,
-SVG authoring, and visual/technical QA.
+SVG authoring, source-SVG review, and technical QA.
 
 Treat `ppt-master/` as an internal runtime package, never as a second skill. It
 has no `SKILL.md` or UI metadata and may be called only through the EY request
@@ -101,8 +101,12 @@ command-scoped `EY_DECK_SVG_PYTHON` environment variable to its returned
 absolute Python executable, then run the emitted command. Reuse that environment
 for the emitted record command; do not install or search for another runtime.
 The command creates one independent A request for Cover, Agenda, Section
-divider, and Ending pages. It creates independent A and B requests from the same
-locked content for every other authored page.
+divider, and Ending pages. For substantive pages, the EY controller writes an
+automatic hash-bound `candidate_plan` after content locks: default to A; use A/B
+only for approved chart/table evidence, explicit comparison or hierarchy,
+high-stakes selection, or an explicit alternatives decision. An explicit
+single-candidate decision overrides those triggers. Do not ask for another
+per-page confirmation and do not let PPT Master choose the candidate count.
 
 For `RUN_EMBEDDED_PPT_MASTER_SVG`, process every request independently:
 
@@ -111,8 +115,9 @@ For `RUN_EMBEDDED_PPT_MASTER_SVG`, process every request independently:
 2. Run `validate_request`.
 3. Obey the context's `design_quality` and the request's `variant_direction`. Treat the first
    authored SVG as an internal draft; complete information design, page
-   composition, art-direction refinement, full-slide review, and source repair
-   before the candidate becomes visible.
+   composition, art-direction refinement, direct source-SVG full-slide review,
+   and source repair before the candidate becomes visible. Do not render the SVG
+   in Chromium for content or visual QA.
 4. Let the bundled PPT Master write only the request's `artifact_path` as the durable
    output of that internal loop.
 5. Run `record` once. It atomically performs the final service `complete` check
@@ -125,13 +130,13 @@ overlap QA check. This freedom includes imagery, mixed-format text, semantic
 geometry, and page-specific compositions; do not reduce capability to avoid a
 renderer or validation defect.
 
-Make both A and B executive-grade. Use coherent icons where they improve
-recognition, scanning, or visual rhythm, and omit them otherwise. Do not reduce
-A to a generic safe draft, B to an ornamental experiment, or design quality to
-extra icons or effects. Do not reduce B to a cosmetic variation when a
-meaningful alternative exists. Follow the request's page-specific paired search
-roles, which are selected from approved content and user intent; do not impose a
-universal A/B design axis.
+Make every planned candidate executive-grade. Use coherent icons where they
+improve recognition, scanning, or visual rhythm, and omit them otherwise. When
+the plan contains A/B, do not reduce A to a generic safe draft, B to an
+ornamental experiment, or design quality to extra icons or effects. Do not
+reduce B to a cosmetic variation when a meaningful alternative exists. Follow
+the request's page-specific paired search roles, which are selected from
+approved content and user intent; do not impose a universal A/B design axis.
 Do not expose PPT Master's internal strategy as another EY approval gate.
 
 Run the emitted presentation command for `PRESENT_SVG_OPTION`,

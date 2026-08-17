@@ -18,7 +18,13 @@ from validate_framework import validate as validate_framework
 from workflow_content import content_section, promote_provisional_content, provisional_content_errors
 from workflow_io import atomic_write, command_line, now, read_json, sha256, text_sha256, write_json
 from workflow_paths import ProjectPaths
-from workflow_ppt_master import SERVICE_CLI, embedding_errors, write_packet, write_page_context
+from workflow_ppt_master import (
+    SERVICE_CLI,
+    candidate_plan_for_page,
+    embedding_errors,
+    write_packet,
+    write_page_context,
+)
 from workflow_pptx import (
     SERVICE_CONTRACT as PPTX_SERVICE_CONTRACT,
     export_from_request,
@@ -32,7 +38,7 @@ from workflow_svg import (
     confirm_candidate,
     confirmation_valid,
     discard_cycle,
-    initial_versions_for_page_type,
+    legacy_initial_versions_for_page_type,
     latest_revision,
     next_revision,
     presentation_valid,
@@ -169,8 +175,23 @@ def service_request_payload(paths: ProjectPaths, controller: Path, slide_id: str
     }
 
 
+def planned_initial_versions(paths: ProjectPaths, page: PageEntry) -> tuple[str, ...]:
+    """Resolve the current hash-bound adaptive plan, preserving legacy cycles."""
+    context_path = paths.page_context(page.slide_id)
+    if not context_path.is_file() and any(
+        paths.packet(page.slide_id, version).is_file() for version in ("A", "B")
+    ):
+        return legacy_initial_versions_for_page_type(page.fields.get("Page type", ""))
+    framework_text = paths.framework.read_text(encoding="utf-8")
+    plan = candidate_plan_for_page(paths, framework_text, page)
+    versions = plan.get("versions")
+    if versions not in (["A"], ["A", "B"]):
+        raise ValueError(f"invalid candidate plan for {page.slide_id}")
+    return tuple(versions)
+
+
 def svg_cycle_started(paths: ProjectPaths, page: PageEntry) -> bool:
-    versions = initial_versions_for_page_type(page.fields.get("Page type", ""))
+    versions = planned_initial_versions(paths, page)
     packets = [paths.packet(page.slide_id, version) for version in versions]
     if any(not packet.is_file() for packet in packets):
         return False
@@ -200,6 +221,8 @@ def svg_cycle_started(paths: ProjectPaths, page: PageEntry) -> bool:
         or context.get("caller") != "ey-deck-design"
         or context.get("slide_id") != page.slide_id
         or context.get("approved_content_sha256") != current_section_hash
+        or context.get("candidate_plan")
+        != candidate_plan_for_page(paths, paths.framework.read_text(encoding="utf-8"), page)
     ):
         return False
     context_hash = sha256(context_path)
@@ -268,7 +291,7 @@ def svg_directive(paths: ProjectPaths, page: PageEntry, controller: Path) -> dic
             }
         return decision_directive(paths, page.slide_id, versions, controller, revision=True)
 
-    initial_versions = initial_versions_for_page_type(page.fields.get("Page type", ""))
+    initial_versions = planned_initial_versions(paths, page)
     missing = [item for item in initial_versions if not candidate_valid(paths, page.slide_id, item)]
     if missing:
         return {
@@ -366,11 +389,13 @@ def directive_payload(project_dir: Path, text: str, controller: Path) -> dict[st
     if status == "Content locked":
         if svg_cycle_started(paths, page):
             return svg_directive(paths, page, controller)
-        initial_versions = initial_versions_for_page_type(page.fields.get("Page type", ""))
+        plan = candidate_plan_for_page(paths, text, page)
+        initial_versions = tuple(plan["versions"])
         return {
             "action": "PREPARE_SVG_CANDIDATES",
             "slide_id": page.slide_id,
             "versions": list(initial_versions),
+            "candidate_plan": plan,
             "required_environment": {
                 SVG_RUNTIME_ENV: "Absolute Python executable returned by load_workspace_dependencies",
             },
@@ -452,9 +477,10 @@ def handle_prepare_candidates(project_dir: Path, text: str, page_id: str, contro
         raise ValueError(" | ".join(errors))
     _svg_runtime_python()
     paths = ProjectPaths(project_dir)
+    discard_cycle(paths, page_id)
     paths.svg_dir(page_id).mkdir(parents=True, exist_ok=True)
     write_page_context(paths, text, page)
-    for version in initial_versions_for_page_type(page.fields.get("Page type", "")):
+    for version in planned_initial_versions(paths, page):
         write_packet(paths, page, version)
     print_next(project_dir, text, controller)
     return 0
@@ -473,7 +499,7 @@ def handle_record_svg(project_dir: Path, text: str, page_id: str, version: str, 
         raise ValueError(f"{page_id} is not the active page awaiting an SVG decision")
     paths = ProjectPaths(project_dir)
     latest = latest_revision(paths, page_id)
-    expected = [latest] if latest else list(initial_versions_for_page_type(page.fields.get("Page type", "")))
+    expected = [latest] if latest else list(planned_initial_versions(paths, page))
     if version not in expected:
         raise ValueError(f"record-svg must use a current requested version: {','.join(expected)}")
     packet = paths.packet(page_id, version)
@@ -520,7 +546,7 @@ def handle_present_svg(project_dir: Path, text: str, page_id: str, versions_text
         base = request.get("base")
         expected = [str(base.get("version")) if isinstance(base, dict) else "", latest]
     else:
-        expected = list(initial_versions_for_page_type(page.fields.get("Page type", "")))
+        expected = list(planned_initial_versions(paths, page))
     if versions != expected:
         raise ValueError(f"present-svg must use the current comparison: {','.join(expected)}")
     paths.revision_request(page_id).parent.mkdir(parents=True, exist_ok=True)

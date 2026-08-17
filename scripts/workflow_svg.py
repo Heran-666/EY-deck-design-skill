@@ -14,7 +14,8 @@ from workflow_paths import ProjectPaths
 from workflow_spec import is_substantive_page_type
 
 
-INITIAL_VERSIONS = ("A", "B")
+INITIAL_VERSIONS = ("A",)
+LEGACY_SUBSTANTIVE_VERSIONS = ("A", "B")
 VERSION_RE = re.compile(r"(?:A|B|R[1-9]\d*)")
 FORBIDDEN_TAGS = {"foreignObject", "script", "style"}
 PAGE_CONTEXT_SCHEMA = "ey-deck.page-authoring-context.v1"
@@ -25,8 +26,13 @@ REQUEST_SCHEMAS = {
 
 
 def initial_versions_for_page_type(page_type: str) -> tuple[str, ...]:
-    """Return one structural candidate or two substantive candidates."""
-    return INITIAL_VERSIONS if is_substantive_page_type(page_type) else ("A",)
+    """Return the adaptive policy's default single candidate."""
+    return INITIAL_VERSIONS
+
+
+def legacy_initial_versions_for_page_type(page_type: str) -> tuple[str, ...]:
+    """Recover a legacy cycle created before adaptive candidate planning."""
+    return LEGACY_SUBSTANTIVE_VERSIONS if is_substantive_page_type(page_type) else INITIAL_VERSIONS
 
 
 def require_version(version: str) -> str:

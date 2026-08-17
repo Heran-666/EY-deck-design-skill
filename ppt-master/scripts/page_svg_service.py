@@ -19,7 +19,8 @@ LEGACY_REQUEST_SCHEMA = "ppt-master.page-svg-request.v2"
 PAGE_CONTEXT_SCHEMA = "ey-deck.page-authoring-context.v1"
 RESULT_SCHEMA = "ppt-master.page-svg-result.v1"
 VERSION_RE = re.compile(r"(?:A|B|R[1-9]\d*)")
-DESIGN_QUALITY_PROFILE = "ey-executive-editorial-v2"
+DESIGN_QUALITY_PROFILE = "ey-executive-editorial-v3"
+CANDIDATE_PLAN_POLICY = "adaptive-v1"
 ICON_QUALITY_RULE = (
     "Add coherent icon elements at semantically appropriate positions when they improve recognition, "
     "scanning, or visual rhythm; omit them when they have no clear communication job."
@@ -28,7 +29,7 @@ VISIBLE_CANDIDATE_GATE = [
     "information_design",
     "page_composition",
     "art_direction_refinement",
-    "full_slide_render_review",
+    "source_svg_full_slide_review",
     "source_repair_and_recheck",
 ]
 FULL_SLIDE_COMPOSITION = {
@@ -165,10 +166,14 @@ def design_contract_errors(request: dict, mode: object, version: object) -> list
                 if not _nonempty_text(basis.get(field)):
                     errors.append(f"variant_direction.selection_basis.{field} must be non-empty")
         if _normalized_page_type(request) not in STRUCTURAL_PAGE_TYPES:
+            plan = request.get("candidate_plan")
+            planned_versions = plan.get("versions") if isinstance(plan, dict) else None
             alternative = direction.get("alternative_contract")
-            if not isinstance(alternative, dict):
+            if planned_versions == ["A", "B"] and not isinstance(alternative, dict):
                 errors.append("substantive independent variant requires an alternative_contract")
-            else:
+            elif planned_versions == ["A"] and alternative is not None:
+                errors.append("single-candidate plan must not declare an alternative_contract")
+            elif isinstance(alternative, dict):
                 if not _nonempty_text(alternative.get("pair_id")):
                     errors.append("variant_direction.alternative_contract.pair_id must be non-empty")
                 counterpart = alternative.get("counterpart_role")
@@ -207,6 +212,24 @@ def request_errors(request: dict) -> list[str]:
             "composition_space must enable unrestricted full-slide composition; "
             "placeholder bounds are native metadata only and fixed-atom overlap is not a QA gate"
         )
+    plan = context.get("candidate_plan")
+    if request.get("schema") == LEGACY_REQUEST_SCHEMA:
+        planned_versions = (
+            ["A"] if _normalized_page_type(context) in STRUCTURAL_PAGE_TYPES else ["A", "B"]
+        )
+    elif not isinstance(plan, dict):
+        errors.append("candidate_plan must be an object")
+        planned_versions = None
+    else:
+        planned_versions = plan.get("versions")
+        if plan.get("policy") != CANDIDATE_PLAN_POLICY:
+            errors.append(f"candidate_plan.policy must be {CANDIDATE_PLAN_POLICY}")
+        if planned_versions not in (["A"], ["A", "B"]):
+            errors.append("candidate_plan.versions must be ['A'] or ['A', 'B']")
+        if not _nonempty_text(plan.get("reason")) or not _nonempty_text(plan.get("content_signal")):
+            errors.append("candidate_plan reason and content_signal must be non-empty")
+        if _normalized_page_type(context) in STRUCTURAL_PAGE_TYPES and planned_versions != ["A"]:
+            errors.append("structural pages require a single A candidate")
     artifact = Path(str(request.get("artifact_path", "")))
     if not artifact.is_absolute() or artifact.suffix.lower() != ".svg":
         errors.append("artifact_path must be an absolute .svg path")
@@ -231,7 +254,9 @@ def request_errors(request: dict) -> list[str]:
     feedback = request.get("feedback")
     if mode == "independent":
         if version not in {"A", "B"} or base is not None or feedback is not None:
-            errors.append("independent mode requires A/B with null base and feedback")
+            errors.append("independent mode requires planned A or B with null base and feedback")
+        if isinstance(planned_versions, list) and version not in planned_versions:
+            errors.append("independent version must be included in candidate_plan.versions")
     elif mode == "revision":
         if not isinstance(version, str) or not version.startswith("R"):
             errors.append("revision mode requires an Rn version")

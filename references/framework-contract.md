@@ -112,7 +112,8 @@ items` within 500 characters and `Content scope` within 700. Store a substantive
 
 For content review, controller `next` emits Project context, the active
 Storyline entry, and compact adjacent context. For SVG generation, it writes
-one hash-bound page authoring context and one shared self-contained prototype,
-then binds each candidate-specific request to that context. Previously confirmed
+one hash-bound page authoring context containing the adaptive A/A-B candidate
+plan and one shared self-contained prototype, then binds each candidate-specific
+request to that context. Previously confirmed
 pages and adjacent Storyline context may inform consistency without becoming a
 second state authority.

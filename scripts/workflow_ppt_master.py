@@ -36,7 +36,7 @@ IMAGE_MIME_TYPES = {
 def design_quality_contract() -> dict[str, object]:
     """Return the mandatory quality floor for every first-visible candidate."""
     return {
-        "profile": "ey-executive-editorial-v2",
+        "profile": "ey-executive-editorial-v3",
         "target": (
             "Executive-grade EY editorial design that is polished, restrained, "
             "distinctive, and ready for the user to evaluate without first asking for more design."
@@ -56,13 +56,13 @@ def design_quality_contract() -> dict[str, object]:
             "Uniform equal columns or repeated rounded rectangles as the default page grammar.",
             "Using extra icons, gradients, shadows, or ornament as a substitute for information design.",
             "Decorative geometry that has no communication job.",
-            "Treating the first authored SVG as ready without art-direction refinement and full-slide review.",
+            "Treating the first authored SVG as ready without art-direction refinement and direct source-SVG full-slide review.",
         ],
         "visible_candidate_gate": [
             "information_design",
             "page_composition",
             "art_direction_refinement",
-            "full_slide_render_review",
+            "source_svg_full_slide_review",
             "source_repair_and_recheck",
         ],
     }
@@ -162,6 +162,60 @@ STRUCTURAL_DIRECTIONS = {
     ),
 }
 
+CANDIDATE_PLAN_POLICY = "adaptive-v1"
+DUAL_MODEL_SIGNALS = frozenset(
+    {
+        "quantitative-chart",
+        "exact-table",
+        "explicit-comparison",
+        "semantic-hierarchy",
+    }
+)
+EXPLICIT_SINGLE_MARKERS = (
+    "single candidate",
+    "one candidate",
+    "only one design",
+    "a only",
+    "单候选",
+    "一个候选",
+    "只生成一个",
+    "仅生成 a",
+)
+EXPLICIT_DUAL_MARKERS = (
+    "a/b",
+    "two candidates",
+    "two design options",
+    "two alternatives",
+    "dual candidates",
+    "双候选",
+    "两个候选",
+    "两个设计方向",
+    "两个备选",
+)
+HIGH_STAKES_DECISION_MARKERS = (
+    "select the preferred",
+    "choose the preferred",
+    "choose one",
+    "approve the",
+    "prioritize",
+    "trade-off",
+    "make a decision",
+    "decide between",
+    "选择首选",
+    "选择一个",
+    "批准",
+    "确定优先级",
+    "优先排序",
+    "取舍",
+    "作出决策",
+    "做出决策",
+)
+
+
+def _project_context_value(project_context: dict[str, str], label: str) -> str:
+    snake = label.strip().lower().replace(" ", "_")
+    return str(project_context.get(label) or project_context.get(snake) or "")
+
 
 def _exploration_signal(
     approved_content: str,
@@ -176,8 +230,8 @@ def _exploration_signal(
     approved_intent = " ".join(
         (
             page.fields.get("Narrative role", ""),
-            project_context.get("Audience outcome", ""),
-            project_context.get("Storyline thesis", ""),
+            _project_context_value(project_context, "Audience outcome"),
+            _project_context_value(project_context, "Storyline thesis"),
         )
     ).casefold()
     selection_context = f"{content}\n{approved_intent}"
@@ -207,20 +261,81 @@ def _basis_value(value: str | None) -> str:
     return cleaned or "Not specified"
 
 
+def candidate_plan(
+    page: PageEntry,
+    approved_content: str,
+    project_context: dict[str, str],
+) -> dict[str, object]:
+    """Choose one default candidate or a bounded A/B exploration automatically."""
+    page_type = normalize_page_type(page.fields.get("Page type", ""))
+    signal = _exploration_signal(approved_content, page, project_context)
+    decisions = page.fields.get("Confirmed decisions", "").casefold()
+    intent = " ".join(
+        (
+            page.fields.get("Narrative role", ""),
+            _project_context_value(project_context, "Audience outcome"),
+        )
+    ).casefold()
+
+    if page_type in STRUCTURAL_DIRECTIONS or page_type == "protected placeholder":
+        versions = ["A"]
+        reason = "structural-page"
+    elif any(marker in decisions for marker in EXPLICIT_SINGLE_MARKERS):
+        versions = ["A"]
+        reason = "explicit-single-candidate"
+    elif any(marker in decisions for marker in EXPLICIT_DUAL_MARKERS):
+        versions = ["A", "B"]
+        reason = "explicit-alternatives"
+    elif any(marker in intent for marker in HIGH_STAKES_DECISION_MARKERS):
+        versions = ["A", "B"]
+        reason = "high-stakes-decision"
+    elif signal in DUAL_MODEL_SIGNALS:
+        versions = ["A", "B"]
+        reason = f"distinct-communication-models:{signal}"
+    else:
+        versions = ["A"]
+        reason = "default-single-candidate"
+
+    return {
+        "policy": CANDIDATE_PLAN_POLICY,
+        "versions": versions,
+        "reason": reason,
+        "content_signal": signal,
+    }
+
+
+def candidate_plan_for_page(
+    paths: ProjectPaths,
+    framework_text: str,
+    page: PageEntry,
+) -> dict[str, object]:
+    section = content_section(paths.content.read_text(encoding="utf-8"), page.slide_id).rstrip()
+    if not section:
+        raise ValueError(f"approved content not found for {page.slide_id}")
+    project_context = line_fields(h2_section(framework_text, "Project context"))
+    return candidate_plan(page, section, project_context)
+
+
 def independent_variant_directions(
     page: PageEntry,
     approved_content: str,
     project_context: dict[str, str],
+    plan: dict[str, object] | None = None,
 ) -> dict[str, dict[str, object]]:
     """Select page-specific exploration directions from content and approved intent."""
     page_type = normalize_page_type(page.fields.get("Page type", ""))
+    active_plan = plan or candidate_plan(page, approved_content, project_context)
+    versions = active_plan.get("versions")
+    if versions not in (["A"], ["A", "B"]):
+        raise ValueError("candidate plan versions must be ['A'] or ['A', 'B']")
     basis = {
         "method": "page-content-and-approved-user-intent",
         "content_signal": _exploration_signal(approved_content, page, project_context),
         "page_type": _basis_value(page.fields.get("Page type")),
         "narrative_role": _basis_value(page.fields.get("Narrative role")),
-        "audience_outcome": _basis_value(project_context.get("Audience outcome")),
-        "storyline_thesis": _basis_value(project_context.get("Storyline thesis")),
+        "audience_outcome": _basis_value(_project_context_value(project_context, "Audience outcome")),
+        "storyline_thesis": _basis_value(_project_context_value(project_context, "Storyline thesis")),
+        "candidate_plan_reason": _basis_value(str(active_plan.get("reason") or "")),
     }
     if page_type in STRUCTURAL_DIRECTIONS:
         role, intent = STRUCTURAL_DIRECTIONS[page_type]
@@ -237,9 +352,8 @@ def independent_variant_directions(
     pair = VARIANT_PAIRS[signal]
     pair_id = f"{page.slide_id}:{signal}:v1"
     directions: dict[str, dict[str, object]] = {}
-    for version, counterpart in (("A", "B"), ("B", "A")):
+    for version in versions:
         role, intent = pair[version]
-        counterpart_role = pair[counterpart][0]
         directions[version] = {
             "role": role,
             "intent": intent,
@@ -248,16 +362,18 @@ def independent_variant_directions(
                 "narrative role, audience outcome, and EY identity."
             ),
             "selection_basis": basis,
-            "alternative_contract": {
+        }
+        if versions == ["A", "B"]:
+            counterpart = "B" if version == "A" else "A"
+            directions[version]["alternative_contract"] = {
                 "pair_id": pair_id,
-                "counterpart_role": counterpart_role,
+                "counterpart_role": pair[counterpart][0],
                 "required_difference_axes": [
                     "communication_model",
                     "information_hierarchy",
                     "composition_or_visualization",
                 ],
-            },
-        }
+            }
     return directions
 
 
@@ -363,6 +479,7 @@ def page_context_payload(
         paths.template_prototype(page.slide_id),
     )
     context = line_fields(h2_section(framework_text, "Project context"))
+    plan = candidate_plan(page, section.rstrip(), context)
     pages = page_entries(framework_text)
     page_index = next(index for index, item in enumerate(pages) if item.slide_id == page.slide_id)
     adjacent_pages = {
@@ -411,6 +528,7 @@ def page_context_payload(
             "next_connection": page.fields.get("Next connection", ""),
             "adjacent_pages": adjacent_pages,
         },
+        "candidate_plan": plan,
         "design_quality": design_quality_contract(),
         "confirmed_pages": confirmed_pages,
         "approved_content": section.rstrip(),
@@ -462,8 +580,13 @@ def request_payload(
     project_context = context.get("project_context")
     if not isinstance(project_context, dict):
         raise ValueError(f"page authoring context has no project context: {context_path}")
+    plan = context.get("candidate_plan")
+    if not isinstance(plan, dict) or plan.get("versions") not in (["A"], ["A", "B"]):
+        raise ValueError(f"page authoring context has no valid candidate plan: {context_path}")
+    if not base_version and version not in plan["versions"]:
+        raise ValueError(f"candidate version {version} is not requested by the page candidate plan")
     directions = (
-        independent_variant_directions(page, current_section, project_context)
+        independent_variant_directions(page, current_section, project_context, plan)
         if not base_version
         else None
     )

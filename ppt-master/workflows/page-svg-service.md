@@ -11,7 +11,7 @@ a hash-bound `ey-deck.page-authoring-context.v1`. Read v2 only for recovery of
 an already active legacy cycle. EY
 owns page order, content approval, candidate naming, user choice, and final
 publication. PPT Master owns page design, SVG construction,
-visual inspection, and technical SVG quality.
+direct source-SVG inspection, and technical SVG quality.
 
 ## Entry
 
@@ -19,10 +19,9 @@ visual inspection, and technical SVG quality.
 2. Load workspace dependencies, set command-scoped `EY_DECK_SVG_PYTHON` to the
    returned absolute Python executable, and run the parent-provided
    `validate_request` command. Use that verified runtime for SVG validation and
-   finalization. Browser rendering remains an independent capability and need
-   not share the same Python environment.
-3. Read the request's hash-bound `authoring_context`. Read `design_quality` and
-   `template.design_spec.path` from that shared context and
+   finalization. Do not load or invoke a browser-rendering capability for candidate QA.
+3. Read the request's hash-bound `authoring_context`. Read `design_quality`, the
+   EY-owned `candidate_plan`, and `template.design_spec.path` from that shared context and
    `variant_direction` from the candidate request, then read
    `references/strategist.md`, `references/strategist-template.md`,
    `references/executor-base.md`, and `references/executor-structured.md`. Load chart, table,
@@ -70,28 +69,29 @@ the complete PPT Master loop internally for every candidate:
    decoration, or effects without a communication job. Refine hierarchy, rhythm,
    optical balance, edges, connectors, and emphasis until the page satisfies
    every `design_quality.must_have` and none of `design_quality.avoid`.
-8. **Review and repair** — render or inspect the complete page at slide
-   scale. Review composition and craft as well as clipping, overlap, legibility,
-   and template fidelity. Repair the owning SVG and recheck it before returning
-   COMPLETE. The first visible candidate must never be merely the first draft.
+8. **Review and repair** — inspect the complete source SVG directly at full-slide
+   coordinate scale. Review composition and craft as well as clipping, overlap,
+   legibility, and template fidelity. Repair the owning SVG and reinspect the
+   source before returning COMPLETE. The first visible candidate must never be
+   merely the first draft.
 
-Render from a local HTTP preview with a source-hash cache key, a fresh browser
-context, completed font loading, and two animation frames before capture. If a
-browser preview omits intact XML elements, classify and retry it as a renderer
-failure before changing the SVG. Do not remove imagery, mixed formatting,
-nested emphasis, or spatial complexity merely to stabilize one preview backend.
+Do not invoke Chromium, Playwright, or another browser renderer to QA candidate
+content or appearance. Browser output is neither a prerequisite nor completion
+evidence. Candidate acceptance rests on direct source-SVG review plus the
+service's deterministic technical validation.
 
 Keep internal strategy and design decisions inside PPT Master. They are not
 additional parent-workflow gates or durable EY state.
 
 ## Independent variants
 
-Cover, Agenda, Section divider, and Ending receive only independent A as their
-initial candidate. Other authored pages receive independent A and B requests.
-Treat every emitted candidate as a complete solution to the same locked content.
-For A/B, start each from the bound prototype and content; do not use A as B's
-repair target. Difference is useful only when it creates a meaningful user
-choice—never change facts or force novelty at the cost of quality. Prefer a
+Honor the EY-owned adaptive `candidate_plan`; never change its versions or ask
+for another confirmation. Structural and default substantive pages receive only
+independent A. Pages with a verified dual-design need receive independent A and
+B requests. Treat every emitted candidate as a complete solution to the same
+locked content. For A/B, start each from the bound prototype and content; do not
+use A as B's repair target. Difference is useful only when it creates a meaningful
+user choice—never change facts or force novelty at the cost of quality. Prefer a
 materially different communication model, information hierarchy, composition,
 or visualization when two strong alternatives exist; cosmetic-only variation
 is insufficient when a substantive alternative is available.
@@ -99,15 +99,15 @@ is insufficient when a substantive alternative is available.
 Honor each request's dynamically selected search role without weakening either
 option. The adapter derives the paired roles from the page's approved content
 form and approved user intent: Narrative role, Audience outcome, and Storyline
-thesis. Treat the role as a search bias, not a prescribed layout. For a
-substantive page, use `alternative_contract` to ensure that A and B differ
+thesis. Treat the role as a search bias, not a prescribed layout. For an A/B
+plan, use `alternative_contract` to ensure that A and B differ
 materially in their communication model, information hierarchy, or
 composition/visualization; do not fall back to one universal A/B axis.
 
 Do not make A a generic safe draft or B an ornamental experiment. Both must
 pass the same `design_quality` contract before the parent may display them.
-For an A-only structural page, apply its dynamically selected structural role
-within the bound template; do not invent B or a second lifecycle branch.
+For any A-only plan, apply its selected complete direction within the bound
+template; do not invent B, an alternative contract, or a second lifecycle branch.
 
 ## Revisions
 
@@ -138,9 +138,10 @@ A later Rn may use any currently displayed candidate as its base.
   paragraph's visual lines as sibling `<text>` elements. Treat the quality
   checker's fragmented-paragraph warning as blocking and repair it before
   returning COMPLETE.
-- Inspect the complete page at slide scale and repair clipping, overlap,
+- Inspect the complete source SVG at full-slide coordinate scale and repair clipping, overlap,
   off-canvas content, unreadable text, broken hierarchy, template drift, and
-  unsupported SVG before returning COMPLETE.
+  unsupported SVG before returning COMPLETE. Do not use a Chromium render for
+  this inspection.
 
 Return BLOCKED only when locked content, the bound template, or the environment
 makes completion impossible. Do not mutate upstream inputs to escape a block.
