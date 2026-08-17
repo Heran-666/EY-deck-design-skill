@@ -115,6 +115,9 @@ template only here and retain its original Slide ID position. For
 
 Export through editable native DrawingML with flat Quick Generate structure,
 `preserve` text flow, no notes, final SVG validation, conversion trace,
-postflight, and text-frame parity. One logical text box is one SVG `<text>` with
-child `<tspan>` runs. On text-frame failure, reopen and reconfirm the source SVG.
+postflight, and text-frame parity. One logical text box is one SVG `<text>`;
+inline `<tspan>` runs are non-positional with literal spaces, while multiline
+rows use same-x `dy` positioning. Export requires source/trace/PPTX carrier
+conservation and per-carrier OOXML text continuity. On failure, reopen and
+reconfirm the source SVG.
 Deliver only after `PPTX_STAGE_COMPLETE`.

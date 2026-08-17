@@ -1301,6 +1301,7 @@ def convert_element(elem: ET.Element, ctx: ConvertContext) -> ShapeResult | None
                 metadata['shape_id'] = int(shape_match.group(1))
             if result.bounds_emu is not None:
                 metadata['bounds_emu'] = list(result.bounds_emu)
+            metadata.update(result.trace_metadata)
             metadata.update(_geometry_trace_metadata(elem, result))
             trace('native', **metadata)
         else:

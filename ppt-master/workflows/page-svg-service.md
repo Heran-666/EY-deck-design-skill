@@ -83,8 +83,12 @@ revised SVG for the next review round.
   `<script>`, `foreignObject`, remote URLs, or runtime placeholders.
 - Hand-author page composition. Scripts may validate, render, or convert
   supporting assets, but may not generate it.
-- Represent each logical PowerPoint text box with one `<text>` element and
-  child `<tspan>` runs. Fragmented paragraphs are blocking.
+- Represent each logical PowerPoint text box with one `<text>` element. Keep
+  inline-formatting `<tspan>` runs non-positional with literal word spaces; use
+  same-x rows with first `dy="0"` and later positive relative `dy` for multiline
+  text. Non-zero `dx`, ambiguous absolute `y`, and fragmented paragraphs block.
+- During `complete`, run the exact preserve-mode positional-tspan transform on
+  an in-memory copy. Block any source `<text>` carrier that becomes 1→N.
 - Inspect and repair the complete source SVG for off-canvas content, clipping,
   overlap, illegibility, broken hierarchy, template drift, and unsupported SVG.
 

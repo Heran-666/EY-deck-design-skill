@@ -84,6 +84,10 @@ class ProjectPaths:
         return self.working / "receipts" / "pptx" / "text-frames.json"
 
     @property
+    def pptx_text_failure(self) -> Path:
+        return self.working / "receipts" / "pptx" / "text-failure.json"
+
+    @property
     def svg_quality_report(self) -> Path:
         return self.root / "validation" / "svg_quality_report.json"
 

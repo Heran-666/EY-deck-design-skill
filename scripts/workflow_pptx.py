@@ -8,6 +8,7 @@ import json
 import os
 import shutil
 import subprocess
+import sys
 import tempfile
 import zipfile
 from pathlib import Path
@@ -22,15 +23,21 @@ from workflow_svg import confirmation_valid
 
 SKILL_ROOT = Path(__file__).resolve().parents[1]
 PPT_MASTER_ROOT = SKILL_ROOT / "ppt-master"
+PPT_MASTER_SCRIPTS = PPT_MASTER_ROOT / "scripts"
+if str(PPT_MASTER_SCRIPTS) not in sys.path:
+    sys.path.insert(0, str(PPT_MASTER_SCRIPTS))
+from svg_finalize.flatten_tspan import text_carrier_integrity_errors  # noqa: E402
 SERVICE_CONTRACT = PPT_MASTER_ROOT / "workflows" / "svg-deck-pptx-service.md"
 SVG_QUALITY_CHECKER = PPT_MASTER_ROOT / "scripts" / "svg_quality_checker.py"
 PPTX_EXPORTER = PPT_MASTER_ROOT / "scripts" / "svg_to_pptx.py"
 REQUEST_SCHEMA = "ppt-master.svg-deck-pptx-request.v2"
 RECEIPT_SCHEMA = "ey-deck.pptx-export.v1"
-TEXT_AUDIT_SCHEMA = "ey-deck.pptx-text-frame-audit.v1"
+TEXT_AUDIT_SCHEMA = "ey-deck.pptx-text-frame-audit.v2"
 TEXT_FLOW = "preserve"
+TEXT_FAILURE_SCHEMA = "ey-deck.pptx-text-failure.v1"
 RUNTIME_PYTHON_ENV = "EY_DECK_PPTX_PYTHON"
 PRESENTATION_NS = "http://schemas.openxmlformats.org/presentationml/2006/main"
+DRAWINGML_NS = "http://schemas.openxmlformats.org/drawingml/2006/main"
 SVG_NS = "http://www.w3.org/2000/svg"
 FLAT_PROJECTION_ATTRS = frozenset(
     {
@@ -51,6 +58,15 @@ BLOCKING_TEXT_WARNING_MARKERS = (
     "paragraph-like line run(s) split across sibling <text> elements",
     "multi-line <text> with leading direct text that cannot be normalized into one PPT text frame",
 )
+
+
+class TextCarrierIntegrityError(ValueError):
+    """A slide-local editable-text failure that requires SVG reconfirmation."""
+
+    def __init__(self, slide_id: str, source_kind: str, message: str) -> None:
+        super().__init__(message)
+        self.slide_id = slide_id
+        self.source_kind = source_kind
 
 
 def _output_filename(text: str) -> str:
@@ -133,6 +149,8 @@ def request_payload(paths: ProjectPaths, text: str) -> dict[str, object]:
             "block_fragmented_paragraph_warnings": True,
             "require_conversion_trace": True,
             "require_text_frame_parity": True,
+            "require_source_carrier_conservation": True,
+            "require_text_sequence_parity": True,
             "require_pptx_postflight": True,
         },
     }
@@ -227,10 +245,20 @@ def _write_flat_projection(
     source: Path,
     destination: Path,
     *,
+    slide_id: str,
     source_kind: str,
 ) -> dict[str, object]:
     """Write and attest a visual-equivalent flat SVG projection."""
     root = ET.parse(source).getroot()
+    text_errors = text_carrier_integrity_errors(root)
+    if text_errors:
+        raise TextCarrierIntegrityError(
+            slide_id,
+            source_kind,
+            f"{slide_id} violates editable text-carrier integrity: "
+            + " | ".join(text_errors)
+        )
+    source_text_carriers = _assign_stable_text_carrier_ids(root, slide_id)
     source_visual_fingerprint = _visual_fingerprint(root)
     removed_attributes = 0
     for element in root.iter():
@@ -256,7 +284,35 @@ def _write_flat_projection(
         "conversion_sha256": sha256(destination),
         "visual_fingerprint": source_visual_fingerprint,
         "removed_structure_attributes": removed_attributes,
+        "source_text_carriers": source_text_carriers,
     }
+
+
+def _assign_stable_text_carrier_ids(root: ET.Element, slide_id: str) -> list[str]:
+    """Assign deterministic bridge-only ids to otherwise anonymous text carriers."""
+    used: set[str] = set()
+    for element in root.iter():
+        element_id = (element.get("id") or "").strip()
+        if not element_id:
+            continue
+        if element_id in used:
+            raise ValueError(f"duplicate SVG id prevents stable carrier mapping: {element_id}")
+        used.add(element_id)
+
+    carriers: list[str] = []
+    for ordinal, element in enumerate(root.iter(f"{{{SVG_NS}}}text"), start=1):
+        carrier_id = (element.get("id") or "").strip()
+        if not carrier_id:
+            base = f"ey-text-{slide_id}-{ordinal:03d}"
+            carrier_id = base
+            suffix = 2
+            while carrier_id in used:
+                carrier_id = f"{base}-{suffix}"
+                suffix += 1
+            element.set("id", carrier_id)
+            used.add(carrier_id)
+        carriers.append(carrier_id)
+    return carriers
 
 
 def _annotate_trace_sources(
@@ -285,8 +341,40 @@ def _annotate_trace_sources(
     write_json(trace_path, trace)
 
 
-def _pptx_text_box_counts(pptx_path: Path, slide_count: int) -> list[int]:
-    counts: list[int] = []
+def _append_text_token(tokens: list[dict[str, str]], value: str) -> None:
+    if not value:
+        return
+    if tokens and tokens[-1].get("kind") == "text":
+        tokens[-1]["value"] = tokens[-1].get("value", "") + value
+    else:
+        tokens.append({"kind": "text", "value": value})
+
+
+def _ooxml_text_sequence(text_body: ET.Element) -> list[dict[str, str]]:
+    tokens: list[dict[str, str]] = []
+    paragraphs = text_body.findall(f"{{{DRAWINGML_NS}}}p")
+    for paragraph_index, paragraph in enumerate(paragraphs):
+        if paragraph_index:
+            tokens.append({"kind": "paragraph"})
+        for child in list(paragraph):
+            if child.tag == f"{{{DRAWINGML_NS}}}br":
+                tokens.append({"kind": "hard-break"})
+                continue
+            if child.tag not in {
+                f"{{{DRAWINGML_NS}}}r",
+                f"{{{DRAWINGML_NS}}}fld",
+            }:
+                continue
+            for text_node in child.iter(f"{{{DRAWINGML_NS}}}t"):
+                _append_text_token(tokens, text_node.text or "")
+    return tokens
+
+
+def _pptx_text_boxes(
+    pptx_path: Path,
+    slide_count: int,
+) -> list[dict[int, list[dict[str, str]]]]:
+    slides: list[dict[int, list[dict[str, str]]]] = []
     with zipfile.ZipFile(pptx_path) as archive:
         for slide_number in range(1, slide_count + 1):
             name = f"ppt/slides/slide{slide_number}.xml"
@@ -294,13 +382,28 @@ def _pptx_text_box_counts(pptx_path: Path, slide_count: int) -> list[int]:
                 root = ET.fromstring(archive.read(name))
             except KeyError as exc:
                 raise ValueError(f"PPTX is missing {name}") from exc
-            counts.append(
-                sum(
-                    node.get("txBox") == "1"
-                    for node in root.iter(f"{{{PRESENTATION_NS}}}cNvSpPr")
-                )
-            )
-    return counts
+            boxes: dict[int, list[dict[str, str]]] = {}
+            for shape in root.iter(f"{{{PRESENTATION_NS}}}sp"):
+                nonvisual = shape.find(f"{{{PRESENTATION_NS}}}nvSpPr")
+                text_body = shape.find(f"{{{PRESENTATION_NS}}}txBody")
+                if nonvisual is None or text_body is None:
+                    continue
+                shape_props = nonvisual.find(f"{{{PRESENTATION_NS}}}cNvSpPr")
+                shape_identity = nonvisual.find(f"{{{PRESENTATION_NS}}}cNvPr")
+                if (
+                    shape_props is None
+                    or shape_props.get("txBox") != "1"
+                    or shape_identity is None
+                ):
+                    continue
+                shape_id = int(shape_identity.get("id", "0"))
+                if shape_id in boxes:
+                    raise ValueError(
+                        f"PPTX slide {slide_number} contains duplicate text-box shape id {shape_id}"
+                    )
+                boxes[shape_id] = _ooxml_text_sequence(text_body)
+            slides.append(boxes)
+    return slides
 
 
 def audit_text_frames(request: dict, output_path: Path, trace_path: Path) -> dict[str, object]:
@@ -311,42 +414,101 @@ def audit_text_frames(request: dict, output_path: Path, trace_path: Path) -> dic
         raise ValueError("conversion trace or export request has no slide roster")
     if len(trace_slides) != len(slides):
         raise ValueError("conversion trace slide count does not match the ordered slide roster")
-    pptx_counts = _pptx_text_box_counts(output_path, len(slides))
+    pptx_slides = _pptx_text_boxes(output_path, len(slides))
     audited: list[dict[str, object]] = []
-    for index, (expected, traced, pptx_count) in enumerate(
-        zip(slides, trace_slides, pptx_counts), start=1
+    for index, (expected, traced, pptx_boxes) in enumerate(
+        zip(slides, trace_slides, pptx_slides), start=1
     ):
         if not isinstance(expected, dict) or not isinstance(traced, dict):
             raise ValueError(f"invalid text-frame trace entry for slide {index}")
+        slide_id = str(expected.get("slide_id") or f"slide-{index}")
+        source_kind = str(expected.get("source_kind") or "confirmed-svg")
+
+        def fail(message: str) -> None:
+            raise TextCarrierIntegrityError(slide_id, source_kind, message)
+
         traced_svg = Path(str(traced.get("svg", ""))).resolve()
         if traced_svg != Path(str(expected.get("path", ""))).resolve():
-            raise ValueError(f"conversion trace source mismatch for slide {index}")
+            fail(f"conversion trace source mismatch for slide {index}")
         preprocess = traced.get("preprocess")
         if not isinstance(preprocess, list):
-            raise ValueError(f"conversion trace has no preprocess ledger for slide {index}")
+            fail(f"conversion trace has no preprocess ledger for slide {index}")
         text_flow_steps = [
             item for item in preprocess
             if isinstance(item, dict) and item.get("action") == "flatten-positional-tspans"
         ]
         if any(item.get("text_flow") != TEXT_FLOW for item in text_flow_steps):
-            raise ValueError(f"slide {index} was not converted with preserve text flow")
+            fail(f"slide {index} was not converted with preserve text flow")
         events = traced.get("events")
         if not isinstance(events, list):
-            raise ValueError(f"conversion trace has no element ledger for slide {index}")
+            fail(f"conversion trace has no element ledger for slide {index}")
         text_events = [item for item in events if isinstance(item, dict) and item.get("tag") == "text"]
         failed = [item for item in text_events if item.get("decision") != "native"]
         if failed:
-            raise ValueError(f"slide {index} contains text that did not become native editable text")
-        if len(text_events) != pptx_count:
-            raise ValueError(
-                f"slide {index} text-frame parity failed: trace={len(text_events)}, pptx={pptx_count}"
+            fail(f"slide {index} contains text that did not become native editable text")
+        source_bridge = traced.get("source_bridge")
+        source_carriers = (
+            source_bridge.get("source_text_carriers")
+            if isinstance(source_bridge, dict)
+            else None
+        )
+        if not isinstance(source_carriers, list) or not all(
+            isinstance(item, str) and item for item in source_carriers
+        ):
+            fail(f"slide {index} trace has no stable source text-carrier roster")
+        event_ids = [item.get("id") for item in text_events]
+        if any(not isinstance(item, str) or not item for item in event_ids):
+            fail(f"slide {index} contains an unaddressable converted text carrier")
+        if len(set(source_carriers)) != len(source_carriers):
+            fail(f"slide {index} source text-carrier ids are not unique")
+        if len(set(event_ids)) != len(event_ids):
+            fail(f"slide {index} converted text-carrier ids are not unique")
+
+        source_count = len(source_carriers)
+        conversion_count = len(text_events)
+        pptx_count = len(pptx_boxes)
+        if not (source_count == conversion_count == pptx_count):
+            fail(
+                f"slide {index} text-carrier conservation failed: "
+                f"source={source_count}, conversion={conversion_count}, pptx={pptx_count}"
+            )
+        if set(source_carriers) != set(event_ids):
+            fail(f"slide {index} source-to-conversion carrier mapping failed")
+
+        carrier_audit: list[dict[str, object]] = []
+        for event in text_events:
+            carrier_id = str(event["id"])
+            shape_id = event.get("shape_id")
+            expected_sequence = event.get("text_sequence")
+            if not isinstance(shape_id, int) or shape_id not in pptx_boxes:
+                fail(
+                    f"slide {index} carrier {carrier_id} has no one-to-one PPTX text-box shape"
+                )
+            if not isinstance(expected_sequence, list):
+                fail(
+                    f"slide {index} carrier {carrier_id} has no conversion text sequence"
+                )
+            actual_sequence = pptx_boxes[shape_id]
+            if expected_sequence != actual_sequence:
+                fail(
+                    f"slide {index} carrier {carrier_id} text continuity failed: "
+                    f"conversion={expected_sequence!r}, pptx={actual_sequence!r}"
+                )
+            carrier_audit.append(
+                {
+                    "carrier_id": carrier_id,
+                    "pptx_shape_id": shape_id,
+                    "status": "passed",
+                }
             )
         audited.append(
             {
                 "slide_number": index,
                 "slide_id": expected.get("slide_id"),
-                "svg_text_frames": len(text_events),
+                "source_svg_text_carriers": source_count,
+                "conversion_text_events": conversion_count,
                 "pptx_text_boxes": pptx_count,
+                "carriers": carrier_audit,
                 "status": "passed",
             }
         )
@@ -359,7 +521,7 @@ def audit_text_frames(request: dict, output_path: Path, trace_path: Path) -> dic
     }
 
 
-def export_from_request(paths: ProjectPaths, text: str) -> Path:
+def _export_from_request_impl(paths: ProjectPaths, text: str) -> Path:
     if not request_valid(paths, text):
         raise ValueError("PPTX export request is missing or stale; prepare it again")
     request = read_json(paths.pptx_request)
@@ -382,6 +544,7 @@ def export_from_request(paths: ProjectPaths, text: str) -> Path:
                 _write_flat_projection(
                     source,
                     staging_svg_output / f"{slide['slide_id']}.svg",
+                    slide_id=str(slide["slide_id"]),
                     source_kind=str(slide.get("source_kind", "confirmed-svg")),
                 )
             )
@@ -402,9 +565,20 @@ def export_from_request(paths: ProjectPaths, text: str) -> Path:
         quality = read_json(staged_quality)
         blocking_text = _blocking_text_warnings(quality)
         if blocking_text:
-            raise ValueError(
+            first_warning = blocking_text[0]
+            affected = next(
+                (
+                    item for item in slides
+                    if isinstance(item, dict)
+                    and f"{item.get('slide_id')}.svg" in first_warning
+                ),
+                slides[0],
+            )
+            raise TextCarrierIntegrityError(
+                str(affected.get("slide_id", "unknown")),
+                str(affected.get("source_kind", "confirmed-svg")),
                 "PPTX text-box preflight rejected fragmented paragraph source: "
-                + " | ".join(blocking_text)
+                + " | ".join(blocking_text),
             )
 
         _run(
@@ -453,6 +627,49 @@ def export_from_request(paths: ProjectPaths, text: str) -> Path:
         },
     )
     return output_path
+
+
+def export_from_request(paths: ProjectPaths, text: str) -> Path:
+    """Export and persist a slide-local recovery receipt for text failures."""
+    try:
+        output = _export_from_request_impl(paths, text)
+    except TextCarrierIntegrityError as exc:
+        write_json(
+            paths.pptx_text_failure,
+            {
+                "schema": TEXT_FAILURE_SCHEMA,
+                "request_sha256": sha256(paths.pptx_request),
+                "slide_id": exc.slide_id,
+                "source_kind": exc.source_kind,
+                "reason": str(exc),
+                "recovery": (
+                    "reopen-svg-and-reconfirm"
+                    if exc.source_kind == "confirmed-svg"
+                    else "repair-deferred-template-upstream"
+                ),
+                "failed_at": now(),
+            },
+        )
+        raise
+    if paths.pptx_text_failure.exists():
+        paths.pptx_text_failure.unlink()
+    return output
+
+
+def text_failure(paths: ProjectPaths) -> dict[str, object] | None:
+    """Return a current text-failure receipt bound to the active export request."""
+    if not paths.pptx_text_failure.is_file() or not paths.pptx_request.is_file():
+        return None
+    try:
+        failure = read_json(paths.pptx_text_failure)
+    except (OSError, ValueError):
+        return None
+    if (
+        failure.get("schema") != TEXT_FAILURE_SCHEMA
+        or failure.get("request_sha256") != sha256(paths.pptx_request)
+    ):
+        return None
+    return failure
 
 
 def export_valid(paths: ProjectPaths, text: str) -> bool:

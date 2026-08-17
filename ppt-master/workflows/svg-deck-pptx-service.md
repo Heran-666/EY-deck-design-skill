@@ -21,8 +21,13 @@ postflight, and conversion trace production.
 4. Export with editable native DrawingML, flat structure, no speaker notes,
    an explicit `preserve` text-flow policy, and a conversion trace.
 5. Require a passing package postflight report.
-6. Verify every traced native SVG text carrier has exactly one corresponding
-   PowerPoint text box on the same slide.
+6. Assign stable bridge-only ids to anonymous source text carriers. Require
+   source carrier count = conversion text-event count = PowerPoint text box
+   count on every slide.
+7. Map each carrier id through the conversion trace to one PowerPoint shape and
+   compare its OOXML character order, literal spaces, paragraphs, and hard line
+   breaks. A failure returns the authored page to SVG reconfirmation; repair a
+   deferred template upstream.
 
 Never re-enter page design, rewrite copy, change page order, select another SVG
 candidate, or mutate the ordered source set inside this service.

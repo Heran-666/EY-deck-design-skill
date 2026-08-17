@@ -12,6 +12,7 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 
 from svg_quality_checker import SVGQualityChecker
+from svg_finalize.flatten_tspan import text_carrier_integrity_errors
 
 
 REQUEST_SCHEMA = "ppt-master.page-svg-request.v3"
@@ -245,6 +246,10 @@ def artifact_errors(path: Path) -> list[str]:
         href = element.attrib.get("href") or element.attrib.get("{http://www.w3.org/1999/xlink}href")
         if href and re.match(r"(?i)^(?:https?:)?//", href):
             errors.append(f"artifact contains remote URL: {href}")
+    errors.extend(
+        f"artifact violates PPTX text-frame integrity: {message}"
+        for message in text_carrier_integrity_errors(root)
+    )
     # Page requests are bound to structured Master/Layout prototypes. Validate
     # that contract directly; Quick Generate is reserved for the later flat
     # export projection and would misclassify required structure metadata.

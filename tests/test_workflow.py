@@ -27,6 +27,10 @@ from svg_to_pptx.drawingml.elements import (  # noqa: E402
     ImageValidationDependencyError,
     _valid_project_image_payload,
 )
+from svg_finalize.flatten_tspan import (  # noqa: E402
+    flatten_text_with_tspans,
+    text_carrier_integrity_errors,
+)
 from validate_deck_blueprint import _emphasis_errors  # noqa: E402
 from validate_framework import validate as validate_framework  # noqa: E402
 from workflow_io import sha256 as request_sha256  # noqa: E402
@@ -37,6 +41,7 @@ from workflow_ppt_master import (  # noqa: E402
     materialize_template,
     template_name,
 )
+from workflow_pptx import TEXT_FAILURE_SCHEMA  # noqa: E402
 from workflow_svg import initial_versions_for_page_type  # noqa: E402
 
 
@@ -173,7 +178,7 @@ def multiline_svg() -> str:
     return """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720">
   <rect width="1280" height="720" fill="#222"/>
   <text x="80" y="120" fill="#fff" font-size="24">
-    <tspan x="80" dy="0">Editable first line</tspan>
+    <tspan x="80" dy="0">Editable first </tspan><tspan font-weight="700">line</tspan>
     <tspan x="80" dy="36">Editable second line</tspan>
   </text>
 </svg>
@@ -187,6 +192,33 @@ def fragmented_paragraph_svg() -> str:
     <text x="80" y="120" fill="#fff" font-size="24">This sentence continues across</text>
     <text x="80" y="156" fill="#fff" font-size="24">two sibling SVG text elements</text>
   </g>
+</svg>
+"""
+
+
+def inline_dx_spacing_svg() -> str:
+    return """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720">
+  <text x="80" y="120"><tspan>Agent uses</tspan><tspan dx="4">deterministic controls</tspan></text>
+</svg>
+"""
+
+
+def safe_absolute_y_svg() -> str:
+    return """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720">
+  <text x="80" y="120" font-size="24">
+    <tspan x="80" y="120">Editable first line</tspan>
+    <tspan x="80" y="156">Editable second line</tspan>
+  </text>
+</svg>
+"""
+
+
+def nonmergeable_relative_dy_svg() -> str:
+    return """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720">
+  <text x="80" y="120" font-size="10">
+    <tspan x="80" dy="0">First row</tspan>
+    <tspan x="80" dy="100">Distant independent row</tspan>
+  </text>
 </svg>
 """
 
@@ -845,6 +877,44 @@ class WorkflowTests(unittest.TestCase):
             self.assertEqual(renamed.returncode, 0, renamed.stdout + renamed.stderr)
             self.assertEqual(next_payload(project)["action"], "PREPARE_PPTX_EXPORT")
 
+    def test_current_text_failure_receipt_routes_back_to_svg_reconfirmation(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project = Path(tmp)
+            lock_content(project)
+            prepare_candidates(project)
+            complete_candidate(project, "A", "Export source")
+            self.assertEqual(
+                run(project, "present-svg", "--page", "S01", "--versions", "A").returncode,
+                0,
+            )
+            self.assertEqual(
+                run(project, "confirm-svg", "--page", "S01", "--version", "A").returncode,
+                0,
+            )
+            self.assertEqual(run(project, "prepare-pptx-export").returncode, 0)
+            request = project / "working" / "packets" / "pptx" / "export.json"
+            failure = project / "working" / "receipts" / "pptx" / "text-failure.json"
+            failure.parent.mkdir(parents=True, exist_ok=True)
+            failure.write_text(
+                json.dumps(
+                    {
+                        "schema": TEXT_FAILURE_SCHEMA,
+                        "request_sha256": request_sha256(request),
+                        "slide_id": "S01",
+                        "source_kind": "confirmed-svg",
+                        "reason": "text continuity failed",
+                        "recovery": "reopen-svg-and-reconfirm",
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            directive = next_payload(project)
+
+            self.assertEqual(directive["action"], "REOPEN_PPTX_TEXT_SOURCE")
+            self.assertEqual(directive["slide_id"], "S01")
+            self.assertIn("reopen-svg", directive["commands"]["reopen"])
+
     def test_pptx_roster_injects_deferred_templates_in_framework_order(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             project = Path(tmp)
@@ -929,8 +999,19 @@ class WorkflowTests(unittest.TestCase):
             audit = json.loads((project / "working" / "receipts" / "pptx" / "text-frames.json").read_text())
             self.assertEqual(audit["status"], "passed")
             self.assertEqual(audit["text_flow"], "preserve")
-            self.assertEqual(audit["slides"][0]["svg_text_frames"], 1)
+            self.assertEqual(audit["slides"][0]["source_svg_text_carriers"], 1)
+            self.assertEqual(audit["slides"][0]["conversion_text_events"], 1)
             self.assertEqual(audit["slides"][0]["pptx_text_boxes"], 1)
+            self.assertEqual(len(audit["slides"][0]["carriers"]), 1)
+            with zipfile.ZipFile(project / "sample.pptx") as archive:
+                slide_root = ET.fromstring(archive.read("ppt/slides/slide1.xml"))
+            exported_text = "".join(
+                node.text or ""
+                for node in slide_root.iter(
+                    "{http://schemas.openxmlformats.org/drawingml/2006/main}t"
+                )
+            )
+            self.assertIn("Editable first line", exported_text)
             trace = json.loads(
                 (project / "validation" / "sample.trace.json").read_text(encoding="utf-8")
             )
@@ -1037,6 +1118,49 @@ class WorkflowTests(unittest.TestCase):
             self.assertNotEqual(completed.returncode, 0)
             self.assertIn("PPTX text-frame integrity", completed.stdout)
             self.assertIn("sibling <text> elements", completed.stdout)
+
+    def test_page_service_blocks_dx_visual_spacing_without_literal_space(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            artifact = Path(tmp) / "dx.svg"
+            artifact.write_text(inline_dx_spacing_svg(), encoding="utf-8")
+
+            errors = artifact_errors(artifact)
+
+            self.assertTrue(any("positional dx" in item for item in errors))
+            self.assertTrue(any("literal whitespace" in item for item in errors))
+
+    def test_safe_absolute_y_rows_normalize_to_one_preserve_text_carrier(self) -> None:
+        root = ET.fromstring(safe_absolute_y_svg())
+
+        self.assertEqual(text_carrier_integrity_errors(root), [])
+        changed = flatten_text_with_tspans(
+            ET.ElementTree(root),
+            merge_paragraphs=True,
+            preserve_line_breaks=True,
+        )
+
+        self.assertTrue(changed)
+        texts = list(root.iter("{http://www.w3.org/2000/svg}text"))
+        self.assertEqual(len(texts), 1)
+        rows = list(texts[0])
+        self.assertTrue(all(row.get("y") is None for row in rows))
+        self.assertEqual(texts[0].get("data-paragraph-line-height"), "36")
+        self.assertEqual(rows[1].get("data-paragraph-line-break"), "1")
+
+    def test_preserve_preflight_blocks_source_carrier_that_would_split_one_to_many(self) -> None:
+        root = ET.fromstring(nonmergeable_relative_dy_svg())
+
+        errors = text_carrier_integrity_errors(root)
+
+        self.assertTrue(any("1→N" in item for item in errors))
+
+    def test_real_s02_text_fixture_is_blocked_before_pptx_export(self) -> None:
+        fixture = ROOT / "tests" / "fixtures" / "henkel-s02-text-carriers.svg"
+
+        errors = text_carrier_integrity_errors(ET.parse(fixture).getroot())
+
+        self.assertTrue(any("positional dx" in item for item in errors))
+        self.assertTrue(any("absolute-y rows" in item for item in errors))
 
     def test_service_rejects_remote_svg_dependencies(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

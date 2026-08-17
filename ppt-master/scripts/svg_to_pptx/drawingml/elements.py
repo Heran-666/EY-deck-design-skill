@@ -2672,6 +2672,33 @@ def _build_run_xml(
 </a:r>'''
 
 
+def _text_sequence_tokens(
+    paragraph_runs: list[list[dict[str, Any]]] | None,
+    runs: list[dict[str, Any]],
+) -> list[dict[str, str]]:
+    """Return the exact semantic text sequence emitted to DrawingML."""
+    tokens: list[dict[str, str]] = []
+
+    def append_text(value: str) -> None:
+        if not value:
+            return
+        if tokens and tokens[-1].get('kind') == 'text':
+            tokens[-1]['value'] = tokens[-1].get('value', '') + value
+        else:
+            tokens.append({'kind': 'text', 'value': value})
+
+    paragraphs = paragraph_runs if paragraph_runs is not None else [runs]
+    for paragraph_index, paragraph in enumerate(paragraphs):
+        if paragraph_index:
+            tokens.append({'kind': 'paragraph'})
+        for run in paragraph:
+            if run.get('_line_break'):
+                tokens.append({'kind': 'hard-break'})
+            else:
+                append_text(str(run.get('text', '')))
+    return tokens
+
+
 def convert_text(elem: ET.Element, ctx: ConvertContext) -> ShapeResult | None:
     """Convert SVG <text> to DrawingML text shape with multi-run support."""
     raw_x = svg_length_x(elem.get('x'), ctx)
@@ -3152,7 +3179,11 @@ def convert_text(elem: ET.Element, ctx: ConvertContext) -> ShapeResult | None:
 <a:lstStyle/>
 {paragraphs_xml}
 </p:txBody>
-</p:sp>''', bounds_emu=(off_x, off_y, off_x + ext_cx, off_y + ext_cy))
+</p:sp>''', bounds_emu=(off_x, off_y, off_x + ext_cx, off_y + ext_cy),
+        trace_metadata={
+            'text_sequence': _text_sequence_tokens(paragraph_runs, runs),
+        },
+    )
 
 
 # ---------------------------------------------------------------------------

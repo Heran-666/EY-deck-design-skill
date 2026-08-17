@@ -15,13 +15,17 @@ or create a second PPTX implementation in the controller.
 ## Text-frame contract
 
 - One logical PowerPoint text box equals one SVG `<text>` carrier.
-- Use non-positional `<tspan>` children for inline mixed formatting.
-- Use positioned child `<tspan>` rows for authored multiline text.
+- Use non-positional `<tspan>` children for inline mixed formatting. Word spaces
+  must be literal characters; never use `dx` as semantic whitespace.
+- Use same-x child `<tspan>` rows for multiline text: first `dy="0"`, then
+  positive relative `dy`. Only unambiguous transform-free absolute-y stacks may
+  be deterministically normalized.
 - Keep semantically independent labels in separate `<text>` carriers.
 - Export with explicit `preserve` text flow. Never use split/`--no-merge`.
 - Treat the quality checker's high-confidence fragmented-paragraph warning as
   blocking even though it is advisory in generic PPT Master workflows.
-- Require conversion-trace-to-OOXML text-box count parity on every slide.
+- Require source-carrier-to-trace-to-OOXML count conservation and per-carrier
+  character, literal-space, paragraph, and hard-break parity on every slide.
 
 ## Controller actions
 

@@ -49,7 +49,7 @@ def design_quality_contract() -> dict[str, object]:
             "Add coherent icon elements at semantically appropriate positions when they improve recognition, scanning, or visual rhythm; omit them when they have no clear communication job.",
             "Refine alignment, spacing, optical balance, edges, connectors, and emphasis at full-slide scale.",
             "Compose freely across the full 1280x720 slide. Placeholder bounds are native PowerPoint metadata only; do not treat y=650 or any other inset rectangle as a visual content limit.",
-            "Author each logical PowerPoint text box as one SVG <text>; use child <tspan> runs for mixed formatting and positioned <tspan> rows for multiline content, never sibling <text> elements for one paragraph's visual lines.",
+            "Author each logical PowerPoint text box as one SVG <text>; keep inline-formatting <tspan> runs non-positional with literal word spaces, and use same-x rows with first dy=0 then positive relative dy for multiline content; never use sibling <text> elements for one paragraph's visual lines.",
         ],
         "visible_candidate_gate": [
             "information_design",

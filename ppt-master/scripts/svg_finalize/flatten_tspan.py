@@ -2,6 +2,7 @@ import os
 import sys
 import re
 import argparse
+import copy
 from pathlib import Path
 from xml.etree import ElementTree as ET
 
@@ -53,6 +54,10 @@ TEXT_STYLE_ATTRS = {
 
 
 num_re = re.compile(r"^[\s,]*([+-]?(?:\d+\.?\d*|\d*\.\d+))")
+plain_number_re = re.compile(
+    r"^[\s]*[+-]?(?:\d+\.?\d*|\d*\.\d+)(?:px)?[\s]*$",
+    re.IGNORECASE,
+)
 
 
 def parse_first_number(val: str | None) -> float | None:
@@ -241,6 +246,239 @@ def nested_positional_tspan_errors(root: ET.Element) -> list[str]:
                     f"{text_label} contains a nested <tspan> with {attribute}; "
                     "move x/y/non-zero dy to a direct child of <text>"
                 )
+    return errors
+
+
+def _text_label(text_el: ET.Element, ordinal: int | None = None) -> str:
+    text_id = (text_el.get("id") or "").strip()
+    if text_id:
+        return f"<text id={text_id!r}>"
+    if ordinal is not None:
+        return f"<text carrier #{ordinal}>"
+    return "<text>"
+
+
+def _plain_number(value: str | None) -> float | None:
+    """Return a unitless/px SVG number, rejecting relative or list values."""
+    if value is None or not plain_number_re.fullmatch(value):
+        return None
+    return parse_first_number(value)
+
+
+def _ancestor_has_transform(
+    element: ET.Element,
+    parent_map: dict[ET.Element, ET.Element],
+) -> bool:
+    current: ET.Element | None = element
+    while current is not None:
+        if (current.get("transform") or "").strip():
+            return True
+        current = parent_map.get(current)
+    return False
+
+
+def _absolute_y_normalization_plan(
+    text_el: ET.Element,
+    parent_map: dict[ET.Element, ET.Element],
+) -> tuple[list[ET.Element], list[float]] | None:
+    """Return a deterministic absolute-y to relative-dy plan when unambiguous.
+
+    The safe form is deliberately narrow: every visual row starts with a direct
+    child tspan carrying the parent's x and an absolute y, inline formatting runs
+    carry no position attributes, baselines strictly increase, and no transform
+    exists on the carrier or its ancestors. The first baseline must equal the
+    parent text baseline so normalization cannot move the visible first row.
+    """
+    direct_children = list(text_el)
+    if not direct_children or (text_el.text or "").strip():
+        return None
+    if _ancestor_has_transform(text_el, parent_map):
+        return None
+
+    parent_x = _plain_number(text_el.get("x"))
+    parent_y = _plain_number(text_el.get("y"))
+    if parent_x is None or parent_y is None:
+        return None
+
+    line_starters: list[ET.Element] = []
+    baselines: list[float] = []
+    line_open = False
+    for child in direct_children:
+        if child.tag != f"{{{SVG_NS}}}tspan":
+            return None
+        has_y = child.get("y") is not None
+        if has_y:
+            child_x = _plain_number(child.get("x"))
+            child_y = _plain_number(child.get("y"))
+            if (
+                child_x is None
+                or child_y is None
+                or abs(child_x - parent_x) > 1e-6
+                or child.get("dy") is not None
+                or child.get("dx") is not None
+                or (child.get("transform") or "").strip()
+            ):
+                return None
+            line_starters.append(child)
+            baselines.append(child_y)
+            line_open = True
+            continue
+
+        # An unpositioned direct child is an inline formatting run belonging to
+        # the current row. Any position attribute makes the structure ambiguous.
+        if not line_open or any(child.get(name) is not None for name in ("x", "y", "dx", "dy")):
+            return None
+        if (child.get("transform") or "").strip():
+            return None
+
+    if len(line_starters) < 2 or abs(baselines[0] - parent_y) > 1e-6:
+        return None
+    if any(current <= previous for previous, current in zip(baselines, baselines[1:])):
+        return None
+    return line_starters, baselines
+
+
+def _normalize_safe_absolute_y_texts(root: ET.Element) -> int:
+    """Normalize only provably safe direct-child absolute-y line stacks."""
+    parent_map = {child: parent for parent in root.iter() for child in list(parent)}
+    changed = 0
+    for text_el in root.iter(f"{{{SVG_NS}}}text"):
+        if not any(
+            child.tag == f"{{{SVG_NS}}}tspan" and child.get("y") is not None
+            for child in list(text_el)
+        ):
+            continue
+        plan = _absolute_y_normalization_plan(text_el, parent_map)
+        if plan is None:
+            continue
+        line_starters, baselines = plan
+        previous = baselines[0]
+        for index, (line, baseline) in enumerate(zip(line_starters, baselines)):
+            line.attrib.pop("y", None)
+            line.set("dy", "0" if index == 0 else format_number(baseline - previous))
+            previous = baseline
+        changed += 1
+    return changed
+
+
+def editable_text_contract_errors(root: ET.Element) -> list[str]:
+    """Validate the closed SVG text-carrier contract used by native PPTX export."""
+    errors = list(nested_positional_tspan_errors(root))
+    parent_map = {child: parent for parent in root.iter() for child in list(parent)}
+
+    for ordinal, text_el in enumerate(root.iter(f"{{{SVG_NS}}}text"), start=1):
+        label = _text_label(text_el, ordinal)
+        direct_tspans = [
+            child for child in list(text_el)
+            if child.tag == f"{{{SVG_NS}}}tspan"
+        ]
+        if not direct_tspans:
+            continue
+        if len(direct_tspans) != len(list(text_el)):
+            errors.append(f"{label} has a non-tspan direct child")
+            continue
+
+        for direct in direct_tspans:
+            for descendant in direct.iter(f"{{{SVG_NS}}}tspan"):
+                if descendant is direct:
+                    continue
+                positioned = [
+                    name for name in ("x", "y", "dx", "dy")
+                    if descendant.get(name) is not None
+                ]
+                if positioned:
+                    errors.append(
+                        f"{label} has an inline nested <tspan> with positional "
+                        f"attribute(s) {', '.join(positioned)}"
+                    )
+
+        if any(child.get("dx") is not None for child in direct_tspans):
+            errors.append(
+                f"{label} uses positional dx on <tspan>; editable text requires "
+                "literal whitespace and non-positional inline formatting runs"
+            )
+
+        has_absolute_y = any(child.get("y") is not None for child in direct_tspans)
+        if has_absolute_y:
+            if _absolute_y_normalization_plan(text_el, parent_map) is None:
+                errors.append(
+                    f"{label} uses absolute-y rows that cannot be deterministically "
+                    "normalized to one same-x relative-dy text carrier"
+                )
+            continue
+
+        has_line_positioning = any(
+            child.get("x") is not None or child.get("dy") is not None
+            for child in direct_tspans
+        )
+        if not has_line_positioning:
+            continue
+
+        if (text_el.text or "").strip():
+            errors.append(
+                f"{label} mixes leading direct text with positioned rows; "
+                "multiline carriers must start with a dy=0 row"
+            )
+        parent_x = _plain_number(text_el.get("x"))
+        line_index = 0
+        line_open = False
+        for child in direct_tspans:
+            has_x = child.get("x") is not None
+            has_dy = child.get("dy") is not None
+            if has_x or has_dy:
+                line_index += 1
+                child_x = _plain_number(child.get("x"))
+                child_dy = _plain_number(child.get("dy"))
+                expected_dy = child_dy is not None and (
+                    abs(child_dy) <= 1e-6 if line_index == 1 else child_dy > 0
+                )
+                if (
+                    parent_x is None
+                    or child_x is None
+                    or abs(child_x - parent_x) > 1e-6
+                    or not expected_dy
+                ):
+                    errors.append(
+                        f"{label} row {line_index} must repeat the parent x and use "
+                        + ("dy=0" if line_index == 1 else "a positive relative dy")
+                    )
+                line_open = True
+                continue
+            if not line_open:
+                errors.append(
+                    f"{label} starts with an inline run before its dy=0 row"
+                )
+
+    return list(dict.fromkeys(errors))
+
+
+def text_carrier_integrity_errors(root: ET.Element) -> list[str]:
+    """Run the exact preserve transform and reject any source carrier split."""
+    errors = editable_text_contract_errors(root)
+    if errors:
+        return errors
+
+    working_root = copy.deepcopy(root)
+    source_carriers = list(working_root.iter(f"{{{SVG_NS}}}text"))
+    tree = ET.ElementTree(working_root)
+    flatten_text_with_tspans(
+        tree,
+        merge_paragraphs=True,
+        preserve_line_breaks=True,
+    )
+    surviving = {id(element) for element in working_root.iter(f"{{{SVG_NS}}}text")}
+    split_labels = [
+        _text_label(carrier, ordinal)
+        for ordinal, carrier in enumerate(source_carriers, start=1)
+        if id(carrier) not in surviving
+    ]
+    if split_labels:
+        preview = ", ".join(split_labels[:5])
+        suffix = "" if len(split_labels) <= 5 else f", +{len(split_labels) - 5} more"
+        errors.append(
+            f"preserve text-flow preflight split {len(split_labels)} source text "
+            f"carrier(s) 1→N ({preview}{suffix})"
+        )
     return errors
 
 
@@ -526,6 +764,7 @@ def flatten_text_with_tspans(
     every positioned row to its own <text>.
     """
     root = tree.getroot()
+    normalized_absolute_y = _normalize_safe_absolute_y_texts(root)
     positional_errors = nested_positional_tspan_errors(root)
     if positional_errors:
         preview = "; ".join(positional_errors[:3])
@@ -536,7 +775,7 @@ def flatten_text_with_tspans(
         )
         raise ValueError(f"Unsupported nested positional <tspan>: {preview}{suffix}")
     parent_map = {c: p for p in root.iter() for c in p}
-    changed = False
+    changed = bool(normalized_absolute_y)
 
     def is_svg_tag(el: ET.Element, name: str) -> bool:
         return el.tag == f"{{{SVG_NS}}}{name}"

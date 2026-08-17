@@ -30,6 +30,7 @@ from workflow_pptx import (
     export_from_request,
     export_valid,
     request_valid as pptx_request_valid,
+    text_failure as pptx_text_failure,
     write_request as write_pptx_request,
 )
 from workflow_spec import (
@@ -339,6 +340,30 @@ def directive_payload(project_dir: Path, text: str, controller: Path) -> dict[st
                 "pptx": str(paths.pptx_output(filename).resolve()),
                 "postflight_report": str(paths.pptx_postflight_report(filename).resolve()),
                 "text_frame_audit": str(paths.pptx_text_audit.resolve()),
+            }
+        text_failure = pptx_text_failure(paths)
+        if text_failure is not None:
+            slide_id = str(text_failure.get("slide_id", ""))
+            source_kind = str(text_failure.get("source_kind", ""))
+            if source_kind == "confirmed-svg":
+                return {
+                    "action": "REOPEN_PPTX_TEXT_SOURCE",
+                    "slide_id": slide_id,
+                    "reason": text_failure.get("reason"),
+                    "commands": {
+                        "reopen": command_line(
+                            controller,
+                            "reopen-svg",
+                            project_dir,
+                            "--page",
+                            slide_id,
+                        ),
+                    },
+                }
+            return {
+                "action": "REPAIR_DEFERRED_TEMPLATE_TEXT",
+                "slide_id": slide_id,
+                "reason": text_failure.get("reason"),
             }
         if pptx_request_valid(paths, text):
             return {
