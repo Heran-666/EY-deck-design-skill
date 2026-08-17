@@ -17,7 +17,7 @@ from svg_finalize.flatten_tspan import text_carrier_integrity_errors
 
 REQUEST_SCHEMA = "ppt-master.page-svg-request.v3"
 LEGACY_REQUEST_SCHEMA = "ppt-master.page-svg-request.v2"
-PAGE_CONTEXT_SCHEMA = "ey-deck.page-authoring-context.v1"
+PAGE_CONTEXT_SCHEMA = "ey-deck.page-authoring-context.v4"
 RESULT_SCHEMA = "ppt-master.page-svg-result.v1"
 VERSION_RE = re.compile(r"(?:A|B|R[1-9]\d*)")
 DESIGN_QUALITY_PROFILE = "ey-executive-editorial-v3"
@@ -48,6 +48,15 @@ STRUCTURAL_PAGE_TYPES = {
     "ending",
     "closing",
     "closing page",
+    "protected placeholder",
+}
+PAGE_LOGIC_KEYS = {
+    "page_objective",
+    "audience_move",
+    "reasoning_pattern",
+    "argument_chain",
+    "relationship_constraints",
+    "argument_priority",
 }
 BLOCKING_TEXT_WARNING_MARKERS = (
     "paragraph-like line run(s) split across sibling <text> elements",
@@ -146,6 +155,21 @@ def design_contract_errors(request: dict) -> list[str]:
     return errors
 
 
+def page_logic_errors(request: dict) -> list[str]:
+    logic = request.get("page_logic")
+    if _normalized_page_type(request) in STRUCTURAL_PAGE_TYPES:
+        return [] if logic is None else ["structural page must not contain page_logic"]
+    if not isinstance(logic, dict):
+        return ["substantive page requires page_logic"]
+    errors: list[str] = []
+    if set(logic) != PAGE_LOGIC_KEYS:
+        errors.append("page_logic must contain exactly the required semantic fields")
+    for key in PAGE_LOGIC_KEYS:
+        if not _nonempty_text(logic.get(key)):
+            errors.append(f"page_logic.{key} must be non-empty")
+    return errors
+
+
 def request_errors(request: dict) -> list[str]:
     errors: list[str] = []
     if request.get("schema") not in {REQUEST_SCHEMA, LEGACY_REQUEST_SCHEMA}:
@@ -224,6 +248,8 @@ def request_errors(request: dict) -> list[str]:
     else:
         errors.append("mode must be independent or revision")
     errors.extend(design_contract_errors(context))
+    if request.get("schema") != LEGACY_REQUEST_SCHEMA:
+        errors.extend(page_logic_errors(context))
     return errors
 
 

@@ -31,7 +31,7 @@ from svg_finalize.flatten_tspan import (  # noqa: E402
     flatten_text_with_tspans,
     text_carrier_integrity_errors,
 )
-from validate_deck_blueprint import _emphasis_errors  # noqa: E402
+from validate_deck_blueprint import _emphasis_errors, validate_page_logic  # noqa: E402
 from validate_framework import validate as validate_framework  # noqa: E402
 from workflow_io import sha256 as request_sha256  # noqa: E402
 from workflow_ppt_master import (  # noqa: E402
@@ -153,6 +153,14 @@ CONTENT_S02 = """# Presentation Build Specification
 - Language: English
 
 ## S02
+
+### Page logic（Build-only）
+- Page objective: Explain the recommendation
+- Audience move: From uncertainty to readiness to proceed
+- Reasoning pattern: Recommendation and implication
+- Argument chain: S02-B1 states the recommended action
+- Relationship constraints: None
+- Argument priority: Establish the action first
 
 ### On-slide content
 - Title: A sharper title
@@ -503,6 +511,22 @@ class WorkflowTests(unittest.TestCase):
             repaired = prepare_candidates(project)
             self.assertEqual(repaired["action"], "RUN_EMBEDDED_PPT_MASTER_SVG")
 
+    def test_v3_page_context_is_regenerated_without_breaking_the_flow(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project = Path(tmp)
+            lock_content(project)
+            prepare_candidates(project)
+            context_path = project / "working" / "packets" / "S01" / "context.json"
+            context = json.loads(context_path.read_text(encoding="utf-8"))
+            context["schema"] = "ey-deck.page-authoring-context.v3"
+            context_path.write_text(json.dumps(context), encoding="utf-8")
+
+            self.assertEqual(next_payload(project)["action"], "PREPARE_SVG_CANDIDATES")
+            repaired = prepare_candidates(project)
+            self.assertEqual(repaired["action"], "RUN_EMBEDDED_PPT_MASTER_SVG")
+            regenerated = json.loads(context_path.read_text(encoding="utf-8"))
+            self.assertEqual(regenerated["schema"], "ey-deck.page-authoring-context.v4")
+
     def test_single_structural_revision_and_confirmation_flow(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             project = Path(tmp)
@@ -531,7 +555,7 @@ class WorkflowTests(unittest.TestCase):
                 self.assertEqual(request["authoring_context"]["sha256"], request_sha256(context_path))
                 context = json.loads(context_path.read_text(encoding="utf-8"))
                 shared_contexts.add(context_path)
-                self.assertEqual(context["schema"], "ey-deck.page-authoring-context.v1")
+                self.assertEqual(context["schema"], "ey-deck.page-authoring-context.v4")
                 self.assertNotIn("direction_contract", context)
                 self.assertEqual(context["composition_space"]["mode"], "full-slide")
                 self.assertIsNone(context["composition_space"]["global_content_cap"])
@@ -819,6 +843,42 @@ class WorkflowTests(unittest.TestCase):
 """
         errors = _emphasis_errors(empty)
         self.assertTrue(any("must contain at least one annotation" in error for error in errors))
+
+    def test_substantive_page_logic_is_required_and_block_bound(self) -> None:
+        section = """## S02
+
+### Page logic（Build-only）
+- Page objective: Explain the recommendation
+- Audience move: From uncertainty to readiness to proceed
+- Reasoning pattern: Recommendation and implication
+- Argument chain: S02-B1 establishes the action before S02-B2 states the implication
+- Relationship constraints: S02-B2 is an implication, not a second option
+- Argument priority: Establish the action before its implication
+
+### On-slide content
+- Title: Recommendation
+
+#### S02-B1｜Action
+- Detail: Proceed with the selected path.
+
+#### S02-B2｜Implication
+- Detail: Begin implementation planning.
+"""
+        self.assertEqual(validate_page_logic("S02", section, "Standard content"), [])
+        missing = validate_page_logic(
+            "S02",
+            section.replace("### Page logic（Build-only）", "### Removed logic"),
+            "Standard content",
+        )
+        self.assertTrue(any("missing Page logic" in error for error in missing))
+        unknown = validate_page_logic(
+            "S02",
+            section.replace("S02-B2 is an implication", "S02-B9 is an implication"),
+            "Standard content",
+        )
+        self.assertTrue(any("unknown blocks: S02-B9" in error for error in unknown))
+        structural = validate_page_logic("S02", section, "Agenda")
+        self.assertTrue(any("structural page" in error for error in structural))
 
     def test_visual_review_falls_back_to_installed_chrome(self) -> None:
         sentinel = object()
@@ -1221,6 +1281,17 @@ class WorkflowTests(unittest.TestCase):
                 context_descriptors.add((descriptor["path"], descriptor["sha256"]))
                 context = json.loads(Path(descriptor["path"]).read_text(encoding="utf-8"))
                 prototype_paths.add(context["template"]["prototype"])
+                self.assertEqual(
+                    context["page_logic"],
+                    {
+                        "page_objective": "Explain the recommendation",
+                        "audience_move": "From uncertainty to readiness to proceed",
+                        "reasoning_pattern": "Recommendation and implication",
+                        "argument_chain": "S02-B1 states the recommended action",
+                        "relationship_constraints": "None",
+                        "argument_priority": "Establish the action first",
+                    },
+                )
             self.assertEqual(len(context_descriptors), 1)
             self.assertEqual(len(prototype_paths), 1)
             self.assertNotIn("variant_direction", requests["A"])

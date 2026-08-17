@@ -1,11 +1,11 @@
 ---
 name: ey-deck-design
 description: >
-  Create and approve EY Storylines and exact substantive slide content, defer
-  Cover, Agenda, Section divider, and Ending pages to approved export templates,
-  generate and confirm substantive page SVGs through the bundled PPT Master,
-  and export the ordered roster as editable DrawingML PPTX. Use only when the
-  user explicitly invokes $ey-deck-design.
+  Create and approve EY Storylines, substantive page outlines, and page logic;
+  defer Cover, Agenda, Section divider, and Ending pages to approved export
+  templates; generate and confirm substantive page SVGs through the bundled
+  PPT Master; and export the ordered roster as editable DrawingML PPTX. Use only
+  when the user explicitly invokes $ey-deck-design.
 ---
 
 # EY Deck Design
@@ -21,8 +21,8 @@ user-visible skill.
 | User | Approve Storyline/content; review, refine, and confirm SVGs |
 | EY controller | Order, state, paths, hashes, requests, receipts, publication, recovery |
 | `framework.md` | Project context, confirmed Storyline, coarse page state |
-| `content.md` | Exact approved copy, data, emphasis, page-local sources |
-| Bundled PPT Master | Page strategy, design, SVG review/repair, DrawingML conversion, postflight |
+| `content.md` | Approved page outline, logic, facts, data, emphasis intent, sources |
+| Bundled PPT Master | Page wording, strategy, design, SVG review/repair, DrawingML conversion, postflight |
 
 Candidates live in `svg_working/<Slide ID>/`; only `confirm-svg` may publish one
 to `svg_output/<Slide ID>.svg`. Keep candidate history and PPT Master internals
@@ -69,9 +69,11 @@ the controller requests migration from workflow 6.0.
 
 Never create `content.md` sections for `Deferred template` pages. For
 `PRESENT_PAGE_REVIEW`, replace `working/provisional-content.md` with exactly
-the active page. Include final visible copy, complete data, emphasis, and
-sources; exclude visual/layout direction. Run `present-review`, show the whole
-page, and wait for explicit approval before `approve-content`.
+the active page. For every substantive page, include the build-only Page logic,
+preferred wording, complete facts and data, emphasis intent, and sources;
+exclude visual/layout direction. Structural pages omit Page logic. Run
+`present-review`, show the whole page including Page logic, and wait for
+explicit semantic approval before `approve-content`.
 
 Never invent client, EY, source, credential, case, people, capacity, fee,
 schedule, tool, approval, learning, or business-outcome facts.
@@ -89,8 +91,10 @@ For each `RUN_EMBEDDED_PPT_MASTER_SVG` request:
 
 1. Read the request, hash-bound `authoring_context`, and `service_contract`.
 2. Run `validate_request`.
-3. Let PPT Master choose the communication model, hierarchy, visual concept,
-   geometry, and composition for the single SVG.
+3. Use `page_logic` to preserve the approved argument, relationships, and
+   argument priority. Follow PPT Master's `content vs expression` rule for
+   wording optimization and semantic fidelity. Let it choose the communication
+   model, hierarchy, visual concept, geometry, and composition.
 4. Complete information design, composition, art-direction refinement, direct
    source-SVG review, repair, and recheck before exposing the candidate. Do not
    use Chromium or another browser renderer for candidate QA.
@@ -103,7 +107,9 @@ overlap gate.
 Present the emitted SVG at review scale and wait. If the user confirms it,
 publish that exact version. Otherwise bind the exact feedback to the displayed
 SVG, create one immutable `R<n>`, present only that revised SVG, and repeat.
-Reopen content for copy/meaning changes; reopen SVG for a design restart.
+Use an SVG revision for wording or design refinement within the approved
+meaning. Reopen content for changes to meaning, facts, data, sources, or Page
+logic.
 
 ## PPTX export
 
@@ -118,8 +124,8 @@ Export through editable native DrawingML with flat Quick Generate structure,
 postflight, and text-frame parity. One logical text box is one SVG `<text>`;
 inline `<tspan>` runs are non-positional with literal spaces, while visual
 wrap rows use same-x `dy` positioning and must rejoin as continuous text rather
-than DrawingML hard breaks. Use a real paragraph boundary only when the approved
-copy is semantically separate. Export requires source/trace/PPTX carrier
+than DrawingML hard breaks. Use a real paragraph boundary only when the SVG
+wording is semantically separate. Export requires source/trace/PPTX carrier
 conservation and per-carrier OOXML text continuity. On failure, reopen and
 reconfirm the source SVG.
 Deliver only after `PPTX_STAGE_COMPLETE`.

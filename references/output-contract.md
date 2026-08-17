@@ -28,47 +28,61 @@ registers, review logs, open questions, or assumptions.
 ````markdown
 ## S03
 
+### Page logic（Build-only）
+- Page objective: <why this page exists>
+- Audience move: <audience state before → after>
+- Reasoning pattern: <semantic argument pattern>
+- Argument chain: <name every top-level block and explain its role in the claim>
+- Relationship constraints: <relationships that must not be misread; or None>
+- Argument priority: <semantic order in which the argument should land>
+
 ### On-slide content
-- Title: <exact copy>
-- Subtitle: <optional exact copy>
-- Core insight: <optional exact copy>
+- Title: <preferred page title>
+- Subtitle: <optional preferred wording>
+- Core insight: <approved claim or takeaway>
 
 #### S03-B1｜<parent or peer title>
 - Child logic（Build-only）: <only for a genuine parent>
 
 ##### S03-B1.1｜<child title>
-- Detail: <exact visible copy; optional only when heading is complete>
+- Detail: <substantive point with preferred wording; optional when heading is complete>
 - Emphasis:
-  - “<exact visible substring>”｜<关键重点 | 次级重点 | 对比重点 | 普通加粗>
+  - “<substring expressing the priority>”｜<关键重点 | 次级重点 | 对比重点 | 普通加粗>
 
 #### S03-B2｜<table block title>
 - Table purpose（Build-only）: <required lookup/comparison>
 
-| <exact header> | <exact header> |
+| <preferred header> | <preferred header> |
 |---|---|
-| <exact row label> | <exact cell> |
+| <row label> | <approved value or text> |
 
-- Table note: <optional exact copy>
+- Table note: <optional note or caveat>
 
 #### S03-B3｜<chart block title>
 - Chart purpose（Build-only）: <relationship and intended conclusion>
-- Unit: <exact visible unit>
-- Period: <optional exact period>
+- Unit: <approved unit>
+- Period: <optional approved period>
 
-| Category | <exact series name> |
+| Category | <approved series name> |
 |---|---:|
-| <exact category> | <exact value> |
+| <approved category> | <approved value> |
 
-- Chart note: <optional exact copy or caveat>
+- Chart note: <optional note or caveat>
 
 ### Sources
-- On-slide source: <exact footer or None>
+- On-slide source: <approved source footer or None>
 - Source details: <provenance and supported IDs; or No external sources>
 ````
 
-The page heading contains only the Slide ID. `Title` is the sole exact page
-title and is synchronized to `framework.md` after approval. Page type and
-template come from `framework.md`, not `content.md`.
+The page heading contains only the Slide ID. `Title` is the preferred working
+title and is synchronized to `framework.md` after approval. PPT Master may
+optimize the visible title without changing its meaning. Page type and template
+come from `framework.md`, not `content.md`.
+
+Every substantive page requires `Page logic（Build-only）`. Its `Argument chain`
+must name every top-level block and may reference only IDs on that page. These
+fields guide information design but remain invisible. Cover, Agenda, Section
+divider, Ending, and protected placeholder pages must omit Page logic.
 
 Do not add Visual Direction, design briefs, wireframes, coordinates,
 measurements, element maps, zones, named compositions, or layouts. Content
@@ -96,26 +110,22 @@ Agenda contains `Title` plus sequential top-level block headings only:
 ```
 
 Do not add Subtitle, Core insight, Detail, Child logic, Emphasis, tables,
-charts, or descriptions. Do not number labels in content; PPT Master may derive
-visible numbering from block order.
+charts, descriptions, or Page logic. Do not number labels in content; PPT
+Master may derive visible numbering from block order.
 
-## Visible-content rules
+## Content adaptation
 
-- Every audience-facing character is final. SVG authoring may wrap but may not
-  add, remove, shorten, or rewrite it without reopening content.
-- Build-only fields stay invisible. PPT Master must reproduce headings, Title,
-  Subtitle, Core insight, Detail, table/chart cells, Unit, Period, visible notes,
-  and On-slide source.
-- `Emphasis` quotes an exact visible substring from the same block. Use only
+- Follow PPT Master's `content vs expression` rule. Treat narrative wording as
+  preferred, not verbatim; permit concise connective copy that adds no claim.
+- Build-only fields stay invisible. They may guide generated wording but must
+  not be copied onto the page as internal instructions.
+- `Emphasis` identifies a semantic priority in the source outline. Use only
   `关键重点`, `次级重点`, `对比重点`, or `普通加粗`; use `对比重点` only for an explicit
-  approved contrast. Emphasis is a required semantic priority, not a complete
-  style map.
-- Keep titles on one line and within 36 Chinese-width characters; resolve
-  crowding during content review.
+  approved contrast. PPT Master may emphasize equivalent optimized wording.
 
 ## Sources and validation
 
-`On-slide source` is exact footer copy or `None`. `Source details` records
+`On-slide source` is approved footer content or `None`. `Source details` records
 authoritative provenance and supported IDs. Identify user/internal material and
 never invent URLs, dates, licenses, or approval status. Do not record
 construction-only visual assets here.

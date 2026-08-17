@@ -15,7 +15,7 @@ metadata:
 
 This package is not a standalone skill. Invoke it only through EY Deck Design
 with a validated `ppt-master.page-svg-request.v3` page request and its
-hash-bound `ey-deck.page-authoring-context.v1`, or a hash-bound
+hash-bound `ey-deck.page-authoring-context.v4`, or a hash-bound
 `ppt-master.svg-deck-pptx-request.v2` export request.
 
 ## Entry

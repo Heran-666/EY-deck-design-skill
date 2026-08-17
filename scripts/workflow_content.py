@@ -10,6 +10,16 @@ from framework_lib import PageEntry, page_entries
 from validate_deck_blueprint import validate as validate_blueprint
 
 
+PAGE_LOGIC_FIELDS = {
+    "Page objective": "page_objective",
+    "Audience move": "audience_move",
+    "Reasoning pattern": "reasoning_pattern",
+    "Argument chain": "argument_chain",
+    "Relationship constraints": "relationship_constraints",
+    "Argument priority": "argument_priority",
+}
+
+
 def content_section(content: str, slide_id: str) -> str:
     match = re.search(
         rf"^## {re.escape(slide_id)}(?:｜[^\n]*)?$",
@@ -25,6 +35,24 @@ def content_section(content: str, slide_id: str) -> str:
     )
     end = match.end() + next_match.start() if next_match else len(content)
     return content[match.start() : end].rstrip() + "\n"
+
+
+def page_logic(section: str) -> dict[str, str] | None:
+    """Return the approved build-only page logic in service-friendly keys."""
+    match = re.search(r"^### Page logic（Build-only）\s*$", section, re.MULTILINE)
+    if not match:
+        return None
+    next_h3 = re.search(r"^### ", section[match.end() :], re.MULTILINE)
+    end = match.end() + next_h3.start() if next_h3 else len(section)
+    body = section[match.end() : end]
+    values = {
+        key.strip(): value.strip()
+        for key, value in re.findall(r"^- ([^:\n]+):\s*(.*)$", body, re.MULTILINE)
+    }
+    return {
+        output_key: values.get(source_key, "")
+        for source_key, output_key in PAGE_LOGIC_FIELDS.items()
+    }
 
 
 def provisional_content_errors(path: Path, expected_pages: list[PageEntry]) -> list[str]:

@@ -8,8 +8,8 @@ description: Composable page-level single-SVG review service used by a parent wo
 
 This EY-only internal service accepts a validated
 `ppt-master.page-svg-request.v3` with `caller: ey-deck-design` and a
-hash-bound `ey-deck.page-authoring-context.v1`. Read v2 only to recover an
-active legacy cycle.
+hash-bound `ey-deck.page-authoring-context.v4`. Read request v2 only to recover
+an active legacy cycle.
 
 EY owns content, order, candidate naming, user choice, and publication. PPT
 Master owns design, SVG construction, direct source inspection, and technical
@@ -21,7 +21,7 @@ change EY state, export PPTX, or question the user here.
 1. Run the embedded-root attribution guard.
 2. Load workspace dependencies; set command-scoped `EY_DECK_SVG_PYTHON` to the
    returned Python executable; run the request's `validate_request` command.
-3. Read the bound authoring context, including `design_quality`,
+3. Read the bound authoring context, including `page_logic`, `design_quality`,
    `candidate_plan`, approved content, project/page context, and
    `template.design_spec.path`. Then read `references/strategist.md`,
    `references/strategist-template.md`, `references/executor-base.md`, and
@@ -33,9 +33,12 @@ change EY state, export PPTX, or question the user here.
 
 ## Full design loop
 
-1. **Strategist / information design** — recover intent from the hash-bound
-   context; determine message, hierarchy, narrative connection, communication
-   model, visual concept, geometry, and composition.
+1. **Strategist / information design** — for substantive pages, preserve the
+   approved objective, audience move, argument chain, relationship constraints,
+   and argument priority in `page_logic`. Follow `executor-base.md`'s `content
+   vs expression` rule for wording and text texture. Determine the communication
+   model, visual concept, geometry, and composition without rendering build-only
+   text.
 2. **Page composition** — establish one dominant idea and reading order through
    scale, position, contrast, whitespace, and semantic geometry.
 3. **Visual system and template** — apply the bound EY identity and maintain
@@ -60,8 +63,8 @@ evidence. Keep internal design decisions inside PPT Master.
 ## Initial SVG and revisions
 
 Follow the EY-owned `candidate_plan`: build one complete A solution and do not
-invent B or another initial option. EY supplies no candidate role, adaptation
-rule, or layout.
+invent B or another initial option. EY supplies no separate wording policy,
+candidate design role, or layout.
 
 For Rn, bind the one displayed base and non-empty user feedback. Preserve the
 base except for requested changes and necessary reflow. Repeat the same quality
@@ -70,9 +73,11 @@ revised SVG for the next review round.
 
 ## Invariants
 
-- Preserve every approved visible word, number, source, and Emphasis. Emphasis
-  defines mandatory semantic priority, not a complete style map. Do not add or
-  rewrite audience-facing copy.
+- Follow `executor-base.md`'s `content vs expression` hard rule. Concise
+  connective copy that introduces no new claim is an expression choice.
+- Require structured `page_logic` for substantive pages and omit it for Cover,
+  Agenda, Section divider, Ending, and protected placeholder pages. Treat it as
+  semantic authority, not layout direction or visible copy.
 - Begin from the exact `template.prototype`; preserve its Master/Layout,
   fixed atoms, and placeholder contract.
 - Agenda's composite region is blank: PPT Master owns item grouping, numbering,

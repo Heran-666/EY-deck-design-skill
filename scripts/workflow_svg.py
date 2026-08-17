@@ -18,7 +18,7 @@ INITIAL_VERSIONS = ("A",)
 LEGACY_SUBSTANTIVE_VERSIONS = ("A", "B")
 VERSION_RE = re.compile(r"(?:A|B|R[1-9]\d*)")
 FORBIDDEN_TAGS = {"foreignObject", "script", "style"}
-PAGE_CONTEXT_SCHEMA = "ey-deck.page-authoring-context.v1"
+PAGE_CONTEXT_SCHEMA = "ey-deck.page-authoring-context.v4"
 REQUEST_SCHEMAS = {
     "ppt-master.page-svg-request.v2",
     "ppt-master.page-svg-request.v3",

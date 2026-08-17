@@ -9,7 +9,7 @@ from urllib.parse import unquote, urlsplit
 from xml.etree import ElementTree as ET
 
 from framework_lib import PageEntry, h2_section, line_fields, page_entries
-from workflow_content import content_section
+from workflow_content import content_section, page_logic
 from workflow_io import atomic_write, read_json, sha256, text_sha256, write_json
 from workflow_paths import ProjectPaths
 from workflow_spec import normalize_page_type
@@ -21,7 +21,7 @@ TEMPLATE_ROOT = SKILL_ROOT / "assets" / "templates" / "ey-gradient-dark-v1"
 TEMPLATE_DESIGN_SPEC = TEMPLATE_ROOT / "templates" / "design_spec.md"
 SERVICE_CONTRACT = PPT_MASTER_ROOT / "workflows" / "page-svg-service.md"
 SERVICE_CLI = PPT_MASTER_ROOT / "scripts" / "page_svg_service.py"
-PAGE_CONTEXT_SCHEMA = "ey-deck.page-authoring-context.v1"
+PAGE_CONTEXT_SCHEMA = "ey-deck.page-authoring-context.v4"
 REQUEST_SCHEMA = "ppt-master.page-svg-request.v3"
 IMAGE_MIME_TYPES = {
     ".gif": "image/gif",
@@ -49,7 +49,7 @@ def design_quality_contract() -> dict[str, object]:
             "Add coherent icon elements at semantically appropriate positions when they improve recognition, scanning, or visual rhythm; omit them when they have no clear communication job.",
             "Refine alignment, spacing, optical balance, edges, connectors, and emphasis at full-slide scale.",
             "Compose freely across the full 1280x720 slide. Placeholder bounds are native PowerPoint metadata only; do not treat y=650 or any other inset rectangle as a visual content limit.",
-            "Author each logical PowerPoint text box as one SVG <text>; keep inline-formatting <tspan> runs non-positional with literal word spaces, and use same-x rows with first dy=0 then positive relative dy only as visual-wrap hints for continuous paragraph text; never use sibling <text> elements or authored hard breaks for one paragraph's visual lines, and create a semantic paragraph boundary only when the approved copy actually starts a new paragraph.",
+            "Author each logical PowerPoint text box as one SVG <text>; keep inline-formatting <tspan> runs non-positional with literal word spaces, and use same-x rows with first dy=0 then positive relative dy only as visual-wrap hints for continuous paragraph text; never use sibling <text> elements or authored hard breaks for one paragraph's visual lines, and create a semantic paragraph boundary only when the optimized wording starts a new paragraph.",
         ],
         "visible_candidate_gate": [
             "information_design",
@@ -227,6 +227,7 @@ def page_context_payload(
             "next_connection": page.fields.get("Next connection", ""),
             "adjacent_pages": adjacent_pages,
         },
+        "page_logic": page_logic(section),
         "candidate_plan": plan,
         "design_quality": design_quality_contract(),
         "confirmed_pages": confirmed_pages,

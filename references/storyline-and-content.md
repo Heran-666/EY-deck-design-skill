@@ -24,16 +24,20 @@ For Storyline review:
 
 ## Page argument
 
-Before writing blocks, resolve:
+Before writing blocks, resolve and record for every substantive page:
 
 - `Page objective`: role in the Storyline
 - `Audience move`: intended change in understanding or decision posture
-- `Core insight`: audience-facing claim, when the page is argumentative
-- `Content logic`: how the blocks establish the claim
-- `Supporting information`: necessary evidence or explanation
+- `Reasoning pattern`: progression, comparison, cause/effect, problem/solution,
+  hierarchy, convergence, parallel expansion, or another clear pattern
+- `Argument chain`: how every top-level block supports the page claim
+- `Relationship constraints`: relationships that must not be misread
+- `Argument priority`: the semantic order in which the argument should land
 
-These are reasoning inputs. Do not place review analysis, Visual Direction, or
-specific layout proposals in `content.md`.
+Place these fields in `Page logic（Build-only）`. Approve them with the page
+content outline. Wording is preferred, not verbatim; facts, data, claims,
+relationships, qualifiers, caveats, and sources remain authoritative. Do not
+add visual direction, layout proposals, or coordinates.
 
 Each substantive page uses one claim plus normally three to five planned content blocks,
 or an equivalently complete table, chart, process, or semantic form. Fewer
@@ -49,9 +53,10 @@ IDs encode meaning, not layout:
 - hierarchical decomposition uses a meaningful parent with at least two
   children.
 
-Record peer relationships once in `Content logic` and parent-child relationships
-once in `Child logic`. Put detail in children, collapse single-child structures,
-and normally stop at three levels.
+Record page-level relationships once in `Argument chain` and `Relationship
+constraints`. Record parent-child relationships once in `Child logic`. Put
+detail in children, collapse single-child structures, and normally stop at
+three levels.
 
 ## Content form
 

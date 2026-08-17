@@ -11,6 +11,7 @@ from pathlib import Path
 
 from framework_lib import duplicate_line_fields, line_fields, page_entries
 from workflow_agenda import agenda_schema_errors
+from workflow_spec import is_substantive_page_type
 
 
 SLIDE_RE = re.compile(r"^## (S\d{2})(?:｜[^\n]*)?$", re.MULTILINE)
@@ -35,8 +36,6 @@ PROHIBITED_PAGE_FIELDS = (
     "Final SVG",
     "Review status",
     "Authoring mode",
-    "Page objective",
-    "Audience move",
     "Content logic",
     "RFP relevance",
     "Primary/supporting hierarchy",
@@ -58,19 +57,14 @@ PROHIBITED_PAGE_FIELDS = (
 )
 BUILD_SPEC_HEADING_RE = r"# Presentation Build Specification"
 ALLOWED_EMPHASIS_STYLES = {"关键重点", "次级重点", "对比重点", "普通加粗"}
-
-
-def chinese_width(value: str) -> float:
-    width = 0.0
-    for char in value.strip():
-        code = ord(char)
-        is_wide = (
-            0x2E80 <= code <= 0x9FFF
-            or 0xF900 <= code <= 0xFAFF
-            or 0xFF01 <= code <= 0xFF60
-        )
-        width += 1.0 if is_wide else 0.5
-    return width
+PAGE_LOGIC_FIELDS = (
+    "Page objective",
+    "Audience move",
+    "Reasoning pattern",
+    "Argument chain",
+    "Relationship constraints",
+    "Argument priority",
+)
 
 
 def named_h2_section(text: str, heading: str) -> str:
@@ -208,6 +202,57 @@ def validate_block_hierarchy(slide_id: str, section: str, page_type: str) -> lis
     return errors
 
 
+def validate_page_logic(slide_id: str, section: str, page_type: str) -> list[str]:
+    errors: list[str] = []
+    logic = named_h3_section(section, "Page logic（Build-only）")
+    substantive = is_substantive_page_type(page_type)
+    if not substantive:
+        if logic:
+            errors.append(f"{slide_id} structural page must not contain Page logic")
+        return errors
+    if not logic:
+        return [f"{slide_id} substantive page is missing Page logic（Build-only）"]
+
+    fields = line_fields(logic)
+    errors.extend(
+        f"{slide_id} Page logic has duplicate field: {field}"
+        for field in duplicate_line_fields(logic)
+    )
+    for field in PAGE_LOGIC_FIELDS:
+        if not fields.get(field, "").strip():
+            errors.append(f"{slide_id} Page logic is missing {field}")
+    unexpected = set(fields) - set(PAGE_LOGIC_FIELDS)
+    if unexpected:
+        errors.append(
+            f"{slide_id} Page logic has unsupported fields: "
+            + ", ".join(sorted(unexpected))
+        )
+
+    top_level_ids = [
+        block_id
+        for _level, block_id, _title in BLOCK_HEADING_RE.findall(section)
+        if "." not in block_id
+    ]
+    chain = fields.get("Argument chain", "")
+    missing_ids = [block_id for block_id in top_level_ids if block_id not in chain]
+    if missing_ids:
+        errors.append(
+            f"{slide_id} Argument chain must name every top-level block: "
+            + ", ".join(missing_ids)
+        )
+    referenced_ids = set(re.findall(rf"\b{re.escape(slide_id)}-B\d+(?:\.\d+)*\b", logic))
+    actual_ids = {
+        block_id for _level, block_id, _title in BLOCK_HEADING_RE.findall(section)
+    }
+    unknown_ids = sorted(referenced_ids - actual_ids)
+    if unknown_ids:
+        errors.append(
+            f"{slide_id} Page logic references unknown blocks: "
+            + ", ".join(unknown_ids)
+        )
+    return errors
+
+
 def validate_slide(
     slide_id: str,
     section: str,
@@ -224,9 +269,7 @@ def validate_slide(
     if not re.search(r"^### On-slide content\s*$", section, re.MULTILINE):
         errors.append(f"{slide_id} has no On-slide content section")
     if not title and not is_placeholder:
-        errors.append(f"{slide_id} has no exact audience-facing Title field")
-    if title and chinese_width(title) > 36:
-        errors.append(f"{slide_id} title exceeds 36 Chinese-width characters: {title}")
+        errors.append(f"{slide_id} has no preferred Title field")
 
     if re.search(r"^### Content structure", section, re.MULTILINE):
         errors.append(f"{slide_id} must not contain the deprecated Content structure section")
@@ -239,6 +282,7 @@ def validate_slide(
     if re.search(r"^### Internal notes", section, re.MULTILINE):
         errors.append(f"{slide_id} must not contain Internal notes")
     allowed_h3 = {
+        "Page logic（Build-only）",
         "On-slide content",
         "Sources",
     }
@@ -256,6 +300,7 @@ def validate_slide(
             errors.append(f"{slide_id} must not contain review-oriented field: {prohibited}")
 
     errors.extend(agenda_schema_errors(section, slide_id, page_type))
+    errors.extend(validate_page_logic(slide_id, section, page_type))
 
     if "[占位：" in section and not is_placeholder:
         errors.append(f"{slide_id} protected placeholder must prohibit replacement content and design")

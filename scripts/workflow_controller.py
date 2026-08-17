@@ -19,6 +19,7 @@ from workflow_content import content_section, promote_provisional_content, provi
 from workflow_io import atomic_write, command_line, now, read_json, sha256, text_sha256, write_json
 from workflow_paths import ProjectPaths
 from workflow_ppt_master import (
+    PAGE_CONTEXT_SCHEMA,
     SERVICE_CLI,
     candidate_plan_for_page,
     embedding_errors,
@@ -223,7 +224,7 @@ def svg_cycle_started(paths: ProjectPaths, page: PageEntry) -> bool:
         content_section(paths.content.read_text(encoding="utf-8"), page.slide_id).rstrip()
     )
     if (
-        context.get("schema") != "ey-deck.page-authoring-context.v1"
+        context.get("schema") != PAGE_CONTEXT_SCHEMA
         or context.get("caller") != "ey-deck-design"
         or context.get("slide_id") != page.slide_id
         or context.get("approved_content_sha256") != current_section_hash

@@ -22,8 +22,9 @@ feedback, and confirmation.
 - EY supplies one quality floor, not design direction or layout. PPT Master
   chooses the strongest single solution for A.
 - Materialize one page context and one self-contained template prototype per
-  Slide ID. The context holds approved content, project/page and confirmed-page
-  context, candidate plan, design quality, template, and service contract.
+  Slide ID. The context holds approved content, structured `page_logic` for
+  substantive pages, project/page and confirmed-page context, candidate plan,
+  design quality, template, and service contract.
   Candidate requests hold only identity, artifact, context path/hash, and, for
   revisions, base and feedback.
 - Rn binds the one currently displayed SVG by path and SHA-256 plus non-empty
@@ -41,6 +42,12 @@ Enter through `service_contract` and run PPT Master's full Strategist,
 specialist, template, Executor, and source-SVG completion loop. It may use
 chart, table, qualitative structure, imagery, icons, typography, semantic SVG,
 and effects as needed.
+
+For substantive pages, use `page_logic` to preserve the approved objective,
+audience move, argument chain, relationship constraints, and argument priority.
+Follow PPT Master's `content vs expression` rule to optimize page-local wording
+without changing approved meaning. Do not render build-only fields or treat them
+as layout instructions.
 
 Use confirmed pages and adjacent-page context for coherence without copying
 their compositions. Content pages may use the complete 1280×720 canvas;
