@@ -28,7 +28,8 @@ or create a second PPTX implementation in the controller.
 1. Run `PREPARE_PPTX_EXPORT`'s command once. It materializes self-contained
    Cover, Agenda, Section divider, and Ending template snapshots only for pages
    with `Deferred template`, then creates a hash-bound ordered request. It does
-   not create the deck or enter page design.
+   not create the deck or enter page design. Materialize Ending from its fixed
+   full-slide asset without modifying it or adding content.
 2. On `RUN_EMBEDDED_PPT_MASTER_PPTX`, read the request and its service contract,
    call `load_workspace_dependencies`, set command-scoped
    `EY_DECK_PPTX_PYTHON` to the returned absolute Python executable, then run

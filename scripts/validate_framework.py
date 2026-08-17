@@ -146,6 +146,14 @@ def validate(framework: Path, project_dir: Path | None = None) -> list[str]:
         if status not in READABLE_PAGE_STATES:
             errors.append(f"{page.slide_id} has unsupported Status: {status}")
         page_type = page.fields.get("Page type", "").strip().lower()
+        normalized_page_type = normalize_page_type(page_type)
+        if (
+            normalized_page_type in {"ending", "closing", "closing page"}
+            and status not in {"Deferred template", "SVG confirmed"}
+        ):
+            errors.append(
+                f"{page.slide_id} Ending must use Deferred template and remain unchanged"
+            )
         if status == "Deferred template":
             if not is_deferred_template_page_type(page_type):
                 errors.append(

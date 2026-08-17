@@ -32,13 +32,17 @@ from workflow_pptx import (
     request_valid as pptx_request_valid,
     write_request as write_pptx_request,
 )
-from workflow_spec import READABLE_WORKFLOW_VERSIONS, TERMINAL_PAGE_STATES, WORKFLOW_VERSION
+from workflow_spec import (
+    READABLE_WORKFLOW_VERSIONS,
+    TERMINAL_PAGE_STATES,
+    WORKFLOW_VERSION,
+    normalize_page_type,
+)
 from workflow_svg import (
     candidate_valid,
     confirm_candidate,
     confirmation_valid,
     discard_cycle,
-    legacy_initial_versions_for_page_type,
     latest_revision,
     next_revision,
     presentation_valid,
@@ -182,16 +186,11 @@ def service_request_payload(paths: ProjectPaths, controller: Path, slide_id: str
 
 
 def planned_initial_versions(paths: ProjectPaths, page: PageEntry) -> tuple[str, ...]:
-    """Resolve the current hash-bound adaptive plan, preserving legacy cycles."""
-    context_path = paths.page_context(page.slide_id)
-    if not context_path.is_file() and any(
-        paths.packet(page.slide_id, version).is_file() for version in ("A", "B")
-    ):
-        return legacy_initial_versions_for_page_type(page.fields.get("Page type", ""))
+    """Resolve the current hash-bound single-SVG plan."""
     framework_text = paths.framework.read_text(encoding="utf-8")
     plan = candidate_plan_for_page(paths, framework_text, page)
     versions = plan.get("versions")
-    if versions not in (["A"], ["A", "B"]):
+    if versions != ["A"]:
         raise ValueError(f"invalid candidate plan for {page.slide_id}")
     return tuple(versions)
 
@@ -256,7 +255,7 @@ def decision_directive(
         "action": "COLLECT_SVG_REVISION_DECISION" if revision else "COLLECT_SVG_DECISION",
         "slide_id": slide_id,
         "displayed_versions": versions,
-        "decision_rules": "Confirm one displayed version, or write one concrete revision request and choose its displayed base.",
+        "decision_rules": "Confirm the displayed SVG, or write one concrete optimization request for that SVG.",
         "revision_feedback_file": str(feedback),
         "commands": {
             "confirm": command_line(controller, "confirm-svg", paths.root, "--page", slide_id, "--version", "<DISPLAYED_VERSION>"),
@@ -278,10 +277,7 @@ def svg_directive(paths: ProjectPaths, page: PageEntry, controller: Path) -> dic
                 "slide_id": page.slide_id,
                 "requests": [service_request_payload(paths, controller, page.slide_id, latest)],
             }
-        request = read_json(paths.packet(page.slide_id, latest))
-        base = request.get("base")
-        base_version = str(base.get("version")) if isinstance(base, dict) else ""
-        versions = [base_version, latest]
+        versions = [latest]
         if not presentation_valid(paths, page.slide_id, versions):
             return {
                 "action": "PRESENT_SVG_REVISION",
@@ -308,7 +304,7 @@ def svg_directive(paths: ProjectPaths, page: PageEntry, controller: Path) -> dic
     versions = list(initial_versions)
     if not presentation_valid(paths, page.slide_id, versions):
         return {
-            "action": "PRESENT_SVG_OPTION" if len(versions) == 1 else "PRESENT_SVG_OPTIONS",
+            "action": "PRESENT_SVG_OPTION",
             "slide_id": page.slide_id,
             "versions": versions,
             "artifacts": [str(paths.candidate(page.slide_id, item)) for item in versions],
@@ -551,27 +547,22 @@ def handle_present_svg(project_dir: Path, text: str, page_id: str, versions_text
     ):
         raise ValueError(f"{page_id} is not awaiting an SVG decision")
     versions = [require_version(item.strip()) for item in versions_text.split(",") if item.strip()]
-    if len(versions) not in {1, 2} or len(set(versions)) != len(versions):
-        raise ValueError("present-svg requires one or two distinct versions")
+    if len(versions) != 1:
+        raise ValueError("present-svg requires exactly one version")
     paths = ProjectPaths(project_dir)
     latest = latest_revision(paths, page_id)
     if latest:
-        request = read_json(paths.packet(page_id, latest))
-        base = request.get("base")
-        expected = [str(base.get("version")) if isinstance(base, dict) else "", latest]
+        expected = [latest]
     else:
         expected = list(planned_initial_versions(paths, page))
     if versions != expected:
-        raise ValueError(f"present-svg must use the current comparison: {','.join(expected)}")
+        raise ValueError(f"present-svg must use the current version: {','.join(expected)}")
     paths.revision_request(page_id).parent.mkdir(parents=True, exist_ok=True)
     record_presentation(paths, page_id, versions)
     for version in versions:
         artifact = paths.candidate(page_id, version).resolve()
         print(f"### {page_id}｜{version}\n\n![{page_id} {version}]({artifact})\n")
-    if len(versions) == 1:
-        print("The SVG is displayed at review scale. Collect an explicit confirmation or revision request.")
-    else:
-        print("Both SVGs are displayed at the same scale. Collect an explicit confirmation or revision request.")
+    print("The SVG is displayed at review scale. Collect an explicit confirmation or optimization request.")
     print(json.dumps(decision_directive(paths, page_id, versions, controller, revision=versions[-1].startswith("R")), ensure_ascii=False, indent=2))
     return 0
 
@@ -739,6 +730,12 @@ def main() -> int:
             page = page_by_id(text, args.page)
             if page.fields.get("Status") == "Protected placeholder":
                 raise ValueError(f"page cannot be reopened: {args.page}")
+            if (
+                page.fields.get("Status") == "Deferred template"
+                and normalize_page_type(page.fields.get("Page type", ""))
+                in {"ending", "closing", "closing page"}
+            ):
+                raise ValueError(f"{args.page} is the fixed Ending and cannot be modified")
             if (
                 args.command == "reopen-svg"
                 and page.fields.get("Status") == "Deferred template"

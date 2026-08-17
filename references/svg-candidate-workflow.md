@@ -3,7 +3,7 @@
 ## Lifecycle and authority
 
 ```text
-Content locked -> plan A or A/B -> author -> present -> confirm or revise -> SVG confirmed
+Content locked -> author A -> present one SVG -> confirm or optimize -> SVG confirmed
 ```
 
 The controller owns state, requests, receipts, presentation, and publication.
@@ -12,24 +12,23 @@ feedback, and confirmation.
 
 ## Candidate contract
 
-- Deferred template pages never enter this workflow. A Cover, Agenda, Section
-  divider, or Ending page explicitly activated for custom design uses A only.
-  Substantive pages default to A; upgrade to A/B only for chart/table evidence, explicit
-  comparison or hierarchy, a high-stakes choice, or an explicit request for
-  alternatives. An explicit single-candidate decision wins.
+- Deferred template pages never enter this workflow. A Cover, Agenda, or Section
+  divider explicitly activated for custom design uses A only. Ending remains
+  the approved fixed source and never enters SVG candidate design. Every
+  substantive page also uses A only, regardless of content type or requests
+  for alternatives. Generate no second initial option before user review.
 - Persist `candidate_plan` in the hash-bound page context. PPT Master must
   follow it and may not add a gate or version.
-- EY supplies one quality floor, not candidate roles, adaptation rules, layouts,
-  or a universal difference axis. PPT Master chooses the strongest solution for
-  A and, when requested, two complete and meaningfully distinct solutions for
-  A/B.
+- EY supplies one quality floor, not design direction or layout. PPT Master
+  chooses the strongest single solution for A.
 - Materialize one page context and one self-contained template prototype per
   Slide ID. The context holds approved content, project/page and confirmed-page
   context, candidate plan, design quality, template, and service contract.
   Candidate requests hold only identity, artifact, context path/hash, and, for
   revisions, base and feedback.
-- Rn binds one displayed base by path and SHA-256 plus non-empty user feedback.
-  Never overwrite an earlier version.
+- Rn binds the one currently displayed SVG by path and SHA-256 plus non-empty
+  user feedback. Never overwrite an earlier version. Present only the new Rn;
+  keep prior versions as immutable history rather than concurrent options.
 - A candidate is usable only when request, SVG, and receipt hashes agree.
   Presentation binds the exact displayed hashes. Confirmation accepts only a
   displayed version and copies its bytes to `svg_output/<Slide ID>.svg`.
@@ -55,8 +54,9 @@ Do not use Chromium, Playwright, or another browser renderer for candidate QA.
 
 ## User interaction and recovery
 
-- Present A, A/B, or Base/Rn at review scale with exact version labels. Do not
-  recommend a winner unless asked.
+- Present exactly one SVG at review scale with its exact version label. Wait for
+  confirmation or concrete optimization feedback before generating anything
+  else.
 - Preserve revision feedback verbatim. Delete its transient file after the
   controller embeds it in the immutable request. Ask only when no executable
   change can be inferred.

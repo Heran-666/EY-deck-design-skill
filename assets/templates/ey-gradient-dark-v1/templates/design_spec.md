@@ -76,7 +76,7 @@ approved wording.
 | `cover-gradient.png` | Cover gradient |
 | `divider-glow.png` | Divider glow |
 | `ending-background.png` | Ending background source |
-| `ending-slide.png` | Exact Ending page |
+| `ending-slide.png` | Exact user-approved `收尾页.pptx` slide; preserve unchanged |
 
 ## Authoring overrides
 

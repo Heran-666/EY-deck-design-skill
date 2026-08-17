@@ -120,5 +120,6 @@ the user expressly waives the Storyline gate. After approval, all types use the
 same page-by-page content-review controller and bundled PPT Master SVG candidate
 loop for substantive pages. Mark Cover, Agenda, Section divider, and Ending as
 `Deferred template` in the framework unless custom design is explicitly
-requested. Export after every authored page has one confirmed SVG and every
+requested. Keep Ending as the approved fixed closing page with no additions or
+modifications. Export after every authored page has one confirmed SVG and every
 deferred structural page has a known template type.

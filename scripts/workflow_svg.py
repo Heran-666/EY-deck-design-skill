@@ -26,7 +26,7 @@ REQUEST_SCHEMAS = {
 
 
 def initial_versions_for_page_type(page_type: str) -> tuple[str, ...]:
-    """Return the adaptive policy's default single candidate."""
+    """Return the single initial SVG version."""
     return INITIAL_VERSIONS
 
 
@@ -201,7 +201,7 @@ def presented_versions(paths: ProjectPaths, slide_id: str) -> list[str]:
 
 def confirm_candidate(paths: ProjectPaths, slide_id: str, version: str) -> Path:
     if version not in presented_versions(paths, slide_id):
-        raise ValueError(f"{version} was not part of the current displayed comparison")
+        raise ValueError(f"{version} is not the currently displayed SVG")
     source = paths.candidate(slide_id, version)
     target = paths.svg_output / f"{slide_id}.svg"
     target.parent.mkdir(parents=True, exist_ok=True)

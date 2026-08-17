@@ -1,5 +1,5 @@
 ---
-description: Composable page-level SVG variant service used by a parent workflow through a validated request contract.
+description: Composable page-level single-SVG review service used by a parent workflow through a validated request contract.
 ---
 
 # Page SVG Service
@@ -57,18 +57,16 @@ Do not use Chromium, Playwright, or another browser renderer for candidate QA.
 Direct source-SVG review and deterministic validation are the completion
 evidence. Keep internal design decisions inside PPT Master.
 
-## Variants and revisions
+## Initial SVG and revisions
 
-Follow the EY-owned `candidate_plan`. A-only means one complete solution; do
-not invent B. For A/B, build two independent, equally polished solutions from
-the same prototype and content. Their communication model, hierarchy,
-composition, visualization, imagery, typography, or effects should differ
-meaningfully when the content supports it; cosmetic variation is insufficient.
-EY supplies no candidate role, adaptation rule, layout, or universal A/B axis.
+Follow the EY-owned `candidate_plan`: build one complete A solution and do not
+invent B or another initial option. EY supplies no candidate role, adaptation
+rule, or layout.
 
-For Rn, bind the displayed base and non-empty user feedback. Preserve the base
-except for requested changes and necessary reflow. Repeat the same quality
-gate; do not broaden a targeted revision into an unrelated redesign.
+For Rn, bind the one displayed base and non-empty user feedback. Preserve the
+base except for requested changes and necessary reflow. Repeat the same quality
+gate; do not broaden a targeted revision into an unrelated redesign. Return one
+revised SVG for the next review round.
 
 ## Invariants
 

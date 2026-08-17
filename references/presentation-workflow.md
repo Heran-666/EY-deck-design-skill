@@ -43,11 +43,12 @@ current authored lifecycle; only new frameworks default them to template deferra
   executable. A missing or incapable runtime must fail before page state or
   candidate files change; do not install an alternate environment.
 - Deferred template pages never reach `prepare-svg-candidates`. A Cover, Agenda,
-  Section divider, or Ending page explicitly reopened for custom design creates
-  only A. Substantive pages default to A and upgrade to A/B
-  only when the hash-bound adaptive candidate plan detects approved chart/table
-  evidence, explicit comparison or hierarchy, a high-stakes selection, or an
-  explicit alternatives decision. An explicit single-candidate decision wins.
+  or Section divider explicitly reopened for custom design creates only A.
+  Every substantive page also creates only A. Chart/table content, comparisons,
+  high-stakes decisions, and requests for alternatives do not create a second
+  initial SVG; the user reviews A before any further work.
+- Keep the default Ending deferred and literal. Never modify, supplement, or
+  reopen it for design unless the user explicitly replaces the approved source.
 - A missing/invalid candidate remains in `RUN_EMBEDDED_PPT_MASTER_SVG`; repair
   the same requested artifact and rerun `record`, which performs the service
   completion check and candidate recording atomically.
@@ -57,10 +58,9 @@ current authored lifecycle; only new frameworks default them to template deferra
   Rn request after an environment failure; do not allocate a new version. The
   emitted feedback file is transient and is deleted after its exact text is
   embedded in the Rn request.
-- Use `reopen-svg --page <Slide ID>` to delete the current page's A/B/Rn,
-  receipts, and confirmed output, then recompute the adaptive candidate plan
-  from unchanged approved content and confirmed decisions. Reopen does not
-  archive the deleted visual cycle.
+- Use `reopen-svg --page <Slide ID>` to delete the current page's A/Rn,
+  receipts, and confirmed output, then restart from one A using unchanged
+  approved content. Reopen does not archive the deleted visual cycle.
 
 ## Confirmation recovery
 

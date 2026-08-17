@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import io
 import json
 import os
+import posixpath
 import shlex
 import subprocess
 import sys
@@ -11,6 +13,8 @@ import zipfile
 from pathlib import Path
 from unittest import mock
 from xml.etree import ElementTree as ET
+
+from PIL import Image, ImageChops, ImageStat
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -130,7 +134,7 @@ DEFERRED_FRAMEWORK = FRAMEWORK.replace(
 - Chapter: Closing
 - Page type: Ending
 - Narrative role: Close the presentation
-- Content scope: User fills the closing fields after export
+- Content scope: Use the approved fixed closing page unchanged
 - Next connection: None
 - Status: Deferred template
 - Confirmed decisions: None
@@ -337,6 +341,16 @@ class WorkflowTests(unittest.TestCase):
             errors = validate_framework(framework, project)
 
             self.assertTrue(any("Deferred template status requires" in item for item in errors))
+
+    def test_fixed_ending_cannot_be_reopened_for_content_or_svg(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project = Path(tmp)
+            (project / "framework.md").write_text(DEFERRED_FRAMEWORK, encoding="utf-8")
+
+            for command in ("reopen-content", "reopen-svg"):
+                result = run(project, command, "--page", "S03")
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("fixed Ending", result.stdout)
 
     def test_all_deferred_deck_prepares_export_without_content_file(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -633,11 +647,40 @@ class WorkflowTests(unittest.TestCase):
 
             complete_candidate(project, "R1", "Revised option")
             self.assertEqual(next_payload(project)["action"], "PRESENT_SVG_REVISION")
-            self.assertEqual(run(project, "present-svg", "--page", "S01", "--versions", "A,R1").returncode, 0)
-            confirmed = run(project, "confirm-svg", "--page", "S01", "--version", "R1")
+            rejected_pair = run(project, "present-svg", "--page", "S01", "--versions", "A,R1")
+            self.assertNotEqual(rejected_pair.returncode, 0)
+            self.assertIn("exactly one version", rejected_pair.stdout)
+            presented_revision = run(project, "present-svg", "--page", "S01", "--versions", "R1")
+            self.assertEqual(
+                presented_revision.returncode,
+                0,
+                presented_revision.stdout + presented_revision.stderr,
+            )
+            self.assertIn("![S01 R1]", presented_revision.stdout)
+            self.assertNotIn("![S01 A]", presented_revision.stdout)
+            feedback.write_text("Tighten the spacing around the conclusion.", encoding="utf-8")
+            revised_again = run(
+                project, "request-svg-revision", "--page", "S01", "--base", "R1",
+                "--feedback-file", str(feedback),
+            )
+            self.assertEqual(
+                revised_again.returncode,
+                0,
+                revised_again.stdout + revised_again.stderr,
+            )
+            request_r2 = json.loads(
+                (project / "working" / "packets" / "S01" / "R2.json").read_text()
+            )
+            self.assertEqual(request_r2["base"]["version"], "R1")
+            complete_candidate(project, "R2", "Second revision")
+            presented_r2 = run(project, "present-svg", "--page", "S01", "--versions", "R2")
+            self.assertEqual(presented_r2.returncode, 0, presented_r2.stdout + presented_r2.stderr)
+            self.assertIn("![S01 R2]", presented_r2.stdout)
+            self.assertNotIn("![S01 R1]", presented_r2.stdout)
+            confirmed = run(project, "confirm-svg", "--page", "S01", "--version", "R2")
             self.assertEqual(confirmed.returncode, 0, confirmed.stdout + confirmed.stderr)
             self.assertEqual(next_payload(project)["action"], "PREPARE_PPTX_EXPORT")
-            self.assertEqual((project / "svg_output" / "S01.svg").read_text(), svg("Revised option"))
+            self.assertEqual((project / "svg_output" / "S01.svg").read_text(), svg("Second revision"))
 
             reopened = run(project, "reopen-svg", "--page", "S01")
             self.assertEqual(reopened.returncode, 0, reopened.stdout + reopened.stderr)
@@ -900,7 +943,7 @@ class WorkflowTests(unittest.TestCase):
             self.assertEqual(audited.returncode, 0, audited.stdout + audited.stderr)
             self.assertIn("editable PPTX workflow audit passed", audited.stdout)
 
-    def test_deferred_templates_export_in_order_with_editable_text(self) -> None:
+    def test_deferred_templates_export_in_order_with_fixed_ending(self) -> None:
         runtime = os.environ.get("EY_DECK_PPTX_PYTHON")
         if not runtime:
             self.skipTest("PPTX runtime is not available; set EY_DECK_PPTX_PYTHON")
@@ -930,6 +973,33 @@ class WorkflowTests(unittest.TestCase):
                     for name in archive.namelist()
                     if name.startswith("ppt/slides/slide") and name.endswith(".xml")
                 )
+                ending_rels = ET.fromstring(
+                    archive.read("ppt/slides/_rels/slide3.xml.rels")
+                )
+                ending_media = [
+                    posixpath.normpath(
+                        posixpath.join("ppt/slides", relation.attrib["Target"])
+                    )
+                    for relation in ending_rels
+                    if relation.attrib.get("Type", "").endswith("/image")
+                ]
+                ending_asset = TEMPLATE_ROOT / "images" / "ending-slide.png"
+                self.assertEqual(len(ending_media), 1)
+                exported_ending = Image.open(
+                    io.BytesIO(archive.read(ending_media[0]))
+                ).convert("RGBA")
+                approved_ending = Image.open(ending_asset).convert("RGBA").resize(
+                    exported_ending.size,
+                    Image.Resampling.LANCZOS,
+                )
+                ending_diff = ImageStat.Stat(
+                    ImageChops.difference(exported_ending, approved_ending)
+                )
+                self.assertLess(
+                    max(ending_diff.mean),
+                    0.5,
+                    f"fixed Ending pixels changed: size={exported_ending.size}, mean={ending_diff.mean}",
+                )
             self.assertEqual(len(slide_xml), 3)
             audit = json.loads(
                 (project / "working" / "receipts" / "pptx" / "text-frames.json").read_text()
@@ -939,7 +1009,7 @@ class WorkflowTests(unittest.TestCase):
                 ["S01", "S02", "S03"],
             )
             self.assertGreater(audit["slides"][0]["pptx_text_boxes"], 0)
-            self.assertGreater(audit["slides"][2]["pptx_text_boxes"], 0)
+            self.assertEqual(audit["slides"][2]["pptx_text_boxes"], 0)
             trace = json.loads(
                 (project / "validation" / "sample.trace.json").read_text(encoding="utf-8")
             )
@@ -1008,7 +1078,7 @@ class WorkflowTests(unittest.TestCase):
             self.assertEqual(planning["action"], "PREPARE_SVG_CANDIDATES")
             self.assertEqual(planning["slide_id"], "S02")
             self.assertEqual(planning["versions"], ["A"])
-            self.assertEqual(planning["candidate_plan"]["reason"], "default-single-candidate")
+            self.assertEqual(planning["candidate_plan"]["reason"], "single-svg-review")
             payload = prepare_candidates(project, "S02")
             self.assertEqual([item["version"] for item in payload["requests"]], ["A"])
             requests = {}
@@ -1027,7 +1097,7 @@ class WorkflowTests(unittest.TestCase):
             context = json.loads(Path(payload["requests"][0]["request_path"]).read_text())["authoring_context"]
             plan = json.loads(Path(context["path"]).read_text())["candidate_plan"]
             self.assertEqual(plan["versions"], ["A"])
-            self.assertEqual(plan["reason"], "default-single-candidate")
+            self.assertEqual(plan["reason"], "single-svg-review")
             complete_candidate(project, "A", "Content A", page_id="S02")
             self.assertEqual(next_payload(project)["action"], "PRESENT_SVG_OPTION")
             presented = run(project, "present-svg", "--page", "S02", "--versions", "A")
@@ -1040,7 +1110,7 @@ class WorkflowTests(unittest.TestCase):
                 self.assertEqual(initial_versions_for_page_type(page_type), ("A",))
         self.assertEqual(template_name("Ending"), "ending.svg")
 
-    def test_adaptive_candidate_plan_uses_bounded_dual_triggers(self) -> None:
+    def test_candidate_plan_is_single_for_every_content_signal(self) -> None:
         page = type("Page", (), {
             "slide_id": "S03",
             "fields": {
@@ -1068,8 +1138,9 @@ class WorkflowTests(unittest.TestCase):
 
         self.assertEqual(candidate_plan(page, general, context)["versions"], ["A"])
         chart_plan = candidate_plan(page, chart, context)
-        self.assertEqual(chart_plan["versions"], ["A", "B"])
-        self.assertEqual(chart_plan["reason"], "content-supports-meaningful-alternatives")
+        self.assertEqual(chart_plan["versions"], ["A"])
+        self.assertEqual(chart_plan["policy"], "single-svg-review-v1")
+        self.assertEqual(chart_plan["reason"], "single-svg-review")
         self.assertNotIn("content_signal", chart_plan)
 
         page.fields["Narrative role"] = "Support selection of the preferred option"
@@ -1078,15 +1149,15 @@ class WorkflowTests(unittest.TestCase):
             general,
             {**context, "Audience outcome": "Select the preferred option"},
         )
-        self.assertEqual(decision_plan["versions"], ["A", "B"])
-        self.assertEqual(decision_plan["reason"], "high-stakes-decision")
+        self.assertEqual(decision_plan["versions"], ["A"])
+        self.assertEqual(decision_plan["reason"], "single-svg-review")
 
         page.fields["Confirmed decisions"] = "Single candidate only"
         self.assertEqual(candidate_plan(page, chart, context)["versions"], ["A"])
         page.fields["Confirmed decisions"] = "Provide two design options"
-        self.assertEqual(candidate_plan(page, general, context)["versions"], ["A", "B"])
+        self.assertEqual(candidate_plan(page, general, context)["versions"], ["A"])
 
-    def test_explicit_dual_candidate_plan_generates_a_and_b_requests(self) -> None:
+    def test_explicit_alternatives_still_generate_one_initial_svg(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             project = Path(tmp)
             second_page = SECOND_PAGE.replace(
@@ -1111,11 +1182,11 @@ class WorkflowTests(unittest.TestCase):
             self.assertEqual(run(project, "present-review").returncode, 0)
             self.assertEqual(run(project, "approve-content").returncode, 0)
             planning = next_payload(project)
-            self.assertEqual(planning["versions"], ["A", "B"])
-            self.assertEqual(planning["candidate_plan"]["reason"], "explicit-alternatives")
+            self.assertEqual(planning["versions"], ["A"])
+            self.assertEqual(planning["candidate_plan"]["reason"], "single-svg-review")
 
             payload = prepare_candidates(project, "S02")
-            self.assertEqual([item["version"] for item in payload["requests"]], ["A", "B"])
+            self.assertEqual([item["version"] for item in payload["requests"]], ["A"])
             requests = {
                 item["version"]: json.loads(Path(item["request_path"]).read_text())
                 for item in payload["requests"]
@@ -1130,9 +1201,8 @@ class WorkflowTests(unittest.TestCase):
                 self.assertEqual(validated.returncode, 0, validated.stdout + validated.stderr)
             context_path = Path(requests["A"]["authoring_context"]["path"])
             plan = json.loads(context_path.read_text())["candidate_plan"]
-            self.assertEqual(plan["reason"], "explicit-alternatives")
+            self.assertEqual(plan["reason"], "single-svg-review")
             self.assertNotIn("variant_direction", requests["A"])
-            self.assertNotIn("variant_direction", requests["B"])
 
     def test_ppt_master_design_direction_is_not_classified_upstream(self) -> None:
         source = (ROOT / "scripts" / "workflow_ppt_master.py").read_text(encoding="utf-8")
@@ -1155,7 +1225,7 @@ class WorkflowTests(unittest.TestCase):
         ):
             self.assertNotIn(removed_aesthetic_rule, quality_text)
 
-    def test_agenda_and_ending_templates_have_editable_fill_in_text(self) -> None:
+    def test_agenda_is_editable_and_ending_is_fixed_without_added_content(self) -> None:
         agenda = TEMPLATE_ROOT / "templates" / "agenda.svg"
         source = agenda.read_text(encoding="utf-8")
         root = ET.parse(agenda).getroot()
@@ -1172,10 +1242,17 @@ class WorkflowTests(unittest.TestCase):
 
         ending = TEMPLATE_ROOT / "templates" / "ending.svg"
         ending_source = ending.read_text(encoding="utf-8")
-        self.assertIn("Thank you", ending_source)
-        self.assertIn("Name | Role", ending_source)
-        self.assertIn("ending-background.png", ending_source)
-        self.assertNotIn("data-ey-fixed-ending", ending_source)
+        ending_root = ET.parse(ending).getroot()
+        self.assertEqual(ending_root.attrib.get("data-ey-fixed-ending"), "true")
+        self.assertIn("ending-slide.png", ending_source)
+        self.assertNotIn("ending-background.png", ending_source)
+        self.assertEqual(
+            [element.tag.rsplit("}", 1)[-1] for element in ending_root],
+            ["image"],
+        )
+        self.assertFalse(
+            any(element.tag.rsplit("}", 1)[-1] == "text" for element in ending_root.iter())
+        )
 
     def test_full_design_service_contract_is_registered(self) -> None:
         contract = (ROOT / "ppt-master" / "workflows" / "page-svg-service.md").read_text(encoding="utf-8")

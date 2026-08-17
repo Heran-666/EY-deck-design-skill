@@ -64,9 +64,11 @@ Every new Storyline starts with exactly one Cover at S01. At six or more
 substantive pages, include one Agenda at S02 and at least one Section divider.
 Give Cover, Agenda, Section divider, and Ending pages their normal Page type and
 `Deferred template` Status by default. Preserve their Slide IDs and positions,
-but do not draft exact on-slide copy; the user fills their editable template
-fields after PPTX export. Use `reopen-content` only when the user explicitly
-requests a custom-designed structural page.
+but do not draft exact on-slide copy. The user fills the editable Cover, Agenda,
+and Section divider template fields after PPTX export. Ending is the approved
+fixed closing page: preserve it literally and never add or modify content. Use
+`reopen-content` only when the user explicitly requests custom design for an
+editable structural page.
 
 `Output filename` is one plain `.pptx` filename, never a path. Preserve an
 explicit user filename; otherwise derive it once from the deliverable name. It
@@ -120,11 +122,11 @@ items` within 500 characters and `Content scope` within 700. Store a substantive
 
 For content review, controller `next` emits Project context, the active
 Storyline entry, and compact adjacent context. For SVG generation, it writes
-one hash-bound page authoring context containing the adaptive A/A-B candidate
-plan, complete approved content and project/page context, and one shared
-self-contained prototype, then binds each candidate-specific request to that
-context. PPT Master rereads that immutable context after re-entry or compaction
-and independently recovers the design problem; EY does not persist a classified
-design role or adaptation rule. Previously confirmed pages and adjacent
-Storyline context may inform consistency without becoming a second state
-authority.
+one hash-bound page authoring context containing the single-SVG review plan,
+complete approved content and project/page context, and one self-contained
+prototype, then binds the A request or a later feedback-driven Rn request to
+that context. PPT Master rereads that immutable context after re-entry or
+compaction and independently recovers the design problem; EY does not persist
+a classified design role or adaptation rule. Previously confirmed pages and
+adjacent Storyline context may inform consistency without becoming a second
+state authority.

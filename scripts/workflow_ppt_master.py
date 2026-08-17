@@ -61,128 +61,18 @@ def design_quality_contract() -> dict[str, object]:
     }
 
 
-STRUCTURAL_PAGE_TYPES = frozenset(
-    {
-        "cover",
-        "agenda",
-        "section divider",
-        "divider",
-        "ending",
-        "closing",
-        "closing page",
-    }
-)
-
-CANDIDATE_PLAN_POLICY = "adaptive-v1"
-EXPLICIT_SINGLE_MARKERS = (
-    "single candidate",
-    "one candidate",
-    "only one design",
-    "a only",
-    "单候选",
-    "一个候选",
-    "只生成一个",
-    "仅生成 a",
-)
-EXPLICIT_DUAL_MARKERS = (
-    "a/b",
-    "two candidates",
-    "two design options",
-    "two alternatives",
-    "dual candidates",
-    "双候选",
-    "两个候选",
-    "两个设计方向",
-    "两个备选",
-)
-HIGH_STAKES_DECISION_MARKERS = (
-    "select the preferred",
-    "choose the preferred",
-    "choose one",
-    "approve the",
-    "prioritize",
-    "trade-off",
-    "make a decision",
-    "decide between",
-    "选择首选",
-    "选择一个",
-    "批准",
-    "确定优先级",
-    "优先排序",
-    "取舍",
-    "作出决策",
-    "做出决策",
-)
-
-def _project_context_value(project_context: dict[str, str], label: str) -> str:
-    snake = label.strip().lower().replace(" ", "_")
-    return str(project_context.get(label) or project_context.get(snake) or "")
-
-
-def _content_supports_dual_candidates(
-    approved_content: str,
-    page: PageEntry,
-    project_context: dict[str, str],
-) -> bool:
-    """Detect only whether a second candidate may be useful; never select its design direction."""
-    content = approved_content.casefold()
-    if any(marker in content for marker in ("chart purpose", "table purpose", "| category |", "child logic")):
-        return True
-    approved_intent = " ".join(
-        (
-            page.fields.get("Narrative role", ""),
-            _project_context_value(project_context, "Audience outcome"),
-            _project_context_value(project_context, "Storyline thesis"),
-        )
-    ).casefold()
-    selection_context = f"{content}\n{approved_intent}"
-    return any(
-        marker in selection_context
-        for marker in (
-            "comparison", "compare", "versus", "contrast", "before", "after", "difference", "gap",
-            "对比", "比较", "差异", "之前", "之后", "前后", "差距",
-        )
-    )
-
+CANDIDATE_PLAN_POLICY = "single-svg-review-v1"
 
 def candidate_plan(
     page: PageEntry,
     approved_content: str,
     project_context: dict[str, str],
 ) -> dict[str, object]:
-    """Choose one default candidate or a bounded A/B exploration automatically."""
-    page_type = normalize_page_type(page.fields.get("Page type", ""))
-    decisions = page.fields.get("Confirmed decisions", "").casefold()
-    intent = " ".join(
-        (
-            page.fields.get("Narrative role", ""),
-            _project_context_value(project_context, "Audience outcome"),
-        )
-    ).casefold()
-
-    if page_type in STRUCTURAL_PAGE_TYPES or page_type == "protected placeholder":
-        versions = ["A"]
-        reason = "structural-page"
-    elif any(marker in decisions for marker in EXPLICIT_SINGLE_MARKERS):
-        versions = ["A"]
-        reason = "explicit-single-candidate"
-    elif any(marker in decisions for marker in EXPLICIT_DUAL_MARKERS):
-        versions = ["A", "B"]
-        reason = "explicit-alternatives"
-    elif any(marker in intent for marker in HIGH_STAKES_DECISION_MARKERS):
-        versions = ["A", "B"]
-        reason = "high-stakes-decision"
-    elif _content_supports_dual_candidates(approved_content, page, project_context):
-        versions = ["A", "B"]
-        reason = "content-supports-meaningful-alternatives"
-    else:
-        versions = ["A"]
-        reason = "default-single-candidate"
-
+    """Require one initial SVG for every authored page."""
     return {
         "policy": CANDIDATE_PLAN_POLICY,
-        "versions": versions,
-        "reason": reason,
+        "versions": ["A"],
+        "reason": "single-svg-review",
     }
 
 
@@ -390,7 +280,7 @@ def request_payload(
     if not isinstance(project_context, dict):
         raise ValueError(f"page authoring context has no project context: {context_path}")
     plan = context.get("candidate_plan")
-    if not isinstance(plan, dict) or plan.get("versions") not in (["A"], ["A", "B"]):
+    if not isinstance(plan, dict) or plan.get("versions") != ["A"]:
         raise ValueError(f"page authoring context has no valid candidate plan: {context_path}")
     if not base_version and version not in plan["versions"]:
         raise ValueError(f"candidate version {version} is not requested by the page candidate plan")

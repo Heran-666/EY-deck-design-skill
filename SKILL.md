@@ -2,7 +2,7 @@
 name: ey-deck-design
 description: >
   Create and approve EY Storylines and exact substantive slide content, defer
-  Cover, Agenda, Section divider, and Ending pages to editable export templates,
+  Cover, Agenda, Section divider, and Ending pages to approved export templates,
   generate and confirm substantive page SVGs through the bundled PPT Master,
   and export the ordered roster as editable DrawingML PPTX. Use only when the
   user explicitly invokes $ey-deck-design.
@@ -18,7 +18,7 @@ user-visible skill.
 
 | Owner | Authority |
 |---|---|
-| User | Approve Storyline/content; choose, revise, and confirm SVGs |
+| User | Approve Storyline/content; review, refine, and confirm SVGs |
 | EY controller | Order, state, paths, hashes, requests, receipts, publication, recovery |
 | `framework.md` | Project context, confirmed Storyline, coarse page state |
 | `content.md` | Exact approved copy, data, emphasis, page-local sources |
@@ -47,7 +47,8 @@ planned units supporting one claim; structural pages stay concise. S01 is Cover;
 at six or more substantive pages, S02 is Agenda and at least one Section divider
 is required. Set Cover, Agenda, Section divider, and Ending pages to `Deferred
 template` unless the user explicitly requests custom design. Keep their Page
-type and Slide ID; do not author exact copy for them.
+type and Slide ID; do not author exact copy for them. Use the bundled fixed
+Ending page literally; never modify it or add text, shapes, or other content.
 
 Create framework 3.1 / workflow 8.0 with one plain `.pptx` output filename, then
 run:
@@ -79,18 +80,17 @@ schedule, tool, approval, learning, or business-outcome facts.
 
 For `PREPARE_SVG_CANDIDATES`, load workspace dependencies, set
 `EY_DECK_SVG_PYTHON` to the returned absolute Python executable, and run the
-emitted command. Deferred template pages never enter this gate. A structural
-page explicitly activated with `reopen-content` receives A; substantive pages
-default to A and upgrade to A/B only under the hash-bound adaptive plan.
-Explicit single/dual decisions override automatic triggers. EY controls count,
-not design direction.
+emitted command. Deferred template pages never enter this gate. A Cover,
+Agenda, or Section divider explicitly activated with `reopen-content` receives
+A. Every substantive page also receives exactly one initial SVG, A. Do not
+generate alternatives before user review.
 
 For each `RUN_EMBEDDED_PPT_MASTER_SVG` request:
 
 1. Read the request, hash-bound `authoring_context`, and `service_contract`.
 2. Run `validate_request`.
 3. Let PPT Master choose the communication model, hierarchy, visual concept,
-   geometry, composition, and—when applicable—the meaningful A/B difference.
+   geometry, and composition for the single SVG.
 4. Complete information design, composition, art-direction refinement, direct
    source-SVG review, repair, and recheck before exposing the candidate. Do not
    use Chromium or another browser renderer for candidate QA.
@@ -100,10 +100,10 @@ Content pages use the full `1280×720` canvas. Placeholder bounds are native
 metadata, not visual limits; do not add a `y=650` cap, footer reserve, or EY-logo
 overlap gate.
 
-Present emitted candidates at equal review scale. Confirm one displayed version
-or bind exact user feedback to a displayed base and create immutable `R<n>`.
-Present Base/Rn and repeat. Reopen content for copy/meaning changes; reopen SVG
-for a design restart.
+Present the emitted SVG at review scale and wait. If the user confirms it,
+publish that exact version. Otherwise bind the exact feedback to the displayed
+SVG, create one immutable `R<n>`, present only that revised SVG, and repeat.
+Reopen content for copy/meaning changes; reopen SVG for a design restart.
 
 ## PPTX export
 
