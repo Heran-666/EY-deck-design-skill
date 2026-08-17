@@ -21,8 +21,10 @@ direct source-SVG inspection, and technical SVG quality.
    `validate_request` command. Use that verified runtime for SVG validation and
    finalization. Do not load or invoke a browser-rendering capability for candidate QA.
 3. Read the request's hash-bound `authoring_context`. Read `design_quality`, the
-   EY-owned `candidate_plan`, and `template.design_spec.path` from that shared context and
-   `variant_direction` from the candidate request, then read
+   EY-owned `candidate_plan`, the complete approved content and project/page
+   context, and `template.design_spec.path` from that shared context. Derive the
+   page's design direction inside PPT Master; EY supplies no classified role,
+   adaptation rule, or layout axis. Then read
    `references/strategist.md`, `references/strategist-template.md`,
    `references/executor-base.md`, and `references/executor-structured.md`. Load chart, table,
    structure, image, semantic-SVG, visual-style, image-palette, or effects
@@ -45,8 +47,10 @@ the complete PPT Master loop internally for every candidate:
 
 1. **Strategist / information design** — determine the page's audience-facing message,
    information hierarchy, narrative connection, and most effective communication
-   model. Translate `variant_direction` into a page-specific solution; never
-   treat its role as a fixed layout recipe.
+   model. Recover the current page's design intent from the hash-bound request,
+   not conversation memory. Select the communication model, information
+   hierarchy, visual concept, geometry, and composition using PPT Master's own
+   design judgment.
 2. **Page composition** — establish one dominant visual idea and an intentional
    reading order through scale, position, contrast, whitespace, and semantic
    geometry before choosing local containers or decoration.
@@ -64,11 +68,9 @@ the complete PPT Master loop internally for every candidate:
    do not impose a `y=650` cap, reserve a footer band, or add an EY-logo overlap
    QA gate.
 6. **Executor** — hand-author a complete, editable SVG as an internal draft.
-7. **Art-direction refinement** — actively replace generic dashboards, unjustified
-   stacked cards, equal-column defaults, repeated rounded rectangles, icon-led
-   decoration, or effects without a communication job. Refine hierarchy, rhythm,
-   optical balance, edges, connectors, and emphasis until the page satisfies
-   every `design_quality.must_have` and none of `design_quality.avoid`.
+7. **Art-direction refinement** — refine hierarchy, rhythm, optical balance,
+   edges, connectors, emphasis, and every chosen visual treatment until the
+   page satisfies every `design_quality.must_have`.
 8. **Review and repair** — inspect the complete source SVG directly at full-slide
    coordinate scale. Review composition and craft as well as clipping, overlap,
    legibility, and template fidelity. Repair the owning SVG and reinspect the
@@ -96,13 +98,12 @@ materially different communication model, information hierarchy, composition,
 or visualization when two strong alternatives exist; cosmetic-only variation
 is insufficient when a substantive alternative is available.
 
-Honor each request's dynamically selected search role without weakening either
-option. The adapter derives the paired roles from the page's approved content
-form and approved user intent: Narrative role, Audience outcome, and Storyline
-thesis. Treat the role as a search bias, not a prescribed layout. For an A/B
-plan, use `alternative_contract` to ensure that A and B differ
-materially in their communication model, information hierarchy, or
-composition/visualization; do not fall back to one universal A/B axis.
+EY does not choose or persist candidate roles, adaptation rules, or a universal
+A/B axis. PPT Master determines what meaningful difference best fits the
+approved content and context. Both candidates may use any valid communication
+model, information hierarchy, composition, visualization, imagery, typography,
+or effect treatment, provided each is a complete solution and the pair offers a
+real user choice.
 
 Do not make A a generic safe draft or B an ornamental experiment. Both must
 pass the same `design_quality` contract before the parent may display them.
@@ -126,6 +127,9 @@ A later Rn may use any currently displayed candidate as its base.
   not add or rewrite audience-facing copy.
 - Begin from the exact `template.prototype`; preserve its Master/Layout identity,
   fixed atoms, and placeholder contract.
+- For Agenda, the prototype's composite region is deliberately blank. The
+  Agenda title and every agenda-item composition are authored by PPT Master;
+  no card grid, column count, numbering treatment, or item geometry is fixed.
 - Honor the authoring context's `composition_space.mode: full-slide`. Do not treat the object-slot
   rectangle or any inherited placeholder bounds as a clipping, safety, or
   composition boundary.

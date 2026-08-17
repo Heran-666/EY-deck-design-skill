@@ -28,7 +28,7 @@ from workflow_io import sha256 as request_sha256  # noqa: E402
 from workflow_ppt_master import (  # noqa: E402
     TEMPLATE_ROOT,
     candidate_plan,
-    independent_variant_directions,
+    design_quality_contract,
     materialize_template,
     template_name,
 )
@@ -389,6 +389,7 @@ class WorkflowTests(unittest.TestCase):
                 context = json.loads(context_path.read_text(encoding="utf-8"))
                 shared_contexts.add(context_path)
                 self.assertEqual(context["schema"], "ey-deck.page-authoring-context.v1")
+                self.assertNotIn("direction_contract", context)
                 self.assertEqual(context["composition_space"]["mode"], "full-slide")
                 self.assertIsNone(context["composition_space"]["global_content_cap"])
                 self.assertFalse(context["composition_space"]["check_fixed_atom_overlap"])
@@ -396,6 +397,7 @@ class WorkflowTests(unittest.TestCase):
                 self.assertTrue(
                     any("icon elements" in rule for rule in context["design_quality"]["must_have"])
                 )
+                self.assertNotIn("avoid", context["design_quality"])
                 self.assertEqual(
                     context["design_quality"]["visible_candidate_gate"],
                     [
@@ -406,11 +408,7 @@ class WorkflowTests(unittest.TestCase):
                         "source_repair_and_recheck",
                     ],
                 )
-                self.assertEqual(request["variant_direction"]["role"], "identity-led-opening")
-                self.assertEqual(
-                    request["variant_direction"]["selection_basis"]["method"],
-                    "page-content-and-approved-user-intent",
-                )
+                self.assertNotIn("variant_direction", request)
                 validate_python = shlex.split(item["validate_request"])[0]
                 self.assertTrue(Path(validate_python).is_absolute())
                 self.assertNotIn("complete", item)
@@ -534,8 +532,7 @@ class WorkflowTests(unittest.TestCase):
             self.assertFalse(feedback.exists())
             context = json.loads(Path(request["authoring_context"]["path"]).read_text())
             self.assertEqual(context["design_quality"]["profile"], "ey-executive-editorial-v3")
-            self.assertEqual(request["variant_direction"]["role"], "revision")
-            self.assertEqual(request["variant_direction"]["base_version"], "A")
+            self.assertNotIn("variant_direction", request)
 
             complete_candidate(project, "R1", "Revised option")
             self.assertEqual(next_payload(project)["action"], "PRESENT_SVG_REVISION")
@@ -837,9 +834,7 @@ class WorkflowTests(unittest.TestCase):
                 prototype_paths.add(context["template"]["prototype"])
             self.assertEqual(len(context_descriptors), 1)
             self.assertEqual(len(prototype_paths), 1)
-            a_direction = requests["A"]["variant_direction"]
-            self.assertEqual(a_direction["role"], "claim-led-editorial")
-            self.assertNotIn("alternative_contract", a_direction)
+            self.assertNotIn("variant_direction", requests["A"])
             context = json.loads(Path(payload["requests"][0]["request_path"]).read_text())["authoring_context"]
             plan = json.loads(Path(context["path"]).read_text())["candidate_plan"]
             self.assertEqual(plan["versions"], ["A"])
@@ -885,7 +880,8 @@ class WorkflowTests(unittest.TestCase):
         self.assertEqual(candidate_plan(page, general, context)["versions"], ["A"])
         chart_plan = candidate_plan(page, chart, context)
         self.assertEqual(chart_plan["versions"], ["A", "B"])
-        self.assertEqual(chart_plan["reason"], "distinct-communication-models:quantitative-chart")
+        self.assertEqual(chart_plan["reason"], "content-supports-meaningful-alternatives")
+        self.assertNotIn("content_signal", chart_plan)
 
         page.fields["Narrative role"] = "Support selection of the preferred option"
         decision_plan = candidate_plan(
@@ -946,61 +942,39 @@ class WorkflowTests(unittest.TestCase):
             context_path = Path(requests["A"]["authoring_context"]["path"])
             plan = json.loads(context_path.read_text())["candidate_plan"]
             self.assertEqual(plan["reason"], "explicit-alternatives")
-            self.assertIn("alternative_contract", requests["A"]["variant_direction"])
-            self.assertIn("alternative_contract", requests["B"]["variant_direction"])
+            self.assertNotIn("variant_direction", requests["A"])
+            self.assertNotIn("variant_direction", requests["B"])
 
-    def test_variant_directions_adapt_to_page_content_and_approved_intent(self) -> None:
-        page = type("Page", (), {
-            "slide_id": "S03",
-            "fields": {
-                "Page type": "Standard content",
-                "Narrative role": "Compare the options",
-            },
-        })()
-        context = {
-            "Audience outcome": "Select the preferred option",
-            "Storyline thesis": "Option B has the stronger value case",
-        }
-        chart_content = """### On-slide content
-- Title: Performance comparison
-- Chart purpose（Build-only）: Show the ranking
-| Category | Score |
-|---|---:|
-| A | 10 |
-"""
-        comparison_content = """### On-slide content
-- Title: Before and after
-#### S03-B1｜Before
-#### S03-B2｜After
-"""
-        intent_only_comparison = """### On-slide content
-- Title: Available paths
-#### S03-B1｜Path one
-#### S03-B2｜Path two
-"""
+    def test_ppt_master_design_direction_is_not_classified_upstream(self) -> None:
+        source = (ROOT / "scripts" / "workflow_ppt_master.py").read_text(encoding="utf-8")
+        for removed_control in (
+            "VARIANT_PAIRS",
+            "STRUCTURAL_DIRECTIONS",
+            "adaptation_rule",
+            "variant_direction",
+            "alternative_contract",
+        ):
+            self.assertNotIn(removed_control, source)
+        quality = design_quality_contract()
+        self.assertNotIn("avoid", quality)
+        quality_text = json.dumps(quality, ensure_ascii=False).casefold()
+        for removed_aesthetic_rule in (
+            "dashboard",
+            "stacked-card",
+            "equal columns",
+            "rounded rectangles",
+        ):
+            self.assertNotIn(removed_aesthetic_rule, quality_text)
 
-        chart = independent_variant_directions(page, chart_content, context)
-        comparison = independent_variant_directions(page, comparison_content, context)
-        intent_driven = independent_variant_directions(
-            page,
-            intent_only_comparison,
-            {
-                "Audience outcome": "Compare the available options and select one",
-                "Storyline thesis": "One path offers the stronger fit",
-            },
-        )
-
-        self.assertEqual(chart["A"]["role"], "evidence-led-analytical")
-        self.assertEqual(chart["B"]["role"], "conclusion-led-data-story")
-        self.assertEqual(comparison["A"]["role"], "criteria-led-comparison")
-        self.assertEqual(comparison["B"]["role"], "tension-led-contrast")
-        self.assertEqual(intent_driven["A"]["role"], "criteria-led-comparison")
-        self.assertEqual(intent_driven["B"]["role"], "tension-led-contrast")
-        self.assertNotEqual(chart["A"]["role"], comparison["A"]["role"])
-        self.assertEqual(
-            chart["A"]["selection_basis"]["audience_outcome"],
-            "Select the preferred option",
-        )
+    def test_agenda_template_has_blank_replaceable_composite_region(self) -> None:
+        agenda = TEMPLATE_ROOT / "templates" / "agenda.svg"
+        source = agenda.read_text(encoding="utf-8")
+        root = ET.parse(agenda).getroot()
+        region = next(element for element in root.iter() if element.attrib.get("id") == "agenda-content-region")
+        self.assertEqual(region.attrib.get("data-pptx-binding"), "proxy")
+        self.assertNotIn("agenda-sample", source)
+        self.assertNotIn("Agenda item", source)
+        self.assertTrue(any(child.tag.rsplit("}", 1)[-1] == "rect" for child in region))
 
     def test_full_design_service_contract_is_registered(self) -> None:
         contract = (ROOT / "ppt-master" / "workflows" / "page-svg-service.md").read_text(encoding="utf-8")

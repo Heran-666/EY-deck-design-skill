@@ -8,47 +8,6 @@
     <text data-pptx-carrier="true" x="48" y="82" fill="#FFFFFF" font-family="EYInterstate, Microsoft YaHei, Calibri, sans-serif" font-size="32" font-weight="700">Agenda</text>
   </g>
   <g id="agenda-content-region" data-pptx-placeholder="object" data-pptx-binding="proxy" data-pptx-idx="2" data-pptx-bounds="48 145 1152 510">
-    <g id="agenda-sample-left-1">
-      <rect x="48" y="164" width="558" height="108" rx="18" fill="#141414"/>
-      <rect x="48" y="164" width="4" height="108" fill="#FFE600"/>
-      <text x="64" y="231" fill="#FFE600" font-family="EYInterstate, Microsoft YaHei, Calibri, sans-serif" font-size="32" font-weight="700">01</text>
-      <text x="138" y="226" fill="#FFFFFF" font-family="EYInterstate, Microsoft YaHei, Calibri, sans-serif" font-size="18.6667" font-weight="700">Agenda item</text>
-    </g>
-    <g id="agenda-sample-left-2">
-      <rect x="48" y="288" width="558" height="108" rx="18" fill="#141414"/>
-      <rect x="48" y="288" width="4" height="108" fill="#FFE600"/>
-      <text x="64" y="355" fill="#FFE600" font-family="EYInterstate, Microsoft YaHei, Calibri, sans-serif" font-size="32" font-weight="700">02</text>
-      <text x="138" y="350" fill="#FFFFFF" font-family="EYInterstate, Microsoft YaHei, Calibri, sans-serif" font-size="18.6667" font-weight="700">Agenda item</text>
-    </g>
-    <g id="agenda-sample-left-3">
-      <rect x="48" y="412" width="558" height="108" rx="18" fill="#141414"/>
-      <rect x="48" y="412" width="4" height="108" fill="#FFE600"/>
-      <text x="64" y="479" fill="#FFE600" font-family="EYInterstate, Microsoft YaHei, Calibri, sans-serif" font-size="32" font-weight="700">03</text>
-      <text x="138" y="474" fill="#FFFFFF" font-family="EYInterstate, Microsoft YaHei, Calibri, sans-serif" font-size="18.6667" font-weight="700">Agenda item</text>
-    </g>
-    <g id="agenda-sample-left-4">
-      <rect x="48" y="536" width="558" height="108" rx="18" fill="#141414"/>
-      <rect x="48" y="536" width="4" height="108" fill="#FFE600"/>
-      <text x="64" y="603" fill="#FFE600" font-family="EYInterstate, Microsoft YaHei, Calibri, sans-serif" font-size="32" font-weight="700">04</text>
-      <text x="138" y="598" fill="#FFFFFF" font-family="EYInterstate, Microsoft YaHei, Calibri, sans-serif" font-size="18.6667" font-weight="700">Agenda item</text>
-    </g>
-    <g id="agenda-sample-right-1">
-      <rect x="640" y="164" width="558" height="108" rx="18" fill="#141414"/>
-      <rect x="640" y="164" width="4" height="108" fill="#FFE600"/>
-      <text x="656" y="231" fill="#FFE600" font-family="EYInterstate, Microsoft YaHei, Calibri, sans-serif" font-size="32" font-weight="700">05</text>
-      <text x="730" y="226" fill="#FFFFFF" font-family="EYInterstate, Microsoft YaHei, Calibri, sans-serif" font-size="18.6667" font-weight="700">Agenda item</text>
-    </g>
-    <g id="agenda-sample-right-2">
-      <rect x="640" y="288" width="558" height="108" rx="18" fill="#141414"/>
-      <rect x="640" y="288" width="4" height="108" fill="#FFE600"/>
-      <text x="656" y="355" fill="#FFE600" font-family="EYInterstate, Microsoft YaHei, Calibri, sans-serif" font-size="32" font-weight="700">06</text>
-      <text x="730" y="350" fill="#FFFFFF" font-family="EYInterstate, Microsoft YaHei, Calibri, sans-serif" font-size="18.6667" font-weight="700">Agenda item</text>
-    </g>
-    <g id="agenda-sample-right-3">
-      <rect x="640" y="412" width="558" height="108" rx="18" fill="#141414"/>
-      <rect x="640" y="412" width="4" height="108" fill="#FFE600"/>
-      <text x="656" y="479" fill="#FFE600" font-family="EYInterstate, Microsoft YaHei, Calibri, sans-serif" font-size="32" font-weight="700">07</text>
-      <text x="730" y="474" fill="#FFFFFF" font-family="EYInterstate, Microsoft YaHei, Calibri, sans-serif" font-size="18.6667" font-weight="700">Agenda item</text>
-    </g>
+    <rect x="48" y="145" width="1152" height="510" fill="none" stroke="none"/>
   </g>
 </svg>

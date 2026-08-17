@@ -113,7 +113,13 @@ For `RUN_EMBEDDED_PPT_MASTER_SVG`, process every request independently:
 1. Read the request JSON and its hash-bound `authoring_context`; read the
    context's `service_contract`.
 2. Run `validate_request`.
-3. Obey the context's `design_quality` and the request's `variant_direction`. Treat the first
+3. Obey the context's `design_quality`, but derive the strongest communication
+   model, information hierarchy, visual concept, geometry, and composition
+   inside PPT Master from the complete approved content and project/page
+   context. EY does not assign design roles or adaptation rules to candidates.
+   When the candidate plan contains A/B, PPT Master chooses the most meaningful
+   difference between two complete solutions without an upstream preset axis.
+   Treat the first
    authored SVG as an internal draft; complete information design, page
    composition, art-direction refinement, direct source-SVG full-slide review,
    and source repair before the candidate becomes visible. Do not render the SVG
@@ -135,8 +141,8 @@ improve recognition, scanning, or visual rhythm, and omit them otherwise. When
 the plan contains A/B, do not reduce A to a generic safe draft, B to an
 ornamental experiment, or design quality to extra icons or effects. Do not
 reduce B to a cosmetic variation when a meaningful alternative exists. Follow
-the request's page-specific paired search roles, which are selected from
-approved content and user intent; do not impose a universal A/B design axis.
+PPT Master's own page-specific design judgment; the request does not supply
+paired search roles or impose a universal A/B design axis.
 Do not expose PPT Master's internal strategy as another EY approval gate.
 
 Run the emitted presentation command for `PRESENT_SVG_OPTION`,

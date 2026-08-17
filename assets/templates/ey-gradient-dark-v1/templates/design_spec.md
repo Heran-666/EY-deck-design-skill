@@ -76,7 +76,7 @@ scale, wrapping, and density. Preserve literal approved wording.
 | File | Master | Layout key | PowerPoint picker name | Visual character | Reusable slots |
 |---|---|---|---|---|---|
 | `cover.svg` | EY Cover | cover | EY Cover | Gradient frame, authentic EY mark/lockup, fixed tagline | Project type, title, subtitle |
-| `agenda.svg` | EY Dark | agenda | EY Agenda | Dark editorial directory shell | Title and composite agenda region |
+| `agenda.svg` | EY Dark | agenda | EY Agenda | Open dark navigation canvas; no sample item composition | Title and blank composite agenda region |
 | `divider.svg` | EY Dark | divider | EY Section Divider | Dark chapter transition with controlled glow | Section label and title |
 | `content.svg` | EY Dark | content | EY Content | Open black content canvas with fixed EY mark | Title, subtitle, and composite content region |
 | `ending.svg` | EY Dark | ending | EY Ending | Exact supplied legal/brand closing page | None |
@@ -94,6 +94,12 @@ scale, wrapping, and density. Preserve literal approved wording.
 
 - Composite Agenda and Content object slots are editable authoring regions; their
   stored bounds carry native placeholder metadata and do not limit composition.
+- Agenda contains no protected item layout. PPT Master may replace the complete
+  agenda-item composition and independently choose ordering treatment,
+  grouping, numbering, typography, geometry, and use of the canvas. Only the EY
+  Dark Master/Layout identity, authentic fixed mark, and layout glow are fixed;
+  the title placeholder retains its semantic role, not a mandatory agenda-item
+  composition.
 - Content uses a full-slide proxy slot. The entire 1280×720 canvas is available
   for page composition, with no special rule at `y=650` and no EY-logo overlap
   QA check.

@@ -126,7 +126,7 @@ def _authoring_context(request: dict) -> tuple[dict, list[str]]:
     return context, errors
 
 
-def design_contract_errors(request: dict, mode: object, version: object) -> list[str]:
+def design_contract_errors(request: dict) -> list[str]:
     errors: list[str] = []
     quality = request.get("design_quality")
     if not isinstance(quality, dict):
@@ -140,54 +140,8 @@ def design_contract_errors(request: dict, mode: object, version: object) -> list
             errors.append("design_quality.must_have must contain at least six non-empty rules")
         elif ICON_QUALITY_RULE not in quality["must_have"]:
             errors.append("design_quality.must_have must contain the required semantic icon rule")
-        if not _nonempty_text_list(quality.get("avoid"), 5):
-            errors.append("design_quality.avoid must contain at least five non-empty rules")
         if quality.get("visible_candidate_gate") != VISIBLE_CANDIDATE_GATE:
             errors.append("design_quality.visible_candidate_gate must contain the required ordered P0 passes")
-
-    direction = request.get("variant_direction")
-    if not isinstance(direction, dict):
-        errors.append("variant_direction must be an object")
-        return errors
-    if not _nonempty_text(direction.get("intent")) or not _nonempty_text(direction.get("adaptation_rule")):
-        errors.append("variant_direction intent and adaptation_rule must be non-empty")
-    if mode == "independent" and isinstance(version, str):
-        if not _nonempty_text(direction.get("role")):
-            errors.append("independent variant_direction.role must be non-empty")
-        if "base_version" in direction:
-            errors.append("independent variant_direction must not contain base_version")
-        basis = direction.get("selection_basis")
-        if not isinstance(basis, dict):
-            errors.append("independent variant_direction.selection_basis must be an object")
-        else:
-            if basis.get("method") != "page-content-and-approved-user-intent":
-                errors.append("variant direction must be selected from page content and approved user intent")
-            for field in ("content_signal", "page_type", "narrative_role", "audience_outcome", "storyline_thesis"):
-                if not _nonempty_text(basis.get(field)):
-                    errors.append(f"variant_direction.selection_basis.{field} must be non-empty")
-        if _normalized_page_type(request) not in STRUCTURAL_PAGE_TYPES:
-            plan = request.get("candidate_plan")
-            planned_versions = plan.get("versions") if isinstance(plan, dict) else None
-            alternative = direction.get("alternative_contract")
-            if planned_versions == ["A", "B"] and not isinstance(alternative, dict):
-                errors.append("substantive independent variant requires an alternative_contract")
-            elif planned_versions == ["A"] and alternative is not None:
-                errors.append("single-candidate plan must not declare an alternative_contract")
-            elif isinstance(alternative, dict):
-                if not _nonempty_text(alternative.get("pair_id")):
-                    errors.append("variant_direction.alternative_contract.pair_id must be non-empty")
-                counterpart = alternative.get("counterpart_role")
-                if not _nonempty_text(counterpart) or counterpart == direction.get("role"):
-                    errors.append("variant counterpart role must be non-empty and distinct")
-                if not _nonempty_text_list(alternative.get("required_difference_axes"), 2):
-                    errors.append("variant pair must require at least two material difference axes")
-    elif mode == "revision":
-        base = request.get("base")
-        base_version = base.get("version") if isinstance(base, dict) else None
-        if direction.get("role") != "revision":
-            errors.append("revision variant_direction.role must be revision")
-        if direction.get("base_version") != base_version:
-            errors.append("revision variant_direction.base_version must match base.version")
     return errors
 
 
@@ -226,8 +180,8 @@ def request_errors(request: dict) -> list[str]:
             errors.append(f"candidate_plan.policy must be {CANDIDATE_PLAN_POLICY}")
         if planned_versions not in (["A"], ["A", "B"]):
             errors.append("candidate_plan.versions must be ['A'] or ['A', 'B']")
-        if not _nonempty_text(plan.get("reason")) or not _nonempty_text(plan.get("content_signal")):
-            errors.append("candidate_plan reason and content_signal must be non-empty")
+        if not _nonempty_text(plan.get("reason")):
+            errors.append("candidate_plan reason must be non-empty")
         if _normalized_page_type(context) in STRUCTURAL_PAGE_TYPES and planned_versions != ["A"]:
             errors.append("structural pages require a single A candidate")
     artifact = Path(str(request.get("artifact_path", "")))
@@ -270,10 +224,7 @@ def request_errors(request: dict) -> list[str]:
             errors.append("revision mode requires non-empty feedback")
     else:
         errors.append("mode must be independent or revision")
-    effective_contract = dict(context)
-    effective_contract["variant_direction"] = request.get("variant_direction")
-    effective_contract["base"] = request.get("base")
-    errors.extend(design_contract_errors(effective_contract, mode, version))
+    errors.extend(design_contract_errors(context))
     return errors
 
 

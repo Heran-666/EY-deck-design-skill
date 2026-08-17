@@ -51,13 +51,6 @@ def design_quality_contract() -> dict[str, object]:
             "Compose freely across the full 1280x720 slide. Placeholder bounds are native PowerPoint metadata only; do not treat y=650 or any other inset rectangle as a visual content limit.",
             "Author each logical PowerPoint text box as one SVG <text>; use child <tspan> runs for mixed formatting and positioned <tspan> rows for multiline content, never sibling <text> elements for one paragraph's visual lines.",
         ],
-        "avoid": [
-            "Generic dashboards or stacked-card compositions when the content does not require them.",
-            "Uniform equal columns or repeated rounded rectangles as the default page grammar.",
-            "Using extra icons, gradients, shadows, or ornament as a substitute for information design.",
-            "Decorative geometry that has no communication job.",
-            "Treating the first authored SVG as ready without art-direction refinement and direct source-SVG full-slide review.",
-        ],
         "visible_candidate_gate": [
             "information_design",
             "page_composition",
@@ -68,109 +61,19 @@ def design_quality_contract() -> dict[str, object]:
     }
 
 
-VARIANT_PAIRS = {
-    "quantitative-chart": {
-        "A": (
-            "evidence-led-analytical",
-            "Make the quantitative relationship immediately readable, with the evidence structure leading the composition.",
-        ),
-        "B": (
-            "conclusion-led-data-story",
-            "Lead with the audience-facing conclusion and make the same approved data act as its visual proof.",
-        ),
-    },
-    "exact-table": {
-        "A": (
-            "lookup-led-comparison",
-            "Optimize exact scanning and comparison while preserving the table's full approved lookup value.",
-        ),
-        "B": (
-            "decision-led-pattern",
-            "Reorganize the same approved table evidence around the pattern, exception, or decision it supports.",
-        ),
-    },
-    "sequence-process": {
-        "A": (
-            "sequence-led-flow",
-            "Make order, dependencies, and handoffs immediately traceable through a disciplined process flow.",
-        ),
-        "B": (
-            "milestone-led-journey",
-            "Express the same approved sequence through meaningful stages, transitions, or progress landmarks.",
-        ),
-    },
-    "explicit-comparison": {
-        "A": (
-            "criteria-led-comparison",
-            "Make the approved comparison easy to evaluate criterion by criterion with disciplined symmetry.",
-        ),
-        "B": (
-            "tension-led-contrast",
-            "Make the decisive difference, gap, or before-after change the dominant visual idea.",
-        ),
-    },
-    "semantic-hierarchy": {
-        "A": (
-            "architecture-led-hierarchy",
-            "Clarify the approved parent-child structure through explicit levels, grouping, and reading order.",
-        ),
-        "B": (
-            "relationship-led-system",
-            "Show how the same approved elements interact as a system rather than only as a nested hierarchy.",
-        ),
-    },
-    "general-argument": {
-        "A": (
-            "claim-led-editorial",
-            "Lead with the page claim and build a restrained editorial hierarchy around its approved support.",
-        ),
-        "B": (
-            "logic-led-visual-model",
-            "Turn the approved reasoning into a page-specific spatial or semantic model that explains how the claim works.",
-        ),
-    },
-}
-
-STRUCTURAL_DIRECTIONS = {
-    "cover": (
-        "identity-led-opening",
-        "Create a decisive opening that establishes the approved topic and EY identity with immediate executive presence.",
-    ),
-    "agenda": (
-        "navigation-led-orientation",
-        "Make the approved agenda sequence effortless to scan and remember while preserving its structural role.",
-    ),
-    "section divider": (
-        "transition-led-chapter",
-        "Create a clear chapter transition with enough visual change to reset attention without adding new content.",
-    ),
-    "divider": (
-        "transition-led-chapter",
-        "Create a clear chapter transition with enough visual change to reset attention without adding new content.",
-    ),
-    "ending": (
-        "fixed-ending-fidelity",
-        "Preserve the exact fixed ending composition and its native EY identity.",
-    ),
-    "closing": (
-        "fixed-ending-fidelity",
-        "Preserve the exact fixed ending composition and its native EY identity.",
-    ),
-    "closing page": (
-        "fixed-ending-fidelity",
-        "Preserve the exact fixed ending composition and its native EY identity.",
-    ),
-}
-
-CANDIDATE_PLAN_POLICY = "adaptive-v1"
-DUAL_MODEL_SIGNALS = frozenset(
+STRUCTURAL_PAGE_TYPES = frozenset(
     {
-        "quantitative-chart",
-        "exact-table",
-        "explicit-comparison",
-        "semantic-hierarchy",
+        "cover",
+        "agenda",
+        "section divider",
+        "divider",
+        "ending",
+        "closing",
+        "closing page",
     }
 )
+
+CANDIDATE_PLAN_POLICY = "adaptive-v1"
 EXPLICIT_SINGLE_MARKERS = (
     "single candidate",
     "one candidate",
@@ -211,22 +114,20 @@ HIGH_STAKES_DECISION_MARKERS = (
     "做出决策",
 )
 
-
 def _project_context_value(project_context: dict[str, str], label: str) -> str:
     snake = label.strip().lower().replace(" ", "_")
     return str(project_context.get(label) or project_context.get(snake) or "")
 
 
-def _exploration_signal(
+def _content_supports_dual_candidates(
     approved_content: str,
     page: PageEntry,
     project_context: dict[str, str],
-) -> str:
+) -> bool:
+    """Detect only whether a second candidate may be useful; never select its design direction."""
     content = approved_content.casefold()
-    if "chart purpose" in content or "| category |" in content:
-        return "quantitative-chart"
-    if "table purpose" in content:
-        return "exact-table"
+    if any(marker in content for marker in ("chart purpose", "table purpose", "| category |", "child logic")):
+        return True
     approved_intent = " ".join(
         (
             page.fields.get("Narrative role", ""),
@@ -235,30 +136,13 @@ def _exploration_signal(
         )
     ).casefold()
     selection_context = f"{content}\n{approved_intent}"
-    if any(
-        marker in selection_context
-        for marker in (
-            "timeline", "process", "sequence", "roadmap", "milestone", "stage", "step",
-            "时间线", "流程", "顺序", "路径", "里程碑", "阶段", "步骤",
-        )
-    ):
-        return "sequence-process"
-    if any(
+    return any(
         marker in selection_context
         for marker in (
             "comparison", "compare", "versus", "contrast", "before", "after", "difference", "gap",
             "对比", "比较", "差异", "之前", "之后", "前后", "差距",
         )
-    ):
-        return "explicit-comparison"
-    if "child logic" in content:
-        return "semantic-hierarchy"
-    return "general-argument"
-
-
-def _basis_value(value: str | None) -> str:
-    cleaned = (value or "").strip()
-    return cleaned or "Not specified"
+    )
 
 
 def candidate_plan(
@@ -268,7 +152,6 @@ def candidate_plan(
 ) -> dict[str, object]:
     """Choose one default candidate or a bounded A/B exploration automatically."""
     page_type = normalize_page_type(page.fields.get("Page type", ""))
-    signal = _exploration_signal(approved_content, page, project_context)
     decisions = page.fields.get("Confirmed decisions", "").casefold()
     intent = " ".join(
         (
@@ -277,7 +160,7 @@ def candidate_plan(
         )
     ).casefold()
 
-    if page_type in STRUCTURAL_DIRECTIONS or page_type == "protected placeholder":
+    if page_type in STRUCTURAL_PAGE_TYPES or page_type == "protected placeholder":
         versions = ["A"]
         reason = "structural-page"
     elif any(marker in decisions for marker in EXPLICIT_SINGLE_MARKERS):
@@ -289,9 +172,9 @@ def candidate_plan(
     elif any(marker in intent for marker in HIGH_STAKES_DECISION_MARKERS):
         versions = ["A", "B"]
         reason = "high-stakes-decision"
-    elif signal in DUAL_MODEL_SIGNALS:
+    elif _content_supports_dual_candidates(approved_content, page, project_context):
         versions = ["A", "B"]
-        reason = f"distinct-communication-models:{signal}"
+        reason = "content-supports-meaningful-alternatives"
     else:
         versions = ["A"]
         reason = "default-single-candidate"
@@ -300,7 +183,6 @@ def candidate_plan(
         "policy": CANDIDATE_PLAN_POLICY,
         "versions": versions,
         "reason": reason,
-        "content_signal": signal,
     }
 
 
@@ -314,79 +196,6 @@ def candidate_plan_for_page(
         raise ValueError(f"approved content not found for {page.slide_id}")
     project_context = line_fields(h2_section(framework_text, "Project context"))
     return candidate_plan(page, section, project_context)
-
-
-def independent_variant_directions(
-    page: PageEntry,
-    approved_content: str,
-    project_context: dict[str, str],
-    plan: dict[str, object] | None = None,
-) -> dict[str, dict[str, object]]:
-    """Select page-specific exploration directions from content and approved intent."""
-    page_type = normalize_page_type(page.fields.get("Page type", ""))
-    active_plan = plan or candidate_plan(page, approved_content, project_context)
-    versions = active_plan.get("versions")
-    if versions not in (["A"], ["A", "B"]):
-        raise ValueError("candidate plan versions must be ['A'] or ['A', 'B']")
-    basis = {
-        "method": "page-content-and-approved-user-intent",
-        "content_signal": _exploration_signal(approved_content, page, project_context),
-        "page_type": _basis_value(page.fields.get("Page type")),
-        "narrative_role": _basis_value(page.fields.get("Narrative role")),
-        "audience_outcome": _basis_value(_project_context_value(project_context, "Audience outcome")),
-        "storyline_thesis": _basis_value(_project_context_value(project_context, "Storyline thesis")),
-        "candidate_plan_reason": _basis_value(str(active_plan.get("reason") or "")),
-    }
-    if page_type in STRUCTURAL_DIRECTIONS:
-        role, intent = STRUCTURAL_DIRECTIONS[page_type]
-        return {
-            "A": {
-                "role": role,
-                "intent": intent,
-                "adaptation_rule": "Resolve a page-specific composition within the bound structural template.",
-                "selection_basis": basis,
-            }
-        }
-
-    signal = str(basis["content_signal"])
-    pair = VARIANT_PAIRS[signal]
-    pair_id = f"{page.slide_id}:{signal}:v1"
-    directions: dict[str, dict[str, object]] = {}
-    for version in versions:
-        role, intent = pair[version]
-        directions[version] = {
-            "role": role,
-            "intent": intent,
-            "adaptation_rule": (
-                "Use this direction as a search bias, not a fixed layout; adapt it to the locked content, "
-                "narrative role, audience outcome, and EY identity."
-            ),
-            "selection_basis": basis,
-        }
-        if versions == ["A", "B"]:
-            counterpart = "B" if version == "A" else "A"
-            directions[version]["alternative_contract"] = {
-                "pair_id": pair_id,
-                "counterpart_role": pair[counterpart][0],
-                "required_difference_axes": [
-                    "communication_model",
-                    "information_hierarchy",
-                    "composition_or_visualization",
-                ],
-            }
-    return directions
-
-
-def revision_direction(base_version: str) -> dict[str, str]:
-    return {
-        "role": "revision",
-        "intent": (
-            "Preserve the bound base's communication model and executive-grade finish while applying "
-            "the user's feedback and only the dependent reflow it requires."
-        ),
-        "adaptation_rule": "Do not broaden a targeted revision into an unrelated redesign.",
-        "base_version": base_version,
-    }
 
 
 def embedding_errors() -> list[str]:
@@ -585,11 +394,6 @@ def request_payload(
         raise ValueError(f"page authoring context has no valid candidate plan: {context_path}")
     if not base_version and version not in plan["versions"]:
         raise ValueError(f"candidate version {version} is not requested by the page candidate plan")
-    directions = (
-        independent_variant_directions(page, current_section, project_context, plan)
-        if not base_version
-        else None
-    )
     base_payload: dict[str, str] | None = None
     if base_version:
         base = paths.candidate(page.slide_id, base_version)
@@ -611,11 +415,6 @@ def request_payload(
             "path": str(context_path.resolve()),
             "sha256": sha256(context_path),
         },
-        "variant_direction": (
-            revision_direction(base_version)
-            if base_version
-            else directions[version]
-        ),
         "base": base_payload,
         "feedback": feedback if base_version else None,
     }

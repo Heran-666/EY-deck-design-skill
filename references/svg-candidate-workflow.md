@@ -26,13 +26,12 @@ and technical completion. The user owns selection, feedback, and confirmation.
   An explicit single-candidate decision wins over automatic triggers.
 - Persist the decision as `candidate_plan` in the shared hash-bound page context.
   Do not add a user gate and do not let PPT Master change the plan.
-- Every request binds the same executive-grade `design_quality` floor. When the
-  plan is A/B, derive one paired search strategy from the approved content form,
-  Narrative role, Audience outcome, and Storyline thesis. Bind distinct roles to
-  A and B and require a material difference in communication model, information
-  hierarchy, or composition/visualization. Treat both as complete solutions,
-  not safe-versus-experimental tiers. For an A-only plan, bind one complete
-  direction without a fictitious counterpart contract.
+- Every request binds the same executive-grade `design_quality` floor. EY does
+  not classify candidate design roles, generate adaptation rules, or prescribe
+  an A/B difference axis. PPT Master derives the strongest page-specific design
+  direction directly from the complete approved content and project/page
+  context. For A/B, PPT Master chooses two complete, meaningfully distinct
+  solutions according to its own design judgment.
 - Rn binds one displayed base by path and SHA-256 plus one non-empty feedback
   file. Never rewrite an earlier candidate in place.
 - A candidate is usable only when its request, SVG, and receipt hashes agree.
@@ -44,7 +43,10 @@ Materialize one hash-bound page authoring context and one self-contained
 template prototype per Slide ID. Put approved content, project/page context,
 confirmed-page coherence inputs, candidate plan, design quality, template, and service contract
 there once. Make A, B, and every Rn request contain only candidate-specific
-identity, direction, artifact, base, feedback, and the page-context path/hash.
+identity, artifact, base, feedback, and the page-context path/hash.
+On re-entry or after compaction, use the controller to recover the current work
+unit, then reread that request and context; do not reconstruct the direction
+from conversation memory.
 
 ## PPT Master service
 
@@ -63,9 +65,7 @@ there is no `y=650` limit, reserved footer band, or EY-logo overlap QA gate.
 
 Treat the first authored SVG as an internal draft. Before any candidate becomes
 visible, complete the request's ordered information-design, page-composition,
-art-direction, direct source-SVG full-slide review, and source-repair gate. Reject generic card
-stacks, equal-column defaults, repeated rounded rectangles, or icons/effects
-that substitute for information design. Add coherent icons at semantically
+art-direction, direct source-SVG full-slide review, and source-repair gate. Add coherent icons at semantically
 appropriate positions when they improve recognition, scanning, or visual
 rhythm; omit them when they have no clear communication job. Reinspect the
 source SVG after repair.
