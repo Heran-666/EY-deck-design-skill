@@ -288,6 +288,28 @@ def complete_candidate(project: Path, version: str, label: str, page_id: str = "
 
 
 class WorkflowTests(unittest.TestCase):
+    def test_content_review_emits_complete_page_and_directive(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project = Path(tmp)
+            (project / "framework.md").write_text(FRAMEWORK, encoding="utf-8")
+            provisional = project / "working" / "provisional-content.md"
+            provisional.parent.mkdir(parents=True)
+            provisional.write_text(CONTENT, encoding="utf-8")
+
+            presented = run(project, "present-review")
+
+            self.assertEqual(presented.returncode, 0, presented.stdout + presented.stderr)
+            begin = "===== BEGIN COMPLETE CONTENT REVIEW S01 ====="
+            end = "===== END COMPLETE CONTENT REVIEW S01 ====="
+            review = presented.stdout.split(begin, 1)[1].split(end, 1)[0].strip()
+            self.assertEqual(review, CONTENT.strip())
+            self.assertIn("Do not summarize or omit any section or block", presented.stdout)
+            self.assertIn("approve-content", presented.stdout)
+            payload = next_payload(project)
+            self.assertEqual(payload["action"], "COLLECT_CONTENT_DECISION")
+            self.assertEqual(payload["review_contract"]["display_mode"], "full-verbatim")
+            self.assertIn("Do not summarize", payload["review_contract"]["instruction"])
+
     def test_missing_pillow_is_dependency_failure_not_invalid_raster(self) -> None:
         original_import = __import__
 

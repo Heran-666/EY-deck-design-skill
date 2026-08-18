@@ -56,6 +56,7 @@ from workflow_svg import (
 
 
 SVG_RUNTIME_ENV = "EY_DECK_SVG_PYTHON"
+CONTENT_REVIEW_DISPLAY_MODE = "full-verbatim"
 
 
 def update_page(text: str, slide_id: str, updates: dict[str, str]) -> str:
@@ -410,6 +411,14 @@ def directive_payload(project_dir: Path, text: str, controller: Path) -> dict[st
                 "action": "COLLECT_CONTENT_DECISION",
                 "slide_id": page.slide_id,
                 "review_path": str(paths.provisional),
+                "review_contract": {
+                    "display_mode": CONTENT_REVIEW_DISPLAY_MODE,
+                    "instruction": (
+                        "Reproduce the complete review_path content in the user-visible response. "
+                        "Do not summarize, omit blocks, replace content with a link, or request "
+                        "approval from an abbreviated review."
+                    ),
+                },
                 "commands": {
                     "approve": command_line(controller, "approve-content", project_dir),
                     "revise": "Replace working/provisional-content.md, then run present-review again.",
@@ -473,8 +482,14 @@ def handle_present_review(project_dir: Path, text: str, controller: Path) -> int
             "presented_at": now(),
         },
     )
-    print(paths.provisional.read_text(encoding="utf-8"))
-    print("\nContent review is ready. Explicit approval is required.")
+    print(f"===== BEGIN COMPLETE CONTENT REVIEW {page.slide_id} =====")
+    print(paths.provisional.read_text(encoding="utf-8").rstrip())
+    print(f"===== END COMPLETE CONTENT REVIEW {page.slide_id} =====")
+    print(
+        "\nDISPLAY REQUIREMENT: Reproduce the complete review between the markers in "
+        "the user-visible response. Do not summarize or omit any section or block."
+    )
+    print("Explicit semantic approval is required after the complete review is visible.")
     print(command_line(controller, "approve-content", project_dir))
     return 0
 

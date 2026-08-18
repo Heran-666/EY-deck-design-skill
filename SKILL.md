@@ -73,7 +73,9 @@ the active page. For every substantive page, include the build-only Page logic,
 preferred wording, complete facts and data, emphasis intent, and sources;
 exclude visual/layout direction. Structural pages omit Page logic. Run
 `present-review`, show the whole page including Page logic, and wait for
-explicit semantic approval before `approve-content`.
+explicit semantic approval before `approve-content`. Reproduce the complete
+review between the controller's review markers. Do not replace any section,
+content block, detail, data, emphasis, or source with a summary or file link.
 
 Never invent client, EY, source, credential, case, people, capacity, fee,
 schedule, tool, approval, learning, or business-outcome facts.
