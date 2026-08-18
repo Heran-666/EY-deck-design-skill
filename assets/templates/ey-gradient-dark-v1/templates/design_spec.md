@@ -36,8 +36,11 @@ identity and structure below.
 | White | `#FFFFFF` | Primary dark-page text and negative space |
 | Neutral gray | `#A6A6A6` | Secondary copy, dividers, metadata |
 | Pale yellow | `#FFF4B3` | Restrained supporting emphasis |
+| Balancing blue | `#188CE5` (`rgb(24, 140, 229)`) | Balance the dominant EY yellow; express comparison or contrast relationships |
 
-Add hues only to encode a meaningful category, state, threshold, or comparison.
+Use balancing blue selectively so EY yellow remains the primary accent. Add
+other hues only to encode a meaningful category, state, threshold, or
+comparison.
 
 | Text | Font stack |
 |---|---|

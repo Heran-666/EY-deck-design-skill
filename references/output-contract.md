@@ -3,13 +3,14 @@
 ## File boundary
 
 Replace `working/provisional-content.md` with exactly the controller-listed
-active pages; never append. After approval, the controller promotes those exact
-sections to canonical `content.md`. Keep project memory in `framework.md`,
-workflow evidence in receipts, and analysis/design alternatives out of both.
+active pages; never append. After approval, the controller promotes those
+sections unchanged to canonical `content.md`. Store project memory in
+`framework.md` and workflow evidence in receipts. Keep analysis and design
+alternatives out of both files.
 
-Use stable slide IDs (`S01`) and content IDs (`S03-B1`). Decimal children are
-allowed only under a meaningful parent with at least two children; normally
-stop at three levels. IDs encode semantic hierarchy, never layout.
+Use stable slide IDs (`S01`) and content IDs (`S03-B1`). Use decimal children
+only under a meaningful parent with at least two children, and normally stop at
+three levels. IDs express semantic hierarchy, never layout.
 
 Begin provisional and canonical files with:
 
@@ -20,8 +21,8 @@ Begin provisional and canonical files with:
 - Language: <Chinese | English>
 ```
 
-Do not add template identity, visual decisions, Storyline tables, analysis
-registers, review logs, open questions, or assumptions.
+Exclude template identity, visual decisions, Storyline tables, analysis
+registers, review logs, open questions, and assumptions.
 
 ## Page schema
 
@@ -74,31 +75,31 @@ registers, review logs, open questions, or assumptions.
 - Source details: <provenance and supported IDs; or No external sources>
 ````
 
-The page heading contains only the Slide ID. `Title` is the preferred working
-title and is synchronized to `framework.md` after approval. PPT Master may
-optimize the visible title without changing its meaning. Page type and template
-come from `framework.md`, not `content.md`.
+The page heading contains only the Slide ID. `Title` is preferred wording; after
+approval, the controller synchronizes it to `framework.md`. PPT Master may
+optimize the visible title without changing meaning. Page type and template
+come only from `framework.md`.
 
-Every substantive page requires `Page logic（Build-only）`. Its `Argument chain`
-must name every top-level block and may reference only IDs on that page. These
-fields guide information design but remain invisible. Cover, Agenda, Section
-divider, Ending, and protected placeholder pages must omit Page logic.
+Every substantive page requires `Page logic（Build-only）`. `Argument chain`
+must name every top-level block and reference only IDs on that page. These
+fields guide information design but remain invisible. Structural and protected
+pages omit Page logic.
 
 Do not add Visual Direction, design briefs, wireframes, coordinates,
 measurements, element maps, zones, named compositions, or layouts. Content
-forms describe approved information, not composition. Do not create sections
-for `Deferred template` pages; they remain ordered in `framework.md` and are
-materialized only for PPTX export. Protected pages remain in `framework.md` and
-optional `protected_input/`; workflow 8.0 excludes protected pages from the
-authored SVG/PPTX roster.
+describes approved information, not composition. Do not create sections for
+`Deferred template` pages; they remain in `framework.md` until export.
+Protected pages remain in `framework.md` and optional `protected_input/` and
+are excluded from the authored SVG/PPTX roster.
 
-Use a table only for exact multi-field inspection and a chart only for approved
-quantitative relationships. Do not duplicate one dataset as both unless each
-form has a separate approved purpose.
+Use tables for exact multi-field inspection and charts for approved
+quantitative relationships. Do not show one dataset in both forms unless each
+has a separate approved purpose.
 
 ## Agenda exception
 
-Agenda contains `Title` plus sequential top-level block headings only:
+When an Agenda is explicitly authored rather than deferred, include only
+`Title` and sequential top-level block headings:
 
 ```markdown
 ### On-slide content
@@ -110,27 +111,26 @@ Agenda contains `Title` plus sequential top-level block headings only:
 ```
 
 Do not add Subtitle, Core insight, Detail, Child logic, Emphasis, tables,
-charts, descriptions, or Page logic. Do not number labels in content; PPT
-Master may derive visible numbering from block order.
+charts, descriptions, or Page logic. Do not number labels; PPT Master may
+derive visible numbering from block order.
 
 ## Content adaptation
 
-- Follow PPT Master's `content vs expression` rule. Treat narrative wording as
-  preferred, not verbatim; permit concise connective copy that adds no claim.
-- Build-only fields stay invisible. They may guide generated wording but must
-  not be copied onto the page as internal instructions.
-- `Emphasis` identifies a semantic priority in the source outline. Use only
-  `关键重点`, `次级重点`, `对比重点`, or `普通加粗`; use `对比重点` only for an explicit
-  approved contrast. PPT Master may emphasize equivalent optimized wording.
+- Apply PPT Master's `content vs expression` rule: wording is preferred, not
+  verbatim, and concise connective copy may add no new claim.
+- Keep build-only fields invisible; use them as guidance, never on-slide text.
+- Use `Emphasis` only for semantic priority: `关键重点`, `次级重点`, `对比重点`, or
+  `普通加粗`. Reserve `对比重点` for an approved contrast. PPT Master may apply
+  the emphasis to equivalent optimized wording.
 
 ## Sources and validation
 
 `On-slide source` is approved footer content or `None`. `Source details` records
-authoritative provenance and supported IDs. Identify user/internal material and
-never invent URLs, dates, licenses, or approval status. Do not record
-construction-only visual assets here.
+authoritative provenance and supported IDs. Identify user or internal material;
+never invent URLs, dates, licenses, or approval status. Exclude construction-only
+visual assets.
 
-Use controller `present-review` for the normal validation and review gate.
-`scripts/validate_deck_blueprint.py` is the direct diagnostic for schema, IDs,
+Use controller `present-review` for the normal validation and review gate. Use
+`scripts/validate_deck_blueprint.py` only for direct diagnosis of schema, IDs,
 duplicates, emphasis targets, page types, and cross-page rules. Human review
-owns meaning, evidence quality, hierarchy, and buildability.
+decides meaning, evidence quality, hierarchy, and buildability.

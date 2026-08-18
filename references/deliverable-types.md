@@ -9,22 +9,29 @@
 
 ## 1. Classify from the supplied background
 
-Review the user's objective, audience, source material, delivery setting, requested output, desired audience change, and constraints before asking about format. Infer the primary deliverable type:
+Review the objective, audience, source material, delivery setting, requested
+output, desired audience change, and constraints. Infer the primary type:
 
-- `Proposal`: seeks selection, approval, sponsorship, funding, or authorization for a proposed response, scope, approach, or commercial offer.
-- `Sharing deck`: communicates experience, insights, progress, practices, or a point of view primarily to create understanding, alignment, or discussion.
-- `Training`: builds knowledge or capability and requires explicit learning objectives, explanation, examples, practice, checks, or application support.
-- `Interpretation`: explains and makes sense of supplied material, findings, policy, research, data, or an existing document, with emphasis on meaning, implications, uncertainty, and response.
-- `Other: <specific form>`: names the actual form when none of the four types fits, such as decision briefing, workshop, readout, update, report-out, or keynote.
+- `Proposal`: seeks approval, selection, sponsorship, funding, or authorization
+  for a response, scope, approach, or commercial offer.
+- `Sharing deck`: shares experience, insights, progress, practices, or a point of
+  view to build understanding, alignment, or discussion.
+- `Training`: builds knowledge or capability through learning objectives,
+  explanation, examples, practice, checks, or application support.
+- `Interpretation`: explains supplied material, findings, policy, research,
+  data, or documents, emphasizing meaning, implications, uncertainty, and
+  response.
+- `Other: <specific form>`: names the actual form when none of the above fits,
+  such as decision briefing, workshop, readout, update, report-out, or keynote.
 
-Classify by the audience outcome, not by the user's casual use of words such as “deck,” “presentation,” or “sharing.” Treat hybrids by their dominant purpose. Mention a secondary type only when it materially changes the Storyline.
+Classify by audience outcome, not casual labels such as “deck,” “presentation,”
+or “sharing.” For hybrids, choose the dominant purpose and add a secondary type
+only when it changes the Storyline.
 
-Before drafting the Storyline, the minimum usable intake is the objective,
-audience, desired audience change, source boundary, and any hard delivery
-constraint. Ask only for missing items that would change the sequence or make a
-claim unsupported; optional context may remain `None`. Also obtain any input
-that the selected type policy marks as required, such as `why now` and the
-intended ending for a Sharing deck.
+Before drafting, obtain the objective, audience, desired audience change,
+source boundary, hard delivery constraints, and any input required by the
+selected type policy. Ask only for missing information that would change the
+sequence or leave a claim unsupported; optional context may remain `None`.
 
 ## 2. Confirm the type
 
@@ -32,13 +39,18 @@ Give one concise preliminary judgment after reviewing the background:
 
 `根据现有背景，我初步判断这是 <type>，因为 <purpose/audience basis>。请确认；如果不准确，请告诉我更希望它作为哪种形式。`
 
-If two types remain genuinely plausible, recommend one and name only the closest alternative with the consequence for structure. Ask no more than the minimum additional question needed to distinguish them. Do not present a page sequence before confirmation unless the user explicitly asks to proceed without the gate.
+If two types remain plausible, recommend one and name only the closest
+alternative, including the structural consequence. Ask only what is needed to
+distinguish them. Do not present a page sequence before confirmation unless the
+user explicitly waives this gate.
 
-Treat a direct correction as confirmation of the corrected type. Record the confirmed type in the temporary intake summary and later in `framework.md`; do not repeatedly reconfirm it unless the user's objective changes.
+Treat a direct correction as confirmation. Record the confirmed type in the
+temporary intake summary and later in `framework.md`; reconfirm only if the
+objective changes.
 
 ## 3. Route to the type policy
 
-Apply this universal structural shell before the selected type policy:
+Apply this shared structural shell before the selected type policy:
 
 - place exactly one `Cover` at S01 for every deliverable type;
 - when there are at least six substantive pages, place one `Agenda` at S02 and
@@ -56,7 +68,7 @@ After confirmation, read [storyline-and-content.md](storyline-and-content.md) an
 | `Interpretation` | [storyline-type-interpretation.md](storyline-type-interpretation.md) |
 | `Other: <specific form>` | [storyline-type-other.md](storyline-type-other.md) |
 
-Each type policy must define these sections:
+Each type policy owns these sections:
 
 1. `Audience outcome`: activation condition and required intake context;
 2. `Storyline logic`: the type-specific audience journey and sequencing rules;
@@ -64,19 +76,19 @@ Each type policy must define these sections:
 4. `Safeguards`: failure modes and unsupported behaviors to prevent;
 5. `Completion checks`: conditions the proposed Storyline must satisfy.
 
-Treat each type policy as the sole owner of that type's Storyline sequence,
-required inputs, safeguards, and completion checks. To add a new primary type,
-create one policy with this contract, add one route above, and extend the
-`Deliverable type` schema and validator. Keep `SKILL.md` pointed at this router
-so the controller can continue loading exactly one confirmed type policy. Do
-not copy type-specific rules back into this router or into
-`storyline-and-content.md`.
+Do not duplicate type-specific sequence, inputs, safeguards, or completion
+checks in this router or `storyline-and-content.md`. To add a primary type,
+create a policy with this contract, add its route above, and extend the
+`Deliverable type` schema and validator. Keep `SKILL.md` linked to this router.
 
-For a hybrid, choose one primary type and only the necessary secondary behavior. Read one additional type policy only when that secondary behavior materially changes the Storyline. Surface conflicting audience outcomes before drafting, and keep `Deliverable type` set to the confirmed primary type.
+For a hybrid, keep `Deliverable type` set to the confirmed primary type. Read
+one secondary policy only when its behavior materially changes the Storyline,
+and resolve conflicting audience outcomes before drafting.
 
 ## 4. Present the Storyline for approval
 
-For every confirmed type, briefly explain the overall narrative arc and how it serves the confirmed audience outcome, then show the complete page sequence beginning with S01 Cover. Use the following fixed field order for every displayed page:
+Briefly explain how the narrative arc serves the audience outcome, then show
+the complete page sequence from S01 Cover. Use this field order for every page:
 
 1. `Slide ID`
 2. `Page title / purpose`
@@ -85,21 +97,20 @@ For every confirmed type, briefly explain the overall narrative arc and how it s
 5. `Content Summary`
 6. `Next connection`
 
-Format `Content Summary` for each substantive content page as normally three to
-five bullets. Make every bullet name one distinct planned content block, claim,
-evidence group, example, boundary, implication, action, or audience takeaway,
-and state enough for the user to understand what that unit will contribute.
-Together, the bullets must establish the page's main claim and the support
-needed to make it useful. Allow two bullets only for a deliberate single-impact
-page whose focus serves the audience journey. Keep Cover, Agenda, Section
-divider, protected, Ending, and other structural pages concise and
-role-appropriate. Keep all bullets at Storyline level: do not draft exact
-on-slide copy, invent unsupported facts, pad repeated ideas, or include
-visual-design instructions.
+For each substantive page, use normally three to
+five bullets in `Content Summary` unless a deliberate single-impact page needs
+only two. Each bullet must identify a
+distinct planned block, claim, evidence group, example, boundary, implication,
+action, or takeaway and explain its contribution. Together they must establish
+the page claim and its support. Keep structural pages concise. Stay at
+Storyline level: no final copy, unsupported facts, filler, or visual direction.
 
-Show a substantive `Next connection` only when the current page is a content page and the immediately following page is also a content page. Explain which specific claim, evidence, question, conclusion, or implication on the current page creates the need for the following page; do not merely write “leads to the next page.” Display `Not applicable` when the current page is structural or protected, has no following page, or the next page is a Cover, Agenda, Section divider/chapter page, Ending/closing page, or Protected placeholder.
+Use `Next connection` only between adjacent content pages. Name the claim,
+evidence, question, conclusion, or implication that creates the next-page need;
+never write a generic transition. Use `Not applicable` for structural or
+protected pages, the last page, or any page followed by a non-content page.
 
-Do not display a separate `Protected status`; `Page type: Protected placeholder` is sufficient to identify a protected page in the Storyline.
+Do not add `Protected status`; `Page type: Protected placeholder` is sufficient.
 
 Use this page block unless a compact table can preserve the bullet hierarchy and all fields without ambiguity:
 
@@ -116,10 +127,8 @@ Use this page block unless a compact table can preserve the bullet hierarchy and
 ```
 
 Obtain explicit approval before creating `framework.md` or `content.md`, unless
-the user expressly waives the Storyline gate. After approval, all types use the
-same page-by-page content-review controller and bundled PPT Master SVG candidate
-loop for substantive pages. Mark Cover, Agenda, Section divider, and Ending as
-`Deferred template` in the framework unless custom design is explicitly
-requested. Keep Ending as the approved fixed closing page with no additions or
-modifications. Export after every authored page has one confirmed SVG and every
-deferred structural page has a known template type.
+the user waives this gate. After approval, use the shared controller workflow.
+In `framework.md`, default Cover, Agenda, Section divider, and Ending to
+`Deferred template` unless custom design is requested; never modify the fixed
+Ending. Export only after every authored page has a confirmed SVG and every
+deferred page has a known template type.

@@ -2,14 +2,14 @@
 
 ## Boundary
 
-Create `framework.md` only after explicit approval of the complete Storyline.
-It owns compact project context, page order, narrative intent, content state,
-durable decisions, and unresolved items. It must not contain exact approved
-copy/data, design directions, layout choices, visual style, SVG/PPTX details,
-receipts, or bundled PPT Master internal state.
+Create `framework.md` only after the complete Storyline is explicitly approved.
+It stores compact project context, page order, narrative intent, durable page
+state, decisions, and unresolved items. Exclude approved copy or data, design
+and layout choices, visual style, SVG/PPTX details, receipts, and PPT Master
+internal state.
 
-Before approval, use optional `working/intake-summary.md`. After approval, merge
-only effective durable information into `framework.md`.
+Before approval, use optional `working/intake-summary.md`. After approval, move
+only durable information into `framework.md`.
 
 ## Required structure
 
@@ -48,41 +48,34 @@ only effective durable information into `framework.md`.
 - Open items: <unresolved items or None>
 ```
 
-Use one sequential Slide ID system only. After content approval, the controller
-synchronizes the Storyline heading to the exact approved audience-facing title.
-Do not duplicate approved copy in `Content scope` or `Confirmed decisions`.
+Use one sequential Slide ID system. After content approval, the controller
+synchronizes the Storyline heading to the approved audience-facing title. Do
+not duplicate approved copy in `Content scope` or `Confirmed decisions`.
 
-When materializing an approved substantive page, preserve the three to five
-distinct planned units from its Storyline `Content Summary` in `Content scope`;
-compress wording and separate units with semicolons, but do not collapse the
-scope to a vague topic label. Preserve the main claim plus the relevant
-explanation, evidence, example, boundary, implication, or action that the user
-approved. Keep structural pages role-appropriate and concise. This is planning
-scope for later content authoring, not exact on-slide copy.
+For each substantive page, preserve the three to five
+distinct planned units from the approved `Content Summary` in `Content scope`.
+Compress them with semicolons, but retain the main claim and its approved
+explanation, evidence, example, boundary, implication, or action. Do not reduce
+the scope to a topic label or write final on-slide copy. Keep structural pages role-appropriate and concise.
 
-Every new Storyline starts with exactly one Cover at S01. At six or more
-substantive pages, include one Agenda at S02 and at least one Section divider.
-Give Cover, Agenda, Section divider, and Ending pages their normal Page type and
-`Deferred template` Status by default. Preserve their Slide IDs and positions,
-but do not draft exact on-slide copy. The user fills the editable Cover, Agenda,
-and Section divider template fields after PPTX export. Ending is the approved
-fixed closing page: preserve it literally and never add or modify content. Use
-`reopen-content` only when the user explicitly requests custom design for an
-editable structural page.
+Apply the structural shell from `deliverable-types.md`. Give Cover, Agenda,
+Section divider, and Ending their normal Page type and `Deferred template`
+status by default. Preserve their Slide IDs and positions without final copy;
+the user fills editable template fields after export. Keep Ending unchanged.
+Use `reopen-content` only when the user requests custom design for an editable
+structural page.
 
-`Output filename` is one plain `.pptx` filename, never a path. Preserve an
-explicit user filename; otherwise derive it once from the deliverable name. It
-becomes the project-root output of the ordered-roster-to-PPTX stage. Workflow
-8.0 records the output, postflight, conversion trace, and text-frame audit
-outside `framework.md`.
+`Output filename` must be one plain `.pptx` filename, never a path. Preserve a
+user-specified name; otherwise derive it once from the deliverable name. The
+export writes it to the project root. Store postflight, conversion trace, and
+text-frame audit outside `framework.md`.
 
-For `Protected placeholder`, set both Page type and Status to
-`Protected placeholder`. Put the exact approved instruction in `Content scope`;
-it must begin with `[占位：` and state that AI must not generate, rewrite, or
-supplement the page. An optional supplied literal SVG may live at
-`protected_input/<Slide ID>.svg`, but workflow 8.0 does not validate, confirm,
-or include protected placeholders in the PPTX roster. Export only explicitly
-confirmed authored SVGs plus hash-bound `Deferred template` snapshots.
+For a protected page, set both Page type and Status to `Protected placeholder`.
+In `Content scope`, preserve the exact approved instruction beginning with
+`[占位：`; it must forbid AI generation, rewriting, and supplementation. An
+optional literal SVG may live at `protected_input/<Slide ID>.svg`, but workflow
+8.0 does not validate, confirm, or export protected placeholders. Export only
+confirmed authored SVGs and hash-bound `Deferred template` snapshots.
 
 ## Durable states
 
@@ -94,39 +87,34 @@ Use only:
 4. `Deferred template`
 5. `Protected placeholder`
 
-The controller always selects the first page that is neither `SVG confirmed`
-nor `Deferred template` nor `Protected placeholder`. Content approval sets
-`Content locked`; candidate preparation leaves that durable state unchanged;
-explicit publication sets `SVG confirmed`. `Deferred template` is valid only
-for Cover, Agenda, Section divider, and Ending page types. `Open items` must be
-`None` before content locks or template deferral.
+The controller selects the first page not in `SVG confirmed`, `Deferred
+template`, or `Protected placeholder`. Content approval sets `Content locked`;
+candidate preparation does not change it; publication sets `SVG confirmed`.
+Only Cover, Agenda, Section divider, and Ending may use `Deferred template`.
+`Open items` must be `None` before content lock or template deferral.
 
-Derive transient progress from evidence under `working/`: a current content
-review receipt means content is being reviewed, and a hash-bound page context
-plus the complete initial request set means SVG decisions are in progress. Do
-not write `Content reviewing` or `Awaiting SVG decision` into new or updated
-frameworks. Accept those legacy values only long enough to finish or reopen an
-existing pre-8.0 cycle.
+Derive transient progress from evidence under `working/`: a current review
+receipt means content review; a hash-bound page context plus complete initial
+requests means SVG review. Never write `Content reviewing` or `Awaiting SVG
+decision` into new or updated frameworks. Accept legacy values only long enough
+to finish or reopen a pre-8.0 cycle.
 
-Keep candidate versions and revision history out of this file. Their immutable
-request, artifact, presentation, and decision receipts live under `working/`.
-A content reopen returns to `Not started`; an SVG-only reopen returns to
-`Content locked` and deletes the evidence from which transient SVG progress is
-derived.
+Keep candidate versions and revision history under `working/`, with their
+immutable request, artifact, presentation, and decision receipts. Reopening
+content returns the page to `Not started`; reopening SVG returns it to `Content
+locked` and removes transient SVG evidence.
 
-Keep `Narrative role`, `Next connection`, `Confirmed decisions`, and `Open
-items` within 500 characters and `Content scope` within 700. Store a substantive
+Limit `Narrative role`, `Next connection`, `Confirmed decisions`, and `Open
+items` to 500 characters each; limit `Content scope` to 700. Use a substantive
 `Next connection` only between adjacent content pages; otherwise use `None`.
 
 ## Targeted loading
 
-For content review, controller `next` emits Project context, the active
+For content review, controller `next` emits project context, the active
 Storyline entry, and compact adjacent context. For SVG generation, it writes
-one hash-bound page authoring context containing the single-SVG review plan,
-complete approved content, structured page logic for substantive pages,
-project/page context, and one self-contained prototype. It then binds the A
-request or a later feedback-driven Rn request to that context. PPT Master
-rereads the immutable context after re-entry or compaction and applies its
-native content-expression rules. Previously confirmed pages and adjacent
-Storyline context may inform consistency without becoming a second state
-authority.
+one hash-bound authoring context containing the single-SVG plan, complete
+approved content, substantive-page logic, project/page context, and one
+self-contained prototype. It binds A and later feedback-driven Rn requests to
+that context. After re-entry or compaction, PPT Master rereads the immutable
+context and applies its content-expression rules. Confirmed pages and adjacent
+Storyline context may guide consistency but never become state authority.

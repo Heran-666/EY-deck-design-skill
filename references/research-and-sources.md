@@ -2,46 +2,75 @@
 
 ## 1. Research purpose
 
-Use internet research when it materially strengthens audience context, market evidence, benchmarks, standards, regulatory context, factual claims, or the credibility of the presentation argument. Research to improve accuracy and relevance, not to pad the deck.
+Research only when it materially improves audience context, evidence, benchmarks,
+standards, regulatory context, factual accuracy, or argument credibility. Do not
+research to add volume.
 
-Prefer user-supplied approved internal material for client facts, EY credentials, cases, policies, systems, team experience, delivery methods, tools, pricing, schedules, and commitments. Verify time-sensitive or high-risk facts using current authoritative sources.
+Use approved user-supplied material for client- or EY-specific facts, including
+credentials, cases, policies, systems, experience, methods, tools, pricing,
+schedules, and commitments. Verify time-sensitive or high-risk external claims
+against current authoritative sources.
 
 ## 2. Source hierarchy
 
 Prefer sources in this order:
 
-1. Approved EY or client internal sources supplied by the user for internal facts
-2. Governments, regulators, statistical agencies, standards bodies, official company filings, and first-party datasets or documentation
-3. Original institutional research from credible international organizations, universities, or recognized professional bodies
+1. Approved EY or client material supplied by the user for internal facts
+2. Governments, regulators, statistical agencies, standards bodies, official
+   filings, and first-party data or documentation
+3. Original research from credible international organizations, universities,
+   or professional bodies
 4. Peer-reviewed research
-5. Reputable industry research and established news organizations when no stronger primary source exists
+5. Reputable industry research or established news when no stronger source exists
 
-Avoid unsourced aggregators, SEO summaries, low-quality market-size pages, anonymous content, and sources that merely repeat another source. Use direct source pages rather than search-result URLs. Cross-check important or surprising claims against a second authoritative source when practical.
+Use the strongest available direct source, not a search-result URL or a page that
+only repeats another source. Avoid anonymous content, SEO summaries, unsourced
+aggregators, and low-quality market-size pages. When practical, cross-check
+material or surprising claims against a second authoritative source.
 
 ## 3. Claim discipline
 
-- Cite external numbers, factual comparisons, forecasts, standards, regulations, benchmarks, and non-obvious market claims.
-- Distinguish RFP facts, user-provided internal facts, researched evidence, historical data, forecast data, assumptions, inferences, illustrative examples, and recommendations.
-- Do not turn an inference, interpretation, recommendation, or working hypothesis into a sourced fact. Label it and explain its basis during co-creation in conversation.
-- Preserve units, dates, geography, scope, sample, definitions, and methodological caveats that affect interpretation.
-- Do not infer EY or client policy, approval, credentials, prior work, team experience, delivery capacity, fees, schedules, tools, or commitments from public material.
-- Do not use public marketing language as evidence of engagement-specific capability.
+- Cite external numbers, comparisons, forecasts, standards, regulations,
+  benchmarks, and non-obvious market claims.
+- Classify each claim as an RFP fact, user-provided internal fact, researched
+  evidence, historical or forecast data, assumption, inference, illustration,
+  or recommendation.
+- Label assumptions, inferences, interpretations, recommendations, and working
+  hypotheses; do not present them as sourced facts.
+- Preserve any unit, date, geography, scope, sample, definition, or caveat that
+  changes how the evidence should be interpreted.
+- Never infer EY or client policy, approval, credentials, experience, capacity,
+  fees, schedules, tools, or commitments from public material. Public marketing
+  language does not prove engagement-specific capability.
 
 ## 4. Page-local source format
 
-Store both forms with the page that uses them:
+Store both fields on every page that uses factual evidence:
 
 - `On-slide source`: concise final footer copy.
-- `Source details`: organization, title, date, direct URL or local path, access date, and supported content IDs; use `No external sources` when applicable.
+- `Source details`: organization, title, date, direct URL or local path, access
+  date, and supported content IDs. Use `No external sources` when applicable.
 
-Do not create a separate complete source register. Keep factual evidence next to the page it supports. Do not record construction-only photographs, illustrations, icons, or other visual assets selected during page authoring. If a visual itself carries factual evidence, retain its factual source with the page.
+Keep evidence with the page it supports; do not create a separate complete source
+register. Exclude construction-only photos, illustrations, icons, and other
+visual assets from `content.md`. If a visual conveys factual evidence, record
+its factual source with the page.
 
-The bounded page-authoring action may source external visual material and is responsible for any source or usage record required during production. Keep those selections, links, Visual Directions, and concrete visual solutions out of `content.md`. Never invent a license status.
+Page authoring owns any production record needed for external visual assets.
+Keep asset selections, links, Visual Directions, and visual solutions out of
+`content.md`; never invent license status.
 
 ## 5. Internal, illustrative, and conflicting material
 
-Label constructed scenarios, example outputs, and invented numbers as illustrative when they could be mistaken for verified client material. Do not cite a fictional case as evidence.
+Label constructed scenarios, sample outputs, and invented numbers as
+illustrative when they could be mistaken for verified material. Never cite a
+fictional case as evidence.
 
-When an internal requirement is missing, use `[待补充：<specific approved internal source or fact>]`. When an authoritative external source cannot be found, use `[待补充权威来源：<specific claim>]` or revise the storyline so it does not depend on the claim.
+For missing internal evidence, use
+`[待补充：<specific approved internal source or fact>]`. If no authoritative
+external source is available, use `[待补充权威来源：<specific claim>]` or revise
+the Storyline so it does not rely on that claim.
 
-If credible sources conflict, explain differences in definitions, dates, scope, or methodology. Do not select the more convenient claim without explanation.
+When credible sources conflict, compare their definitions, dates, scope, and
+methodology. Do not choose the more convenient claim without explaining the
+difference.
