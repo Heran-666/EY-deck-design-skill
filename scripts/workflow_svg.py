@@ -18,10 +18,10 @@ INITIAL_VERSIONS = ("A",)
 LEGACY_SUBSTANTIVE_VERSIONS = ("A", "B")
 VERSION_RE = re.compile(r"(?:A|B|R[1-9]\d*)")
 FORBIDDEN_TAGS = {"foreignObject", "script", "style"}
-PAGE_CONTEXT_SCHEMA = "ey-deck.page-authoring-context.v5"
+PAGE_CONTEXT_SCHEMA = "ey-deck.page-authoring-context.v6"
 REQUEST_SCHEMAS = {
     "ppt-master.page-svg-request.v2",
-    "ppt-master.page-svg-request.v3",
+    "ppt-master.page-svg-request.v4",
 }
 
 
@@ -76,7 +76,7 @@ def candidate_valid(paths: ProjectPaths, slide_id: str, version: str) -> bool:
         request = read_json(packet)
     except ValueError:
         return False
-    if request.get("schema") == "ppt-master.page-svg-request.v3":
+    if request.get("schema") == "ppt-master.page-svg-request.v4":
         descriptor = request.get("authoring_context")
         if not isinstance(descriptor, dict):
             return False
@@ -101,7 +101,7 @@ def candidate_valid(paths: ProjectPaths, slide_id: str, version: str) -> bool:
         approved_content_sha256 = request.get("approved_content_sha256")
         context_valid = request.get("schema") == "ppt-master.page-svg-request.v2"
     return (
-        receipt.get("schema") == "ey-deck.svg-candidate.v1"
+        receipt.get("schema") in {"ey-deck.svg-candidate.v1", "ey-deck.svg-candidate.v2"}
         and receipt.get("slide_id") == slide_id
         and receipt.get("version") == version
         and receipt.get("packet_sha256") == sha256(packet)
@@ -118,24 +118,31 @@ def candidate_valid(paths: ProjectPaths, slide_id: str, version: str) -> bool:
     )
 
 
-def record_candidate(paths: ProjectPaths, slide_id: str, version: str) -> None:
+def record_candidate(
+    paths: ProjectPaths,
+    slide_id: str,
+    version: str,
+    *,
+    packet_sha256: str,
+    artifact_sha256: str,
+) -> None:
+    """Persist the exact request and artifact accepted by PPT Master complete."""
     require_version(version)
     packet = paths.packet(slide_id, version)
     artifact = paths.candidate(slide_id, version)
-    if not packet.is_file():
-        raise ValueError(f"candidate packet not found: {packet}")
-    errors = svg_errors(artifact)
-    if errors:
-        raise ValueError(" | ".join(errors))
+    if not packet.is_file() or not artifact.is_file():
+        raise ValueError("candidate request or artifact disappeared after validation")
+    if sha256(packet) != packet_sha256 or sha256(artifact) != artifact_sha256:
+        raise ValueError("candidate request or artifact changed after validation")
     write_json(
         paths.candidate_receipt(slide_id, version),
         {
-            "schema": "ey-deck.svg-candidate.v1",
+            "schema": "ey-deck.svg-candidate.v2",
             "slide_id": slide_id,
             "version": version,
-            "packet_sha256": sha256(packet),
+            "packet_sha256": packet_sha256,
             "artifact_path": str(artifact.resolve()),
-            "artifact_sha256": sha256(artifact),
+            "artifact_sha256": artifact_sha256,
             "recorded_at": now(),
         },
     )
@@ -159,49 +166,9 @@ def latest_revision(paths: ProjectPaths, slide_id: str) -> str | None:
     return versions[-1] if versions else None
 
 
-def presentation_valid(paths: ProjectPaths, slide_id: str, versions: list[str]) -> bool:
-    receipt_path = paths.presentation_receipt(slide_id)
-    if not receipt_path.is_file() or any(not candidate_valid(paths, slide_id, item) for item in versions):
-        return False
-    try:
-        receipt = read_json(receipt_path)
-    except ValueError:
-        return False
-    return receipt.get("versions") == versions and receipt.get("candidate_sha256") == {
-        item: sha256(paths.candidate(slide_id, item)) for item in versions
-    }
-
-
-def record_presentation(paths: ProjectPaths, slide_id: str, versions: list[str]) -> None:
-    if not versions or any(not candidate_valid(paths, slide_id, item) for item in versions):
-        raise ValueError("all displayed candidates must be valid and recorded")
-    write_json(
-        paths.presentation_receipt(slide_id),
-        {
-            "schema": "ey-deck.svg-presentation.v1",
-            "slide_id": slide_id,
-            "versions": versions,
-            "candidate_sha256": {
-                item: sha256(paths.candidate(slide_id, item)) for item in versions
-            },
-            "presented_at": now(),
-        },
-    )
-
-
-def presented_versions(paths: ProjectPaths, slide_id: str) -> list[str]:
-    receipt = read_json(paths.presentation_receipt(slide_id))
-    versions = receipt.get("versions")
-    if not isinstance(versions, list) or not all(isinstance(item, str) for item in versions):
-        raise ValueError("invalid SVG presentation receipt")
-    if not presentation_valid(paths, slide_id, versions):
-        raise ValueError("SVG presentation is missing or stale")
-    return versions
-
-
 def confirm_candidate(paths: ProjectPaths, slide_id: str, version: str) -> Path:
-    if version not in presented_versions(paths, slide_id):
-        raise ValueError(f"{version} is not the currently displayed SVG")
+    if not candidate_valid(paths, slide_id, version):
+        raise ValueError(f"{version} is not a valid current SVG candidate")
     source = paths.candidate(slide_id, version)
     target = paths.svg_output / f"{slide_id}.svg"
     target.parent.mkdir(parents=True, exist_ok=True)
@@ -209,12 +176,11 @@ def confirm_candidate(paths: ProjectPaths, slide_id: str, version: str) -> Path:
     write_json(
         paths.decision_receipt(slide_id),
         {
-            "schema": "ey-deck.svg-decision.v1",
+            "schema": "ey-deck.svg-decision.v2",
             "slide_id": slide_id,
             "confirmed_version": version,
-            "candidate_sha256": sha256(source),
+            "artifact_sha256": sha256(source),
             "confirmed_path": str(target.resolve()),
-            "confirmed_sha256": sha256(target),
             "confirmed_at": now(),
         },
     )
@@ -232,11 +198,12 @@ def confirmation_valid(paths: ProjectPaths, slide_id: str) -> bool:
     except ValueError:
         return False
     source = paths.candidate(slide_id, version)
+    expected_hash = receipt.get("artifact_sha256") or receipt.get("candidate_sha256")
     return (
-        candidate_valid(paths, slide_id, version)
-        and receipt.get("candidate_sha256") == sha256(source)
-        and receipt.get("confirmed_sha256") == sha256(target)
-        and sha256(source) == sha256(target)
+        receipt.get("schema") in {"ey-deck.svg-decision.v1", "ey-deck.svg-decision.v2"}
+        and candidate_valid(paths, slide_id, version)
+        and expected_hash == sha256(source)
+        and expected_hash == sha256(target)
     )
 
 

@@ -33,20 +33,20 @@ source boundary, hard delivery constraints, and any input required by the
 selected type policy. Ask only for missing information that would change the
 sequence or leave a claim unsupported; optional context may remain `None`.
 
-## 2. Confirm the type
+## 2. Confirm the type when needed
 
-Give one concise preliminary judgment after reviewing the background:
+Classify before drafting. When the type is unambiguous, include this concise
+judgment in the Storyline review and obtain one combined approval:
 
 `根据现有背景，我初步判断这是 <type>，因为 <purpose/audience basis>。请确认；如果不准确，请告诉我更希望它作为哪种形式。`
 
-If two types remain plausible, recommend one and name only the closest
-alternative, including the structural consequence. Ask only what is needed to
-distinguish them. Do not present a page sequence before confirmation unless the
-user explicitly waives this gate.
+Use a separate confirmation only when two types remain plausible. Recommend one,
+name the closest alternative and structural consequence, and ask only what is
+needed to distinguish them.
 
-Treat a direct correction as confirmation. Record the confirmed type in the
-temporary intake summary and later in `framework.md`; reconfirm only if the
-objective changes.
+Treat a direct correction or Storyline approval as confirmation. Record the type
+in the temporary intake summary and later in `framework.md`; reconfirm only if
+the objective changes.
 
 ## 3. Route to the type policy
 
@@ -58,7 +58,7 @@ Apply this shared structural shell before the selected type policy:
 - allow Agenda or divider pages in shorter decks when they materially improve
   navigation, but do not add them as decoration.
 
-After confirmation, read [storyline-and-content.md](storyline-and-content.md) and exactly one primary type policy:
+After classification, read [storyline-and-content.md](storyline-and-content.md) and exactly one primary type policy:
 
 | Confirmed primary type | Type policy |
 |---|---|
@@ -134,7 +134,8 @@ Use this page block unless a compact table can preserve the bullet hierarchy and
 ```
 
 Obtain explicit approval before creating `framework.md` or `content.md`, unless
-the user waives this gate. After approval, use the shared controller workflow.
+the user waives this gate. This approval may confirm both an unambiguous type and
+the Storyline. After approval, use the shared controller workflow.
 In `framework.md`, default Cover, Agenda, Section divider, and Ending to
 `Deferred template` unless custom design is requested; never modify the fixed
 Ending. Export only after every authored page has a confirmed SVG and every

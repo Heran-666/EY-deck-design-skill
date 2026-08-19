@@ -15,25 +15,15 @@ from svg_quality_checker import SVGQualityChecker
 from svg_finalize.flatten_tspan import text_carrier_integrity_errors
 
 
-REQUEST_SCHEMA = "ppt-master.page-svg-request.v3"
-LEGACY_REQUEST_SCHEMA = "ppt-master.page-svg-request.v2"
-PAGE_CONTEXT_SCHEMA = "ey-deck.page-authoring-context.v5"
+REQUEST_SCHEMA = "ppt-master.page-svg-request.v4"
+LEGACY_REQUEST_SCHEMAS = {
+    "ppt-master.page-svg-request.v2",
+}
+PAGE_CONTEXT_SCHEMA = "ey-deck.page-authoring-context.v6"
 RESULT_SCHEMA = "ppt-master.page-svg-result.v1"
 VERSION_RE = re.compile(r"(?:A|B|R[1-9]\d*)")
 DESIGN_QUALITY_PROFILE = "ey-executive-editorial-v3"
-CANDIDATE_PLAN_POLICY = "single-svg-review-v1"
-ICON_QUALITY_RULE = (
-    "Add coherent icon elements at semantically appropriate positions when they improve recognition, "
-    "scanning, or visual rhythm; omit them when they have no clear communication job."
-)
-VISIBLE_CANDIDATE_GATE = [
-    "information_design",
-    "page_composition",
-    "art_direction_refinement",
-    "source_svg_full_slide_review",
-    "source_repair_and_recheck",
-]
-FULL_SLIDE_COMPOSITION = {
+LEGACY_FULL_SLIDE_COMPOSITION = {
     "mode": "full-slide",
     "canvas": "0 0 1280 720",
     "placeholder_bounds_role": "native-metadata-only",
@@ -97,14 +87,6 @@ def _nonempty_text(value: object) -> bool:
     return isinstance(value, str) and bool(value.strip())
 
 
-def _nonempty_text_list(value: object, minimum: int) -> bool:
-    return (
-        isinstance(value, list)
-        and len(value) >= minimum
-        and all(_nonempty_text(item) for item in value)
-    )
-
-
 def _normalized_page_type(request: dict) -> str:
     context = request.get("page_context")
     value = context.get("page_type", "") if isinstance(context, dict) else ""
@@ -112,7 +94,7 @@ def _normalized_page_type(request: dict) -> str:
 
 
 def _authoring_context(request: dict) -> tuple[dict, list[str]]:
-    if request.get("schema") == LEGACY_REQUEST_SCHEMA:
+    if request.get("schema") == "ppt-master.page-svg-request.v2":
         return request, []
     descriptor = request.get("authoring_context")
     if not isinstance(descriptor, dict):
@@ -139,22 +121,11 @@ def _authoring_context(request: dict) -> tuple[dict, list[str]]:
 
 
 def design_contract_errors(request: dict) -> list[str]:
-    errors: list[str] = []
-    quality = request.get("design_quality")
-    if not isinstance(quality, dict):
-        errors.append("design_quality must be an object")
-    else:
-        if quality.get("profile") != DESIGN_QUALITY_PROFILE:
-            errors.append(f"design_quality.profile must be {DESIGN_QUALITY_PROFILE}")
-        if not _nonempty_text(quality.get("target")):
-            errors.append("design_quality.target must be non-empty")
-        if not _nonempty_text_list(quality.get("must_have"), 6):
-            errors.append("design_quality.must_have must contain at least six non-empty rules")
-        elif ICON_QUALITY_RULE not in quality["must_have"]:
-            errors.append("design_quality.must_have must contain the required semantic icon rule")
-        if quality.get("visible_candidate_gate") != VISIBLE_CANDIDATE_GATE:
-            errors.append("design_quality.visible_candidate_gate must contain the required ordered P0 passes")
-    return errors
+    return (
+        []
+        if request.get("design_quality_profile") == DESIGN_QUALITY_PROFILE
+        else [f"design_quality_profile must be {DESIGN_QUALITY_PROFILE}"]
+    )
 
 
 def page_logic_errors(request: dict) -> list[str]:
@@ -196,7 +167,7 @@ def execution_anchor_errors(request: dict) -> list[str]:
 
 def request_errors(request: dict) -> list[str]:
     errors: list[str] = []
-    if request.get("schema") not in {REQUEST_SCHEMA, LEGACY_REQUEST_SCHEMA}:
+    if request.get("schema") not in {REQUEST_SCHEMA, *LEGACY_REQUEST_SCHEMAS}:
         errors.append(f"schema must be {REQUEST_SCHEMA}")
     if request.get("caller") != "ey-deck-design":
         errors.append("caller must be ey-deck-design")
@@ -210,27 +181,18 @@ def request_errors(request: dict) -> list[str]:
     errors.extend(context_errors)
     if context.get("canvas") != "0 0 1280 720":
         errors.append("canvas must be 0 0 1280 720")
-    if context.get("composition_space") != FULL_SLIDE_COMPOSITION:
-        errors.append(
-            "composition_space must enable unrestricted full-slide composition; "
-            "placeholder bounds are native metadata only and fixed-atom overlap is not a QA gate"
-        )
-    plan = context.get("candidate_plan")
-    if request.get("schema") == LEGACY_REQUEST_SCHEMA:
+    current_request = request.get("schema") == REQUEST_SCHEMA
+    if current_request:
+        if context.get("composition_mode") != "full-slide":
+            errors.append("composition_mode must be full-slide")
+    elif context.get("composition_space") != LEGACY_FULL_SLIDE_COMPOSITION:
+        errors.append("composition_space must enable unrestricted full-slide composition")
+    if request.get("schema") == "ppt-master.page-svg-request.v2":
         planned_versions = (
             ["A"] if _normalized_page_type(context) in STRUCTURAL_PAGE_TYPES else ["A", "B"]
         )
-    elif not isinstance(plan, dict):
-        errors.append("candidate_plan must be an object")
-        planned_versions = None
     else:
-        planned_versions = plan.get("versions")
-        if plan.get("policy") != CANDIDATE_PLAN_POLICY:
-            errors.append(f"candidate_plan.policy must be {CANDIDATE_PLAN_POLICY}")
-        if planned_versions != ["A"]:
-            errors.append("candidate_plan.versions must be ['A']")
-        if not _nonempty_text(plan.get("reason")):
-            errors.append("candidate_plan reason must be non-empty")
+        planned_versions = ["A"]
     artifact = Path(str(request.get("artifact_path", "")))
     if not artifact.is_absolute() or artifact.suffix.lower() != ".svg":
         errors.append("artifact_path must be an absolute .svg path")
@@ -239,7 +201,8 @@ def request_errors(request: dict) -> list[str]:
         errors.append("approved_content must be non-empty")
     elif context.get("approved_content_sha256") != hashlib.sha256(content.encode("utf-8")).hexdigest():
         errors.append("approved_content SHA-256 mismatch")
-    errors.extend(_bound_file(context, "approved_content_source", "approved_content_source_sha256", "approved content source"))
+    if not current_request:
+        errors.extend(_bound_file(context, "approved_content_source", "approved_content_source_sha256", "approved content source"))
     template = context.get("template")
     if not isinstance(template, dict):
         errors.append("template must be an object")
@@ -257,7 +220,7 @@ def request_errors(request: dict) -> list[str]:
         if version != "A" or base is not None or feedback is not None:
             errors.append("independent mode requires planned A with null base and feedback")
         if isinstance(planned_versions, list) and version not in planned_versions:
-            errors.append("independent version must be included in candidate_plan.versions")
+            errors.append("independent version must be A")
     elif mode == "revision":
         if not isinstance(version, str) or not version.startswith("R"):
             errors.append("revision mode requires an Rn version")
@@ -272,7 +235,7 @@ def request_errors(request: dict) -> list[str]:
     else:
         errors.append("mode must be independent or revision")
     errors.extend(design_contract_errors(context))
-    if request.get("schema") != LEGACY_REQUEST_SCHEMA:
+    if request.get("schema") != "ppt-master.page-svg-request.v2":
         errors.extend(execution_anchor_errors(context))
         errors.extend(page_logic_errors(context))
     return errors

@@ -55,14 +55,8 @@ class ProjectPaths:
     def candidate_receipt(self, slide_id: str, version: str) -> Path:
         return self.working / "receipts" / "svg" / slide_id / f"{version}.json"
 
-    def presentation_receipt(self, slide_id: str) -> Path:
-        return self.working / "receipts" / "svg" / slide_id / "presentation.json"
-
     def decision_receipt(self, slide_id: str) -> Path:
         return self.working / "receipts" / "svg" / slide_id / "decision.json"
-
-    def revision_request(self, slide_id: str) -> Path:
-        return self.working / "revision-requests" / f"{slide_id}.md"
 
     @property
     def pptx_request(self) -> Path:

@@ -30,7 +30,7 @@ from svg_finalize.flatten_tspan import text_carrier_integrity_errors  # noqa: E4
 SERVICE_CONTRACT = PPT_MASTER_ROOT / "workflows" / "svg-deck-pptx-service.md"
 SVG_QUALITY_CHECKER = PPT_MASTER_ROOT / "scripts" / "svg_quality_checker.py"
 PPTX_EXPORTER = PPT_MASTER_ROOT / "scripts" / "svg_to_pptx.py"
-REQUEST_SCHEMA = "ppt-master.svg-deck-pptx-request.v2"
+REQUEST_SCHEMA = "ppt-master.svg-deck-pptx-request.v3"
 RECEIPT_SCHEMA = "ey-deck.pptx-export.v1"
 TEXT_AUDIT_SCHEMA = "ey-deck.pptx-text-frame-audit.v2"
 TEXT_FLOW = "reflow"
@@ -81,7 +81,6 @@ def _slide_roster(paths: ProjectPaths, text: str) -> list[dict[str, str]]:
             continue
         if status == "Deferred template":
             svg_path = paths.pptx_template(page.slide_id).resolve()
-            source = template_path(page).resolve()
             if not svg_path.is_file():
                 raise ValueError(f"deferred template snapshot is missing for {page.slide_id}")
             roster.append(
@@ -91,8 +90,6 @@ def _slide_roster(paths: ProjectPaths, text: str) -> list[dict[str, str]]:
                     "page_type": page.fields.get("Page type", ""),
                     "path": str(svg_path),
                     "sha256": sha256(svg_path),
-                    "template_source_path": str(source),
-                    "template_source_sha256": sha256(source),
                 }
             )
             continue
@@ -122,37 +119,15 @@ def _materialize_deferred_templates(paths: ProjectPaths, text: str) -> None:
 
 def request_payload(paths: ProjectPaths, text: str) -> dict[str, object]:
     filename = _output_filename(text)
-    content_path = paths.content.resolve()
     return {
         "schema": REQUEST_SCHEMA,
         "caller": "ey-deck-design",
-        "project_dir": str(paths.root.resolve()),
-        "framework_path": str(paths.framework.resolve()),
-        "framework_sha256": sha256(paths.framework),
-        "content_path": str(content_path),
-        "content_sha256": sha256(content_path) if content_path.is_file() else None,
         "slides": _slide_roster(paths, text),
         "output_path": str(paths.pptx_output(filename).resolve()),
         "quality_report_path": str(paths.svg_quality_report.resolve()),
         "postflight_report_path": str(paths.pptx_postflight_report(filename).resolve()),
         "conversion_trace_path": str(paths.pptx_conversion_trace(filename).resolve()),
         "text_frame_audit_path": str(paths.pptx_text_audit.resolve()),
-        "conversion": {
-            "object_model": "editable-native-drawingml",
-            "text_flow": TEXT_FLOW,
-            "speaker_notes": "disabled",
-            "pptx_structure": "flat-quick-generate",
-        },
-        "quality_policy": {
-            "require_current_slide_source_hashes": True,
-            "require_final_svg_quality_gate": True,
-            "block_fragmented_paragraph_warnings": True,
-            "require_conversion_trace": True,
-            "require_text_frame_parity": True,
-            "require_source_carrier_conservation": True,
-            "require_text_sequence_parity": True,
-            "require_pptx_postflight": True,
-        },
     }
 
 
@@ -636,6 +611,8 @@ def _export_from_request_impl(paths: ProjectPaths, text: str) -> Path:
 
 def export_from_request(paths: ProjectPaths, text: str) -> Path:
     """Export and persist a slide-local recovery receipt for text failures."""
+    if not request_valid(paths, text):
+        write_request(paths, text)
     try:
         output = _export_from_request_impl(paths, text)
     except TextCarrierIntegrityError as exc:

@@ -40,8 +40,9 @@ of `framework.md`.
 
 ## Storyline and framework
 
-Confirm the deliverable type and complete Storyline before creating
-`framework.md`. Follow the router and confirmed type policy for page structure.
+Classify the deliverable and complete Storyline before creating `framework.md`.
+Confirm the type separately only when it is ambiguous; otherwise include it in
+the Storyline approval. Follow the router and selected type policy.
 Unless the user requests custom design, keep Cover, Agenda, Section divider,
 and Ending in their ordered positions with `Deferred template` status and no
 authored copy. Preserve the bundled Ending unchanged.
@@ -89,17 +90,9 @@ For each `RUN_EMBEDDED_PPT_MASTER_SVG` request:
 
 1. Read the request, hash-bound `authoring_context`, and `service_contract`.
 2. Run `validate_request`.
-3. Preserve the approved argument and relationships from `page_logic`. Apply
-   PPT Master's `content vs expression` rule, and let it choose the information
-   model, hierarchy, visual concept, geometry, and composition.
-4. Finish information design, composition, art-direction refinement, direct
-   source-SVG review, repair, and recheck before presentation. Do not use a
-   browser renderer for candidate QA.
-5. Write only `artifact_path`; run the emitted `record` command once.
-
-Content pages use the full `1280×720` canvas. Placeholder bounds are native
-metadata, not visual limits; do not add a `y=650` cap, footer reserve, or EY-logo
-overlap gate.
+3. Follow the service contract, preserve approved meaning and `page_logic`, and
+   write only `artifact_path`.
+4. Run the emitted `record` command once.
 
 Present the emitted SVG at review scale and wait. On confirmation, publish that
 exact version. Otherwise bind the exact feedback to the displayed SVG, create
@@ -109,17 +102,8 @@ data, sources, or Page logic.
 
 ## PPTX export
 
-After all authored pages are SVG-confirmed, run `PREPARE_PPTX_EXPORT` to freeze
-the ordered roster and hashes. Materialize deferred structural templates only
-here, at their original Slide ID positions. For
-`RUN_EMBEDDED_PPT_MASTER_PPTX`, read its request and service contract, set
-`EY_DECK_PPTX_PYTHON` from workspace dependencies, and run the emitted command.
-
-Export editable native DrawingML with flat Quick Generate structure, `reflow`
-text flow, no notes, final SVG validation, conversion trace, postflight, and
-text-frame parity. Map one logical text box to one SVG `<text>`. Keep inline
-`<tspan>` runs non-positional with literal spaces; rejoin same-x `dy` wrap rows
-as continuous text, not DrawingML hard breaks. Use paragraph boundaries only
-for semantically separate text. Require source/trace/PPTX carrier conservation
-and per-carrier OOXML text continuity. On failure, reopen and reconfirm the
-source SVG. Deliver only after `PPTX_STAGE_COMPLETE`.
+At `EXPORT_EDITABLE_PPTX`, load workspace dependencies, set
+`EY_DECK_PPTX_PYTHON`, and run the emitted command. The adapter freezes a stale
+or missing roster before export and retains it for retries. Follow the bound
+service contract for conversion and recovery. Deliver only after
+`PPTX_STAGE_COMPLETE`.

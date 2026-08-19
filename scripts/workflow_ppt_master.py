@@ -21,8 +21,9 @@ TEMPLATE_ROOT = SKILL_ROOT / "assets" / "templates" / "ey-gradient-dark-v1"
 TEMPLATE_DESIGN_SPEC = TEMPLATE_ROOT / "templates" / "design_spec.md"
 SERVICE_CONTRACT = PPT_MASTER_ROOT / "workflows" / "page-svg-service.md"
 SERVICE_CLI = PPT_MASTER_ROOT / "scripts" / "page_svg_service.py"
-PAGE_CONTEXT_SCHEMA = "ey-deck.page-authoring-context.v5"
-REQUEST_SCHEMA = "ppt-master.page-svg-request.v3"
+PAGE_CONTEXT_SCHEMA = "ey-deck.page-authoring-context.v6"
+REQUEST_SCHEMA = "ppt-master.page-svg-request.v4"
+DESIGN_QUALITY_PROFILE = "ey-executive-editorial-v3"
 IMAGE_MIME_TYPES = {
     ".gif": "image/gif",
     ".jpeg": "image/jpeg",
@@ -31,61 +32,6 @@ IMAGE_MIME_TYPES = {
     ".svg": "image/svg+xml",
     ".webp": "image/webp",
 }
-
-def design_quality_contract() -> dict[str, object]:
-    """Return the mandatory quality floor for every first-visible candidate."""
-    return {
-        "profile": "ey-executive-editorial-v3",
-        "target": (
-            "Executive-grade EY editorial design that is polished, restrained, "
-            "distinctive, and ready for the user to evaluate without first asking for more design."
-        ),
-        "must_have": [
-            "Anchor the page in one audience-facing visual idea tied to its core message.",
-            "Create an intentional first, second, and third reading order through scale, position, contrast, and whitespace.",
-            "Use semantic geometry, spatial relationships, or typography to explain content instead of merely containing it.",
-            "Integrate EY identity through composition and controlled accent behavior, not decoration alone.",
-            "Add coherent icon elements at semantically appropriate positions when they improve recognition, scanning, or visual rhythm; omit them when they have no clear communication job.",
-            "Refine alignment, spacing, optical balance, edges, connectors, and emphasis at full-slide scale.",
-            "Compose freely across the full 1280x720 slide. Placeholder bounds are native PowerPoint metadata only; do not treat y=650 or any other inset rectangle as a visual content limit.",
-            "Author each logical PowerPoint text box as one SVG <text>; keep inline-formatting <tspan> runs non-positional with literal word spaces, and use same-x rows with first dy=0 then positive relative dy only as visual-wrap hints for continuous paragraph text; never use sibling <text> elements or authored hard breaks for one paragraph's visual lines, and create a semantic paragraph boundary only when the optimized wording starts a new paragraph.",
-        ],
-        "visible_candidate_gate": [
-            "information_design",
-            "page_composition",
-            "art_direction_refinement",
-            "source_svg_full_slide_review",
-            "source_repair_and_recheck",
-        ],
-    }
-
-
-CANDIDATE_PLAN_POLICY = "single-svg-review-v1"
-
-def candidate_plan(
-    page: PageEntry,
-    approved_content: str,
-    project_context: dict[str, str],
-) -> dict[str, object]:
-    """Require one initial SVG for every authored page."""
-    return {
-        "policy": CANDIDATE_PLAN_POLICY,
-        "versions": ["A"],
-        "reason": "single-svg-review",
-    }
-
-
-def candidate_plan_for_page(
-    paths: ProjectPaths,
-    framework_text: str,
-    page: PageEntry,
-) -> dict[str, object]:
-    section = content_section(paths.content.read_text(encoding="utf-8"), page.slide_id).rstrip()
-    if not section:
-        raise ValueError(f"approved content not found for {page.slide_id}")
-    project_context = line_fields(h2_section(framework_text, "Project context"))
-    return candidate_plan(page, section, project_context)
-
 
 def embedding_errors() -> list[str]:
     required = (
@@ -182,7 +128,6 @@ def page_context_payload(
         page.fields.get("Page rhythm", ""),
         page.fields.get("Page type", ""),
     )
-    plan = candidate_plan(page, section.rstrip(), context)
     pages = page_entries(framework_text)
     page_index = next(index for index, item in enumerate(pages) if item.slide_id == page.slide_id)
     adjacent_pages = {
@@ -197,28 +142,38 @@ def page_context_payload(
             "narrative_role": pages[page_index + 1].fields.get("Narrative role", ""),
         },
     }
-    confirmed_pages = []
-    for item in pages[:page_index]:
+    consistency_references = []
+    current_type = normalize_page_type(page.fields.get("Page type", ""))
+    for item in reversed(pages[:page_index]):
         confirmed = paths.svg_output / f"{item.slide_id}.svg"
-        if item.fields.get("Status") == "SVG confirmed" and confirmed.is_file():
-            confirmed_pages.append({
-                "slide_id": item.slide_id,
-                "path": str(confirmed.resolve()),
-                "sha256": sha256(confirmed),
-            })
+        if item.fields.get("Status") != "SVG confirmed" or not confirmed.is_file():
+            continue
+        reference = {
+            "slide_id": item.slide_id,
+            "path": str(confirmed.resolve()),
+            "sha256": sha256(confirmed),
+        }
+        if not consistency_references:
+            consistency_references.append(reference)
+            if normalize_page_type(item.fields.get("Page type", "")) == current_type:
+                break
+        elif normalize_page_type(item.fields.get("Page type", "")) == current_type:
+            consistency_references.append(reference)
+            break
+    logic = page_logic(section)
+    page_context = {
+        "page_type": page.fields.get("Page type", ""),
+        "next_connection": page.fields.get("Next connection", ""),
+        "adjacent_pages": adjacent_pages,
+    }
+    if logic is None:
+        page_context["purpose"] = page.fields.get("Narrative role", "")
     return {
         "schema": PAGE_CONTEXT_SCHEMA,
         "caller": "ey-deck-design",
         "slide_id": page.slide_id,
         "canvas": "0 0 1280 720",
-        "composition_space": {
-            "mode": "full-slide",
-            "canvas": "0 0 1280 720",
-            "placeholder_bounds_role": "native-metadata-only",
-            "global_content_cap": None,
-            "check_fixed_atom_overlap": False,
-        },
-        "service_contract": str(SERVICE_CONTRACT.resolve()),
+        "composition_mode": "full-slide",
         "project_context": {
             "deliverable": context.get("Deliverable name", ""),
             "audience": context.get("Audience", ""),
@@ -231,23 +186,14 @@ def page_context_payload(
             ),
             "core_message": context.get("Storyline thesis", ""),
         },
-        "page_context": {
-            "page_type": page.fields.get("Page type", ""),
-            "narrative_role": page.fields.get("Narrative role", ""),
-            "next_connection": page.fields.get("Next connection", ""),
-            "adjacent_pages": adjacent_pages,
-        },
+        "page_context": page_context,
         "page_rhythm": resolved_page_rhythm,
-        "page_logic": page_logic(section),
-        "candidate_plan": plan,
-        "design_quality": design_quality_contract(),
-        "confirmed_pages": confirmed_pages,
+        "page_logic": logic,
+        "design_quality_profile": DESIGN_QUALITY_PROFILE,
+        "consistency_references": consistency_references,
         "approved_content": section.rstrip(),
         "approved_content_sha256": text_sha256(section.rstrip()),
-        "approved_content_source": str(paths.content.resolve()),
-        "approved_content_source_sha256": sha256(paths.content),
         "template": {
-            "workspace": str(TEMPLATE_ROOT.resolve()),
             "prototype": str(prototype.resolve()),
             "prototype_sha256": sha256(prototype),
             "design_spec": {
@@ -291,11 +237,8 @@ def request_payload(
     project_context = context.get("project_context")
     if not isinstance(project_context, dict):
         raise ValueError(f"page authoring context has no project context: {context_path}")
-    plan = context.get("candidate_plan")
-    if not isinstance(plan, dict) or plan.get("versions") != ["A"]:
-        raise ValueError(f"page authoring context has no valid candidate plan: {context_path}")
-    if not base_version and version not in plan["versions"]:
-        raise ValueError(f"candidate version {version} is not requested by the page candidate plan")
+    if not base_version and version != "A":
+        raise ValueError("the initial candidate version must be A")
     base_payload: dict[str, str] | None = None
     if base_version:
         base = paths.candidate(page.slide_id, base_version)

@@ -14,9 +14,9 @@ metadata:
 # PPT Master Internal Runtime
 
 This package is not a standalone skill. Invoke it only through EY Deck Design
-with a validated `ppt-master.page-svg-request.v3` page request and its
-hash-bound `ey-deck.page-authoring-context.v5`, or a hash-bound
-`ppt-master.svg-deck-pptx-request.v2` export request.
+with a validated `ppt-master.page-svg-request.v4` page request and its
+hash-bound `ey-deck.page-authoring-context.v6`, or a hash-bound
+`ppt-master.svg-deck-pptx-request.v3` export request.
 
 ## Entry
 

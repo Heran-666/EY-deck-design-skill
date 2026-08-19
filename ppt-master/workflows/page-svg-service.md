@@ -7,8 +7,8 @@ description: Composable page-level single-SVG review service used by a parent wo
 ## Scope
 
 This EY-only internal service accepts a validated
-`ppt-master.page-svg-request.v3` with `caller: ey-deck-design` and a
-hash-bound `ey-deck.page-authoring-context.v5`. Read request v2 only to recover
+`ppt-master.page-svg-request.v4` with `caller: ey-deck-design` and a
+hash-bound `ey-deck.page-authoring-context.v6`. Read request v2 only to recover
 an active legacy cycle.
 
 EY owns content, order, candidate naming, user choice, and publication. PPT
@@ -22,15 +22,16 @@ change EY state, export PPTX, or question the user here.
 2. Load workspace dependencies; set command-scoped `EY_DECK_SVG_PYTHON` to the
    returned Python executable; run the request's `validate_request` command.
 3. Read the bound authoring context, including `communication.consumption_mode`,
-   `page_rhythm`, `page_logic`, `design_quality`,
-   `candidate_plan`, approved content, project/page context, and
+   `page_rhythm`, `page_logic`, `design_quality_profile`, approved content,
+   project/page context, and
    `template.design_spec.path`. Then read `references/strategist.md`,
    `references/strategist-template.md`, `references/executor-base.md`, and
    `references/executor-structured.md`; load specialist references only when
    useful.
 4. Run the full design loop and write only `artifact_path`.
-5. Complete every `design_quality.visible_candidate_gate` pass, then run
-   `record` once. It performs final `complete` validation atomically.
+5. Complete information design, composition, art-direction refinement,
+   full-slide source review, repair, and recheck; then run `record` once. It
+   binds the exact request and artifact accepted by final `complete` validation.
 
 ## Full design loop
 
@@ -55,7 +56,7 @@ change EY state, export PPTX, or question the user here.
 5. **Executor** — hand-author a complete editable SVG as an internal draft.
 6. **Art-direction refinement** — refine hierarchy, rhythm, optical balance,
    connectors, emphasis, and chosen treatments until all
-   `design_quality.must_have` requirements pass.
+   the `ey-executive-editorial-v3` quality profile passes.
 7. **Review and repair** — inspect the complete source SVG at full-slide scale
    for composition, craft, clipping, overlap, legibility, and template fidelity;
    repair and reinspect before returning COMPLETE.
@@ -66,9 +67,8 @@ evidence. Keep internal design decisions inside PPT Master.
 
 ## Initial SVG and revisions
 
-Follow the EY-owned `candidate_plan`: build one complete A solution and do not
-invent B or another initial option. EY supplies no separate wording policy,
-candidate design role, or layout.
+Build one complete A solution and do not invent B or another initial option. EY
+supplies no separate wording policy, candidate design role, or layout.
 
 For Rn, bind the one displayed base and non-empty user feedback. Preserve the
 base except for requested changes and necessary reflow. Repeat the same quality
@@ -103,7 +103,7 @@ revised SVG for the next review round.
   fixed atoms, and placeholder contract.
 - Agenda's composite region is blank: PPT Master owns item grouping, numbering,
   typography, geometry, and composition.
-- Honor `composition_space.mode: full-slide`. Do not impose a `y=650` cap,
+- Honor `composition_mode: full-slide`. Do not impose a `y=650` cap,
   footer reserve, EY-logo overlap gate, or placeholder clipping boundary.
 - Use a self-contained `viewBox="0 0 1280 720"` SVG. Do not use `<style>`,
   `<script>`, `foreignObject`, remote URLs, or runtime placeholders.

@@ -32,7 +32,7 @@ frameworks.
 ## Content recovery
 
 - Missing or invalid provisional content returns to `PRESENT_PAGE_REVIEW`.
-- Editing provisional content invalidates its presentation receipt; present it
+- Editing provisional content invalidates its review binding; present it
   again before approval.
 - For any change to approved meaning, wording, data, sources, page order, or
   page count, run `reopen-content --page <Slide ID>`. It deletes the affected
@@ -52,8 +52,7 @@ frameworks.
 - For a missing or invalid candidate, stay in
   `RUN_EMBEDDED_PPT_MASTER_SVG`, repair the requested artifact, and rerun
   `record`; do not create a new request.
-- Editing a candidate invalidates its receipt and every presentation or
-  confirmation bound to the old hash.
+- Editing a candidate invalidates its receipt and confirmation.
 - After an environment failure, rerun the same Rn request; do not allocate a
   new version. Keep it bound to the displayed base and exact user feedback.
   The controller deletes the transient feedback file after embedding it.
@@ -70,13 +69,13 @@ confirmed artifact or receipt.
 
 ## PPTX recovery
 
-- `PREPARE_PPTX_EXPORT` snapshots the ordered roster of confirmed SVGs and
-  deferred templates. Any source, framework, content, or output-filename change
-  makes the request stale; prepare a new one.
-- If `RUN_EMBEDDED_PPT_MASTER_PPTX` fails on the environment or a package, fix
-  it and rerun the same request; confirmed SVGs remain unchanged.
+- `EXPORT_EDITABLE_PPTX` snapshots the ordered roster when its request is
+  missing or stale, then exports it. Slide source or output-filename changes
+  make the request stale; unrelated framework or content edits do not.
+- On environment or package failure, fix it and rerun the same command; the
+  current request and confirmed SVGs remain unchanged.
 - A fragmented-paragraph or text-frame failure originates in the source SVG.
   Run `reopen-svg --page <Slide ID>`, repair its logical text carrier, present
-  and reconfirm it, then prepare a new export request.
+  and reconfirm it, then rerun export.
 - Editing the PPTX, report, trace, or audit invalidates the export receipt.
-  Prepare and export again; never edit receipts.
+  Export again; never edit receipts.

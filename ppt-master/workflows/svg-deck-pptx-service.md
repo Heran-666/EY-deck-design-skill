@@ -4,7 +4,7 @@ description: Internal ordered SVG/template roster to editable PPTX service used 
 
 # SVG Deck to Editable PPTX Service
 
-Accept only a hash-bound `ppt-master.svg-deck-pptx-request.v2` packet from
+Accept only a hash-bound `ppt-master.svg-deck-pptx-request.v3` packet from
 `ey-deck-design`. The parent owns page order, confirmed SVG and deferred-template
 snapshot identity, output filename, lifecycle state, and receipts. This service
 owns final SVG technical validation, native DrawingML conversion, package

@@ -109,7 +109,7 @@ decision` into new or updated frameworks. Accept legacy values only long enough
 to finish or reopen a pre-8.0 cycle.
 
 Keep candidate versions and revision history under `working/`, with their
-immutable request, artifact, presentation, and decision receipts. Reopening
+immutable request, artifact, and decision receipts. Reopening
 content returns the page to `Not started`; reopening SVG returns it to `Content
 locked` and removes transient SVG evidence.
 
@@ -121,10 +121,9 @@ items` to 500 characters each; limit `Content scope` to 700. Use a substantive
 
 For content review, controller `next` emits project context, the active
 Storyline entry, and compact adjacent context. For SVG generation, it writes
-one hash-bound authoring context containing the single-SVG plan,
-`communication.consumption_mode`, `page_rhythm`, complete approved content,
-substantive-page logic, project/page context, and one self-contained prototype.
-It binds A and later feedback-driven Rn requests to that context. After re-entry
-or compaction, PPT Master rereads the immutable context and applies its
-content-expression rules. Confirmed pages and adjacent Storyline context may
-guide consistency but never become state authority.
+one hash-bound authoring context containing the execution anchors, complete
+approved content, substantive-page logic, project/page context, at most two
+consistency references, and one self-contained prototype. It binds A and later
+feedback-driven Rn requests to that context. After re-entry or compaction, PPT
+Master rereads it and applies its content-expression rules. References guide
+consistency but never become state authority.
