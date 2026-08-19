@@ -12,6 +12,28 @@ audience journey.
 Apply the structural shell from `deliverable-types.md`; keep structural pages
 concise.
 
+Before presenting the page sequence, choose one deck-level `Reading mode`:
+
+- `text`: reader-led; each page must stand alone with complete explanation;
+- `balanced`: claim and supporting evidence share the page;
+- `presentation`: projection-first; one dominant visual expression carries the claim.
+
+Assign every page one `Page rhythm`: `anchor` for structural pages, `dense` for
+information-heavy explanation or evidence, or `breathing` for a low-density
+impact beat. Substantive pages must use `dense` or `breathing`. Do not infer
+rhythm from the number of blocks alone; consider text volume, evidence
+complexity, reading distance, and the page's audience move.
+
+For Storyline review, show one visual design direction for each
+`Reading mode × Page rhythm` pair. Synthesize it directly from the two axes:
+the Reading mode states where complete meaning is carried; the Page rhythm
+states the page's density, pacing, and focal burden. Name both effects in one
+plain-language sentence. For example, `balanced × dense` keeps the claim and
+its evidence on the page while using compact grouping and strong hierarchy for
+complex relationships. The direction is an execution bias, not a stored
+parameter or layout prescription; do not add coordinates, fixed columns, named
+page templates, or element maps.
+
 For Storyline review:
 
 - Give each substantive page one main claim and normally three to five distinct

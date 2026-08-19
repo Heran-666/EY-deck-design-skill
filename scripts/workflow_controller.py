@@ -35,9 +35,12 @@ from workflow_pptx import (
     write_request as write_pptx_request,
 )
 from workflow_spec import (
+    FRAMEWORK_VERSION,
+    READABLE_FRAMEWORK_VERSIONS,
     READABLE_WORKFLOW_VERSIONS,
     TERMINAL_PAGE_STATES,
     WORKFLOW_VERSION,
+    is_substantive_page_type,
     normalize_page_type,
 )
 from workflow_svg import (
@@ -57,6 +60,47 @@ from workflow_svg import (
 
 SVG_RUNTIME_ENV = "EY_DECK_SVG_PYTHON"
 CONTENT_REVIEW_DISPLAY_MODE = "full-verbatim"
+
+
+def insert_field_after(section: str, anchor: str, field: str, value: str) -> str:
+    if field in line_fields(section):
+        return section
+    pattern = rf"^- {re.escape(anchor)}:\s*.*$"
+    matches = list(re.finditer(pattern, section, re.MULTILINE))
+    if len(matches) != 1:
+        raise ValueError(f"cannot insert {field}: expected one {anchor} field")
+    match = matches[0]
+    return section[: match.end()] + f"\n- {field}: {value}" + section[match.end() :]
+
+
+def migrate_framework_contract(text: str, framework_version: str) -> str:
+    if framework_version != FRAMEWORK_VERSION:
+        context = h2_section(text, "Project context")
+        updated_context = insert_field_after(
+            context,
+            "Storyline thesis",
+            "Reading mode",
+            "balanced",
+        )
+        text = text.replace(context, updated_context, 1)
+        for page in page_entries(text):
+            rhythm = (
+                "dense"
+                if is_substantive_page_type(page.fields.get("Page type", ""))
+                else "anchor"
+            )
+            updated_page = insert_field_after(
+                page.text,
+                "Narrative role",
+                "Page rhythm",
+                rhythm,
+            )
+            text = text.replace(page.text, updated_page, 1)
+
+    current = h2_section(text, "Current position")
+    updated_current = replace_field(current, "Framework version", FRAMEWORK_VERSION)
+    updated_current = replace_field(updated_current, "Workflow version", WORKFLOW_VERSION)
+    return text.replace(current, updated_current, 1)
 
 
 def update_page(text: str, slide_id: str, updates: dict[str, str]) -> str:
@@ -704,28 +748,30 @@ def main() -> int:
                 raise ValueError(f"framework not found: {framework}")
             text = framework.read_text(encoding="utf-8")
             current = h2_section(text, "Current position")
-            version = line_fields(current).get("Workflow version", "")
-            if version not in READABLE_WORKFLOW_VERSIONS:
+            current_values = line_fields(current)
+            framework_version = current_values.get("Framework version", "")
+            workflow_version = current_values.get("Workflow version", "")
+            if framework_version not in READABLE_FRAMEWORK_VERSIONS:
+                raise ValueError(
+                    "unsupported framework version for migration: "
+                    f"{framework_version or 'missing'}"
+                )
+            if workflow_version not in READABLE_WORKFLOW_VERSIONS:
                 raise ValueError(
                     "unsupported workflow version for migration: "
-                    f"{version or 'missing'}"
+                    f"{workflow_version or 'missing'}"
                 )
-            preflight_errors = validate_framework(framework, project_dir)
-            allowed_version_error = f"Workflow version must be {WORKFLOW_VERSION}"
-            blocking_errors = [
-                error for error in preflight_errors
-                if not (version != WORKFLOW_VERSION and error == allowed_version_error)
-            ]
-            if blocking_errors:
-                raise ValueError(" | ".join(blocking_errors))
-            if version != WORKFLOW_VERSION:
-                text = text.replace(
-                    current,
-                    replace_field(current, "Workflow version", WORKFLOW_VERSION),
-                    1,
-                )
+            migrated = migrate_framework_contract(text, framework_version)
+            preflight_errors = validate_framework(framework, project_dir, text=migrated)
+            if preflight_errors:
+                raise ValueError(" | ".join(preflight_errors))
+            if migrated != text:
+                text = migrated
                 atomic_write(framework, text)
-            print(f"Workflow upgraded to {WORKFLOW_VERSION}.")
+            print(
+                f"Framework upgraded to {FRAMEWORK_VERSION}; "
+                f"workflow upgraded to {WORKFLOW_VERSION}."
+            )
             print_next(project_dir, text, controller)
             return 0
         framework, text = load_context(project_dir)

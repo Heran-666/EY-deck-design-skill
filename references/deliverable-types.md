@@ -87,15 +87,18 @@ and resolve conflicting audience outcomes before drafting.
 
 ## 4. Present the Storyline for approval
 
-Briefly explain how the narrative arc serves the audience outcome, then show
-the complete page sequence from S01 Cover. Use this field order for every page:
+Briefly explain how the narrative arc serves the audience outcome, state one
+deck-level `Reading mode` (`text`, `balanced`, or `presentation`), then show the
+complete page sequence from S01 Cover. Use this field order for every page:
 
 1. `Slide ID`
 2. `Page title / purpose`
 3. `Page type`
 4. `Narrative role`
-5. `Content Summary`
-6. `Next connection`
+5. `Page rhythm`
+6. `Visual design direction (<Reading mode> × <Page rhythm>)`
+7. `Content Summary`
+8. `Next connection`
 
 For each substantive page, use normally three to
 five bullets in `Content Summary` unless a deliberate single-impact page needs
@@ -103,7 +106,9 @@ only two. Each bullet must identify a
 distinct planned block, claim, evidence group, example, boundary, implication,
 action, or takeaway and explain its contribution. Together they must establish
 the page claim and its support. Keep structural pages concise. Stay at
-Storyline level: no final copy, unsupported facts, filler, or visual direction.
+Storyline level: no final copy, unsupported facts, filler, detailed layout, or
+coordinates. The combination-derived visual design direction is required, but
+it must remain an execution bias rather than a prescribed template.
 
 Use `Next connection` only between adjacent content pages. Name the claim,
 evidence, question, conclusion, or implication that creates the next-page need;
@@ -119,6 +124,8 @@ Use this page block unless a compact table can preserve the bullet hierarchy and
 
 - Page type: <type>
 - Narrative role: <why this page exists>
+- Page rhythm: <anchor | dense | breathing>
+- Visual design direction (<reading mode> × <page rhythm>): <one sentence combining the two axis definitions>
 - Content Summary:
   - <planned content point>
   - <planned content point>

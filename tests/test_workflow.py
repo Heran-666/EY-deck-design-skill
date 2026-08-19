@@ -54,8 +54,8 @@ FRAMEWORK = """# Presentation Framework
 
 ## Current position
 
-- Framework version: 3.1
-- Workflow version: 8.0
+- Framework version: 3.2
+- Workflow version: 8.1
 - Storyline version: 1.0
 - Output filename: sample.pptx
 
@@ -67,6 +67,7 @@ FRAMEWORK = """# Presentation Framework
 - Audience outcome: Understand the decision
 - Core need: Explain the recommendation
 - Storyline thesis: One clear recommendation
+- Reading mode: balanced
 - Scope boundaries: Supplied facts only
 - Protected content: None
 
@@ -77,6 +78,7 @@ FRAMEWORK = """# Presentation Framework
 - Chapter: Opening
 - Page type: Cover
 - Narrative role: Establish the topic
+- Page rhythm: anchor
 - Content scope: Title and subtitle
 - Next connection: None
 - Status: Not started
@@ -110,6 +112,7 @@ SECOND_PAGE = """
 - Chapter: Main
 - Page type: Standard content
 - Narrative role: Explain the recommendation
+- Page rhythm: dense
 - Content scope: Recommendation detail
 - Next connection: None
 - Status: Not started
@@ -128,6 +131,7 @@ DEFERRED_FRAMEWORK = FRAMEWORK.replace(
 - Chapter: Main
 - Page type: Standard content
 - Narrative role: Explain the recommendation
+- Page rhythm: dense
 - Content scope: Recommendation detail
 - Next connection: None
 - Status: Not started
@@ -139,6 +143,7 @@ DEFERRED_FRAMEWORK = FRAMEWORK.replace(
 - Chapter: Closing
 - Page type: Ending
 - Narrative role: Close the presentation
+- Page rhythm: anchor
 - Content scope: Use the approved fixed closing page unchanged
 - Next connection: None
 - Status: Deferred template
@@ -328,21 +333,33 @@ class WorkflowTests(unittest.TestCase):
     def test_phase_one_workflow_migrates_without_changing_page_state(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             project = Path(tmp)
-            legacy = FRAMEWORK.replace("- Workflow version: 8.0", "- Workflow version: 6.0")
+            legacy = FRAMEWORK.replace("- Framework version: 3.2", "- Framework version: 3.1")
+            legacy = legacy.replace("- Workflow version: 8.1", "- Workflow version: 8.0")
+            legacy = legacy.rstrip() + "\n\n" + SECOND_PAGE.lstrip()
+            legacy = legacy.replace("- Reading mode: balanced\n", "")
+            legacy = legacy.replace("- Page rhythm: anchor\n", "")
+            legacy = legacy.replace("- Page rhythm: dense\n", "")
             (project / "framework.md").write_text(legacy, encoding="utf-8")
 
             upgraded = run(project, "upgrade-workflow")
 
             self.assertEqual(upgraded.returncode, 0, upgraded.stdout + upgraded.stderr)
             text = (project / "framework.md").read_text(encoding="utf-8")
-            self.assertIn("- Workflow version: 8.0", text)
+            self.assertIn("- Framework version: 3.2", text)
+            self.assertIn("- Workflow version: 8.1", text)
+            self.assertIn("- Reading mode: balanced", text)
+            self.assertIn("- Page rhythm: anchor", text)
+            self.assertIn("- Page rhythm: dense", text)
             self.assertIn("- Status: Not started", text)
             self.assertIn('"action": "PRESENT_PAGE_REVIEW"', upgraded.stdout)
 
     def test_phase_one_migration_does_not_mutate_an_invalid_framework(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             project = Path(tmp)
-            legacy = FRAMEWORK.replace("- Workflow version: 8.0", "- Workflow version: 6.0")
+            legacy = FRAMEWORK.replace("- Framework version: 3.2", "- Framework version: 3.1")
+            legacy = legacy.replace("- Workflow version: 8.1", "- Workflow version: 6.0")
+            legacy = legacy.replace("- Reading mode: balanced\n", "")
+            legacy = legacy.replace("- Page rhythm: anchor\n", "")
             legacy = legacy.replace("- Output filename: sample.pptx", "- Output filename: invalid.txt")
             framework = project / "framework.md"
             framework.write_text(legacy, encoding="utf-8")
@@ -356,14 +373,14 @@ class WorkflowTests(unittest.TestCase):
     def test_workflow_seven_is_readable_for_non_mutating_upgrade(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             project = Path(tmp)
-            legacy = FRAMEWORK.replace("- Workflow version: 8.0", "- Workflow version: 7.0")
+            legacy = FRAMEWORK.replace("- Workflow version: 8.1", "- Workflow version: 7.0")
             (project / "framework.md").write_text(legacy, encoding="utf-8")
 
             upgraded = run(project, "upgrade-workflow")
 
             self.assertEqual(upgraded.returncode, 0, upgraded.stdout + upgraded.stderr)
             text = (project / "framework.md").read_text(encoding="utf-8")
-            self.assertIn("- Workflow version: 8.0", text)
+            self.assertIn("- Workflow version: 8.1", text)
             self.assertIn("- Status: Not started", text)
 
     def test_bootstrap_creates_provisional_content_parent(self) -> None:
@@ -499,6 +516,48 @@ class WorkflowTests(unittest.TestCase):
             errors = validate_framework(framework, project)
             self.assertIn("S01 Next connection must be None outside adjacent content pages", errors)
 
+    def test_framework_validates_visual_execution_anchors(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project = Path(tmp)
+            framework = project / "framework.md"
+            framework.write_text(
+                FRAMEWORK.replace("- Reading mode: balanced", "- Reading mode: cinematic"),
+                encoding="utf-8",
+            )
+            self.assertIn(
+                "Reading mode must be text, balanced, or presentation",
+                validate_framework(framework, project),
+            )
+
+            framework.write_text(
+                FRAMEWORK.replace("- Page rhythm: anchor", "- Page rhythm: dense"),
+                encoding="utf-8",
+            )
+            self.assertIn(
+                "S01 structural Page rhythm must be anchor",
+                validate_framework(framework, project),
+            )
+
+            legacy = FRAMEWORK.replace("- Reading mode: balanced\n", "").replace(
+                "- Page rhythm: anchor\n",
+                "",
+            )
+            framework.write_text(legacy, encoding="utf-8")
+            errors = validate_framework(framework, project)
+            self.assertIn("Project context is missing Reading mode", errors)
+            self.assertIn("S01 is missing Page rhythm", errors)
+
+            substantive_anchor = (FRAMEWORK.rstrip() + "\n\n" + SECOND_PAGE.lstrip()).replace(
+                "- Page rhythm: dense",
+                "- Page rhythm: anchor",
+                1,
+            )
+            framework.write_text(substantive_anchor, encoding="utf-8")
+            self.assertIn(
+                "S02 substantive Page rhythm must be dense or breathing",
+                validate_framework(framework, project),
+            )
+
     def test_record_svg_requires_service_complete_acceptance(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             project = Path(tmp)
@@ -533,21 +592,21 @@ class WorkflowTests(unittest.TestCase):
             repaired = prepare_candidates(project)
             self.assertEqual(repaired["action"], "RUN_EMBEDDED_PPT_MASTER_SVG")
 
-    def test_v3_page_context_is_regenerated_without_breaking_the_flow(self) -> None:
+    def test_v4_page_context_is_regenerated_without_breaking_the_flow(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             project = Path(tmp)
             lock_content(project)
             prepare_candidates(project)
             context_path = project / "working" / "packets" / "S01" / "context.json"
             context = json.loads(context_path.read_text(encoding="utf-8"))
-            context["schema"] = "ey-deck.page-authoring-context.v3"
+            context["schema"] = "ey-deck.page-authoring-context.v4"
             context_path.write_text(json.dumps(context), encoding="utf-8")
 
             self.assertEqual(next_payload(project)["action"], "PREPARE_SVG_CANDIDATES")
             repaired = prepare_candidates(project)
             self.assertEqual(repaired["action"], "RUN_EMBEDDED_PPT_MASTER_SVG")
             regenerated = json.loads(context_path.read_text(encoding="utf-8"))
-            self.assertEqual(regenerated["schema"], "ey-deck.page-authoring-context.v4")
+            self.assertEqual(regenerated["schema"], "ey-deck.page-authoring-context.v5")
 
     def test_single_structural_revision_and_confirmation_flow(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -577,8 +636,15 @@ class WorkflowTests(unittest.TestCase):
                 self.assertEqual(request["authoring_context"]["sha256"], request_sha256(context_path))
                 context = json.loads(context_path.read_text(encoding="utf-8"))
                 shared_contexts.add(context_path)
-                self.assertEqual(context["schema"], "ey-deck.page-authoring-context.v4")
+                self.assertEqual(context["schema"], "ey-deck.page-authoring-context.v5")
                 self.assertNotIn("direction_contract", context)
+                self.assertEqual(context["communication"]["consumption_mode"], "balanced")
+                self.assertEqual(
+                    context["communication"]["objective"],
+                    "Explain the recommendation; success means Understand the decision",
+                )
+                self.assertEqual(context["page_rhythm"], "anchor")
+                self.assertNotIn("visual_design_direction", context)
                 self.assertEqual(context["composition_space"]["mode"], "full-slide")
                 self.assertIsNone(context["composition_space"]["global_content_cap"])
                 self.assertFalse(context["composition_space"]["check_fixed_atom_overlap"])
@@ -671,6 +737,33 @@ class WorkflowTests(unittest.TestCase):
             )
             self.assertNotEqual(rejected.returncode, 0)
             self.assertIn("template.design_spec must be an object", rejected.stdout)
+
+            invalid_reading_mode = json.loads(json.dumps(original_context))
+            invalid_reading_mode["communication"]["consumption_mode"] = "cinematic"
+            write_invalid_context(invalid_reading_mode, "invalid-reading-mode")
+            rejected = subprocess.run(
+                [SVG_RUNTIME, str(SERVICE), "validate-request", str(invalid_request)],
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            self.assertNotEqual(rejected.returncode, 0)
+            self.assertIn(
+                "communication.consumption_mode must be text, balanced, or presentation",
+                rejected.stdout,
+            )
+
+            invalid_structural_rhythm = json.loads(json.dumps(original_context))
+            invalid_structural_rhythm["page_rhythm"] = "dense"
+            write_invalid_context(invalid_structural_rhythm, "invalid-structural-rhythm")
+            rejected = subprocess.run(
+                [SVG_RUNTIME, str(SERVICE), "validate-request", str(invalid_request)],
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            self.assertNotEqual(rejected.returncode, 0)
+            self.assertIn("structural page_rhythm must be anchor", rejected.stdout)
 
             stale_design_spec = json.loads(json.dumps(original_context))
             stale_design_spec["template"]["design_spec"]["sha256"] = "0" * 64
@@ -1423,11 +1516,15 @@ class WorkflowTests(unittest.TestCase):
                 )
                 self.assertEqual(validated.returncode, 0, validated.stdout + validated.stderr)
             context_path = Path(requests["A"]["authoring_context"]["path"])
-            plan = json.loads(context_path.read_text())["candidate_plan"]
+            context = json.loads(context_path.read_text())
+            plan = context["candidate_plan"]
             self.assertEqual(plan["reason"], "single-svg-review")
+            self.assertEqual(context["communication"]["consumption_mode"], "balanced")
+            self.assertEqual(context["page_rhythm"], "dense")
+            self.assertNotIn("visual_design_direction", context)
             self.assertNotIn("variant_direction", requests["A"])
 
-    def test_ppt_master_design_direction_is_not_classified_upstream(self) -> None:
+    def test_ppt_master_candidate_variants_are_not_classified_upstream(self) -> None:
         source = (ROOT / "scripts" / "workflow_ppt_master.py").read_text(encoding="utf-8")
         for removed_control in (
             "VARIANT_PAIRS",
@@ -1435,6 +1532,8 @@ class WorkflowTests(unittest.TestCase):
             "adaptation_rule",
             "variant_direction",
             "alternative_contract",
+            "VISUAL_DESIGN_DIRECTIONS",
+            "visual_design_direction",
         ):
             self.assertNotIn(removed_control, source)
         quality = design_quality_contract()
@@ -1488,6 +1587,12 @@ class WorkflowTests(unittest.TestCase):
         self.assertIn("reflow", export_contract)
         self.assertIn("text box", export_contract)
         self.assertIn("postflight", export_contract)
+        self.assertIn("content-over-capacity", contract)
+        self.assertIn("Hard rule — EY fit completion", contract)
+        executor = (ROOT / "ppt-master" / "references" / "executor-base.md").read_text(encoding="utf-8")
+        candidate_workflow = (ROOT / "references" / "svg-candidate-workflow.md").read_text(encoding="utf-8")
+        self.assertNotIn("content-over-capacity", executor)
+        self.assertNotIn("content-over-capacity", candidate_workflow)
         self.assertFalse((ROOT / "ppt-master" / "SKILL.md").exists())
         self.assertFalse((ROOT / "ppt-master" / "agents" / "openai.yaml").exists())
 
@@ -1498,7 +1603,10 @@ class WorkflowTests(unittest.TestCase):
 
         self.assertIn("normally three to\nfive bullets", routing)
         self.assertIn("normally three to five planned content blocks", storyline)
+        self.assertIn("Reading mode × Page rhythm", storyline)
+        self.assertIn("Visual design direction", routing)
         self.assertIn("preserve the three to five\ndistinct planned units", framework)
+        self.assertIn("communication.consumption_mode", framework)
         self.assertIn("Keep structural pages role-appropriate and concise", framework)
 
 

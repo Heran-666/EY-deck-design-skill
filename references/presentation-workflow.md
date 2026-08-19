@@ -12,19 +12,22 @@ skill directory. Resolve the controller from the skill root and run:
 python3 <controller> bootstrap --project-dir <absolute-project-directory>
 ```
 
-`bootstrap` validates framework 3.1 / workflow 8.0 and prints the next action;
+`bootstrap` validates framework 3.2 / workflow 8.1 and prints the next action;
 it does not generate candidates or infer approval.
 
-For a readable pre-8.0 project, run:
+For a readable earlier project, run:
 
 ```bash
 python3 <controller> upgrade-workflow --project-dir <absolute-project-directory>
 ```
 
-`upgrade-workflow` changes only `Workflow version` to 8.0, validates the
-framework, and prints the next action. It leaves content, page states, SVGs,
-decisions, and receipts unchanged. Existing structural pages keep their current
-lifecycle; template deferral is the default only for new frameworks.
+`upgrade-workflow` migrates the framework to 3.2 / workflow 8.1, validates the
+result before writing, and prints the next action. For framework 3.1, it adds
+`Reading mode: balanced`, structural `Page rhythm: anchor`, and substantive
+`Page rhythm: dense` only when those fields are absent. It leaves content,
+page states, SVGs, decisions, and receipts unchanged. Existing structural pages
+keep their current lifecycle; template deferral is the default only for new
+frameworks.
 
 ## Content recovery
 

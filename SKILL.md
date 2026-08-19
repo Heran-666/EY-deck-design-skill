@@ -46,7 +46,8 @@ Unless the user requests custom design, keep Cover, Agenda, Section divider,
 and Ending in their ordered positions with `Deferred template` status and no
 authored copy. Preserve the bundled Ending unchanged.
 
-Create framework 3.1 / workflow 8.0 with one plain `.pptx` output filename, then
+Create framework 3.2 / workflow 8.1 with the approved deck-level Reading mode,
+each page's Page rhythm, and one plain `.pptx` output filename, then
 run:
 
 ```bash

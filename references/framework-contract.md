@@ -3,10 +3,10 @@
 ## Boundary
 
 Create `framework.md` only after the complete Storyline is explicitly approved.
-It stores compact project context, page order, narrative intent, durable page
-state, decisions, and unresolved items. Exclude approved copy or data, design
-and layout choices, visual style, SVG/PPTX details, receipts, and PPT Master
-internal state.
+It stores compact project context, page order, narrative intent, the approved
+reading-mode and page-rhythm execution anchors, durable page state, decisions,
+and unresolved items. Exclude approved copy or data, detailed design and layout
+choices, visual style, SVG/PPTX details, receipts, and PPT Master internal state.
 
 Before approval, use optional `working/intake-summary.md`. After approval, move
 only durable information into `framework.md`.
@@ -18,8 +18,8 @@ only durable information into `framework.md`.
 
 ## Current position
 
-- Framework version: 3.1
-- Workflow version: 8.0
+- Framework version: 3.2
+- Workflow version: 8.1
 - Storyline version: 1.0
 - Output filename: <plain filename ending in .pptx>
 
@@ -31,6 +31,7 @@ only durable information into `framework.md`.
 - Audience outcome: <what the audience should understand, believe, decide, or do>
 - Core need: <need>
 - Storyline thesis: <thesis or organizing idea>
+- Reading mode: <text | balanced | presentation>
 - Scope boundaries: <boundaries or None>
 - Protected content: <scope or None>
 
@@ -41,6 +42,7 @@ only durable information into `framework.md`.
 - Chapter: <chapter>
 - Page type: <type>
 - Narrative role: <why this page exists>
+- Page rhythm: <anchor | dense | breathing>
 - Content scope: <compact semicolon-separated summary of the approved planned content units, not final copy>
 - Next connection: <connection or None>
 - Status: <allowed state>
@@ -57,6 +59,13 @@ distinct planned units from the approved `Content Summary` in `Content scope`.
 Compress them with semicolons, but retain the main claim and its approved
 explanation, evidence, example, boundary, implication, or action. Do not reduce
 the scope to a topic label or write final on-slide copy. Keep structural pages role-appropriate and concise.
+
+Persist the Storyline-approved `Reading mode` and each page's `Page rhythm`.
+Use `anchor` only for structural pages; use `dense` or `breathing` for
+substantive pages. The visual design direction shown during Storyline review is
+derived from this pair and is not stored as a second prose decision. During an
+explicit legacy upgrade, use `balanced`; use `anchor` for structural pages and
+`dense` for substantive pages.
 
 Apply the structural shell from `deliverable-types.md`. Give Cover, Agenda,
 Section divider, and Ending their normal Page type and `Deferred template`
@@ -112,9 +121,10 @@ items` to 500 characters each; limit `Content scope` to 700. Use a substantive
 
 For content review, controller `next` emits project context, the active
 Storyline entry, and compact adjacent context. For SVG generation, it writes
-one hash-bound authoring context containing the single-SVG plan, complete
-approved content, substantive-page logic, project/page context, and one
-self-contained prototype. It binds A and later feedback-driven Rn requests to
-that context. After re-entry or compaction, PPT Master rereads the immutable
-context and applies its content-expression rules. Confirmed pages and adjacent
-Storyline context may guide consistency but never become state authority.
+one hash-bound authoring context containing the single-SVG plan,
+`communication.consumption_mode`, `page_rhythm`, complete approved content,
+substantive-page logic, project/page context, and one self-contained prototype.
+It binds A and later feedback-driven Rn requests to that context. After re-entry
+or compaction, PPT Master rereads the immutable context and applies its
+content-expression rules. Confirmed pages and adjacent Storyline context may
+guide consistency but never become state authority.

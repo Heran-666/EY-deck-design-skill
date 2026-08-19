@@ -17,7 +17,7 @@ from svg_finalize.flatten_tspan import text_carrier_integrity_errors
 
 REQUEST_SCHEMA = "ppt-master.page-svg-request.v3"
 LEGACY_REQUEST_SCHEMA = "ppt-master.page-svg-request.v2"
-PAGE_CONTEXT_SCHEMA = "ey-deck.page-authoring-context.v4"
+PAGE_CONTEXT_SCHEMA = "ey-deck.page-authoring-context.v5"
 RESULT_SCHEMA = "ppt-master.page-svg-result.v1"
 VERSION_RE = re.compile(r"(?:A|B|R[1-9]\d*)")
 DESIGN_QUALITY_PROFILE = "ey-executive-editorial-v3"
@@ -58,6 +58,8 @@ PAGE_LOGIC_KEYS = {
     "relationship_constraints",
     "argument_priority",
 }
+READING_MODES = {"text", "balanced", "presentation"}
+PAGE_RHYTHMS = {"anchor", "dense", "breathing"}
 BLOCKING_TEXT_WARNING_MARKERS = (
     "paragraph-like line run(s) split across sibling <text> elements",
     "multi-line <text> with leading direct text that cannot be normalized into one PPT text frame",
@@ -170,6 +172,28 @@ def page_logic_errors(request: dict) -> list[str]:
     return errors
 
 
+def execution_anchor_errors(request: dict) -> list[str]:
+    errors: list[str] = []
+    communication = request.get("communication")
+    if not isinstance(communication, dict):
+        return ["communication must be an object"]
+    mode = communication.get("consumption_mode")
+    if mode not in READING_MODES:
+        errors.append("communication.consumption_mode must be text, balanced, or presentation")
+    if not _nonempty_text(communication.get("objective")):
+        errors.append("communication.objective must be non-empty")
+    if not _nonempty_text(communication.get("core_message")):
+        errors.append("communication.core_message must be non-empty")
+    rhythm = request.get("page_rhythm")
+    if rhythm not in PAGE_RHYTHMS:
+        errors.append("page_rhythm must be anchor, dense, or breathing")
+    elif _normalized_page_type(request) in STRUCTURAL_PAGE_TYPES and rhythm != "anchor":
+        errors.append("structural page_rhythm must be anchor")
+    elif _normalized_page_type(request) not in STRUCTURAL_PAGE_TYPES and rhythm == "anchor":
+        errors.append("substantive page_rhythm must be dense or breathing")
+    return errors
+
+
 def request_errors(request: dict) -> list[str]:
     errors: list[str] = []
     if request.get("schema") not in {REQUEST_SCHEMA, LEGACY_REQUEST_SCHEMA}:
@@ -249,6 +273,7 @@ def request_errors(request: dict) -> list[str]:
         errors.append("mode must be independent or revision")
     errors.extend(design_contract_errors(context))
     if request.get("schema") != LEGACY_REQUEST_SCHEMA:
+        errors.extend(execution_anchor_errors(context))
         errors.extend(page_logic_errors(context))
     return errors
 

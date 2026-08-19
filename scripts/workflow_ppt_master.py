@@ -12,7 +12,7 @@ from framework_lib import PageEntry, h2_section, line_fields, page_entries
 from workflow_content import content_section, page_logic
 from workflow_io import atomic_write, read_json, sha256, text_sha256, write_json
 from workflow_paths import ProjectPaths
-from workflow_spec import normalize_page_type
+from workflow_spec import normalize_page_type, page_rhythm, reading_mode
 
 
 SKILL_ROOT = Path(__file__).resolve().parents[1]
@@ -21,7 +21,7 @@ TEMPLATE_ROOT = SKILL_ROOT / "assets" / "templates" / "ey-gradient-dark-v1"
 TEMPLATE_DESIGN_SPEC = TEMPLATE_ROOT / "templates" / "design_spec.md"
 SERVICE_CONTRACT = PPT_MASTER_ROOT / "workflows" / "page-svg-service.md"
 SERVICE_CLI = PPT_MASTER_ROOT / "scripts" / "page_svg_service.py"
-PAGE_CONTEXT_SCHEMA = "ey-deck.page-authoring-context.v4"
+PAGE_CONTEXT_SCHEMA = "ey-deck.page-authoring-context.v5"
 REQUEST_SCHEMA = "ppt-master.page-svg-request.v3"
 IMAGE_MIME_TYPES = {
     ".gif": "image/gif",
@@ -31,7 +31,6 @@ IMAGE_MIME_TYPES = {
     ".svg": "image/svg+xml",
     ".webp": "image/webp",
 }
-
 
 def design_quality_contract() -> dict[str, object]:
     """Return the mandatory quality floor for every first-visible candidate."""
@@ -178,6 +177,11 @@ def page_context_payload(
         paths.template_prototype(page.slide_id),
     )
     context = line_fields(h2_section(framework_text, "Project context"))
+    resolved_reading_mode = reading_mode(context.get("Reading mode", ""))
+    resolved_page_rhythm = page_rhythm(
+        page.fields.get("Page rhythm", ""),
+        page.fields.get("Page type", ""),
+    )
     plan = candidate_plan(page, section.rstrip(), context)
     pages = page_entries(framework_text)
     page_index = next(index for index, item in enumerate(pages) if item.slide_id == page.slide_id)
@@ -218,8 +222,14 @@ def page_context_payload(
         "project_context": {
             "deliverable": context.get("Deliverable name", ""),
             "audience": context.get("Audience", ""),
-            "audience_outcome": context.get("Audience outcome", ""),
-            "storyline_thesis": context.get("Storyline thesis", ""),
+        },
+        "communication": {
+            "consumption_mode": resolved_reading_mode,
+            "objective": (
+                f"{context.get('Core need', '')}; success means "
+                f"{context.get('Audience outcome', '')}"
+            ),
+            "core_message": context.get("Storyline thesis", ""),
         },
         "page_context": {
             "page_type": page.fields.get("Page type", ""),
@@ -227,6 +237,7 @@ def page_context_payload(
             "next_connection": page.fields.get("Next connection", ""),
             "adjacent_pages": adjacent_pages,
         },
+        "page_rhythm": resolved_page_rhythm,
         "page_logic": page_logic(section),
         "candidate_plan": plan,
         "design_quality": design_quality_contract(),

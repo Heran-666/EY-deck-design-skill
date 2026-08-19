@@ -10,6 +10,8 @@ from pathlib import Path
 from framework_lib import duplicate_line_fields, h2_section, line_fields, page_entries
 from workflow_spec import (
     FRAMEWORK_VERSION,
+    PAGE_RHYTHMS,
+    READING_MODES,
     READABLE_PAGE_STATES,
     WORKFLOW_VERSION,
     is_deferred_template_page_type,
@@ -31,6 +33,7 @@ CONTEXT_FIELDS = (
     "Audience outcome",
     "Core need",
     "Storyline thesis",
+    "Reading mode",
     "Scope boundaries",
     "Protected content",
 )
@@ -38,6 +41,7 @@ PAGE_FIELDS = (
     "Chapter",
     "Page type",
     "Narrative role",
+    "Page rhythm",
     "Content scope",
     "Next connection",
     "Status",
@@ -70,10 +74,16 @@ def _valid_filename(value: str) -> bool:
     )
 
 
-def validate(framework: Path, project_dir: Path | None = None) -> list[str]:
-    if not framework.is_file():
-        return [f"framework not found: {framework}"]
-    text = framework.read_text(encoding="utf-8")
+def validate(
+    framework: Path,
+    project_dir: Path | None = None,
+    *,
+    text: str | None = None,
+) -> list[str]:
+    if text is None:
+        if not framework.is_file():
+            return [f"framework not found: {framework}"]
+        text = framework.read_text(encoding="utf-8")
     errors: list[str] = []
     if not text.startswith("# Presentation Framework\n"):
         errors.append("framework.md must begin with # Presentation Framework")
@@ -101,6 +111,9 @@ def validate(framework: Path, project_dir: Path | None = None) -> list[str]:
         errors.append("Output filename must be one plain filename ending in .pptx")
 
     context_values = line_fields(context)
+    configured_reading_mode = context_values.get("Reading mode")
+    if configured_reading_mode and configured_reading_mode.strip().lower() not in READING_MODES:
+        errors.append("Reading mode must be text, balanced, or presentation")
     deliverable_type = context_values.get("Deliverable type", "")
     if not re.fullmatch(r"(?:Proposal|Sharing deck|Training|Interpretation|Other:\s*\S(?:.*\S)?)", deliverable_type):
         errors.append("Deliverable type must be Proposal, Sharing deck, Training, Interpretation, or Other: <specific form>")
@@ -147,6 +160,14 @@ def validate(framework: Path, project_dir: Path | None = None) -> list[str]:
             errors.append(f"{page.slide_id} has unsupported Status: {status}")
         page_type = page.fields.get("Page type", "").strip().lower()
         normalized_page_type = normalize_page_type(page_type)
+        configured_page_rhythm = page.fields.get("Page rhythm", "")
+        normalized_page_rhythm = configured_page_rhythm.strip().lower()
+        if normalized_page_rhythm and normalized_page_rhythm not in PAGE_RHYTHMS:
+            errors.append(f"{page.slide_id} Page rhythm must be anchor, dense, or breathing")
+        elif is_substantive_page_type(page_type) and normalized_page_rhythm == "anchor":
+            errors.append(f"{page.slide_id} substantive Page rhythm must be dense or breathing")
+        elif not is_substantive_page_type(page_type) and normalized_page_rhythm not in {"", "anchor"}:
+            errors.append(f"{page.slide_id} structural Page rhythm must be anchor")
         if (
             normalized_page_type in {"ending", "closing", "closing page"}
             and status not in {"Deferred template", "SVG confirmed"}

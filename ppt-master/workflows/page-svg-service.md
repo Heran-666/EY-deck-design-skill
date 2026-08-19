@@ -8,7 +8,7 @@ description: Composable page-level single-SVG review service used by a parent wo
 
 This EY-only internal service accepts a validated
 `ppt-master.page-svg-request.v3` with `caller: ey-deck-design` and a
-hash-bound `ey-deck.page-authoring-context.v4`. Read request v2 only to recover
+hash-bound `ey-deck.page-authoring-context.v5`. Read request v2 only to recover
 an active legacy cycle.
 
 EY owns content, order, candidate naming, user choice, and publication. PPT
@@ -21,7 +21,8 @@ change EY state, export PPTX, or question the user here.
 1. Run the embedded-root attribution guard.
 2. Load workspace dependencies; set command-scoped `EY_DECK_SVG_PYTHON` to the
    returned Python executable; run the request's `validate_request` command.
-3. Read the bound authoring context, including `page_logic`, `design_quality`,
+3. Read the bound authoring context, including `communication.consumption_mode`,
+   `page_rhythm`, `page_logic`, `design_quality`,
    `candidate_plan`, approved content, project/page context, and
    `template.design_spec.path`. Then read `references/strategist.md`,
    `references/strategist-template.md`, `references/executor-base.md`, and
@@ -33,7 +34,10 @@ change EY state, export PPTX, or question the user here.
 
 ## Full design loop
 
-1. **Strategist / information design** — for substantive pages, preserve the
+1. **Strategist / information design** — apply
+   `communication.consumption_mode` and `page_rhythm` together before choosing
+   the information model, using Executor's reading-mode check and per-page
+   layout-rhythm discipline. For substantive pages, preserve the
    approved objective, audience move, argument chain, relationship constraints,
    and argument priority in `page_logic`. Follow `executor-base.md`'s `content
    vs expression` rule for wording and text texture. Determine the communication
@@ -75,6 +79,23 @@ revised SVG for the next review round.
 
 - Follow `executor-base.md`'s `content vs expression` hard rule. Concise
   connective copy that introduces no new claim is an expression choice.
+- **Hard rule — EY fit completion**: For a substantive page in this service, if
+  information-equivalent content cannot fit after changing expression, reflow,
+  geometry, and composition, delete non-essential material in
+  `page_logic.argument_priority` order. Remove repeated explanation, redundant
+  examples, optional context, low-priority elaboration, and connective copy
+  first. Omit secondary evidence only when the remaining evidence still
+  supports the claim. Preserve literal requirements and anything whose omission
+  changes the conclusion, accuracy, decision boundary, or audience move. Do not
+  return `content-over-capacity` for upstream content repair; complete the
+  strongest faithful page that fits. This service-local rule replaces only the
+  generic capacity return for EY substantive pages; it does not relax literal
+  requirements or any mirror/preservation path.
+- This service has no project-root `design_spec.md` or `spec_lock.md`.
+  `communication.consumption_mode` and `page_rhythm` are its authoritative
+  execution anchors. While operating in this service, do not trigger Executor's
+  missing-lock recovery merely because those project-root artifacts do not
+  exist.
 - Require structured `page_logic` for substantive pages and omit it for Cover,
   Agenda, Section divider, Ending, and protected placeholder pages. Treat it as
   semantic authority, not layout direction or visible copy.
