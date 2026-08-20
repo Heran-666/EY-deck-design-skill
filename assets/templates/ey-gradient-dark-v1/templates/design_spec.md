@@ -34,7 +34,7 @@ identity and structure below.
 | EY yellow | `#FFE600` | Identity accent and decisive emphasis |
 | Black | `#000000` | Main background and maximum contrast |
 | White | `#FFFFFF` | Primary dark-page text and negative space |
-| Neutral gray | `#A6A6A6` | Secondary copy, dividers, metadata |
+| Neutral gray | `#D9D9D9` | Secondary copy, dividers, metadata |
 | Pale yellow | `#FFF4B3` | Restrained supporting emphasis |
 | Balancing blue | `#188CE5` (`rgb(24, 140, 229)`) | Balance the dominant EY yellow; express comparison or contrast relationships |
 
