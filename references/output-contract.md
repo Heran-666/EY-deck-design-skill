@@ -3,8 +3,10 @@
 ## File boundary
 
 Replace `working/provisional-content.md` with exactly the controller-listed
-active pages; never append. After approval, the controller promotes those
-sections unchanged to canonical `content.md`. Store project memory in
+active pages; never append. Include the compact build-profile header for the
+first approved page only; later provisional pages reuse the canonical header.
+After approval, the controller promotes those sections unchanged to canonical
+`content.md`. Store project memory in
 `framework.md` and workflow evidence in receipts. Keep analysis and design
 alternatives out of both files.
 
@@ -12,7 +14,7 @@ Use stable slide IDs (`S01`) and content IDs (`S03-B1`). Use decimal children
 only under a meaningful parent with at least two children, and normally stop at
 three levels. IDs express semantic hierarchy, never layout.
 
-Begin provisional and canonical files with:
+Begin the first provisional file and the canonical file with:
 
 ```markdown
 # Presentation Build Specification

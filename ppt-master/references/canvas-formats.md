@@ -63,7 +63,7 @@ not infer alternate canvas classes or values. All values are unitless SVG px.
 | Canvas | Reading mode | Advisory body band | Initial body |
 |---|---|---:|---:|
 | `ppt169` / `ppt43` | `text` | 18–21 | 20 |
-| `ppt169` / `ppt43` | `balanced` | 22–25 | 24 |
+| `ppt169` / `ppt43` | `balanced` | 18–21 | 20 |
 | `ppt169` / `ppt43` | `presentation` | 28–32 | 32 |
 
 **Non-PPT registered and custom canvases**: derive one effective canvas span

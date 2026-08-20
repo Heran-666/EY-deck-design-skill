@@ -133,6 +133,18 @@ def validate(
     cover_ids = [page.slide_id for page, page_type in zip(pages, page_types) if page_type == "cover"]
     if len(cover_ids) != 1:
         errors.append("Confirmed Storyline must contain exactly one Cover: " + (", ".join(cover_ids) or "None"))
+    ending_ids = [
+        page.slide_id
+        for page, page_type in zip(pages, page_types)
+        if page_type in {"ending", "closing", "closing page"}
+    ]
+    if len(ending_ids) != 1:
+        errors.append(
+            "Confirmed Storyline must contain exactly one Ending: "
+            + (", ".join(ending_ids) or "None")
+        )
+    elif ending_ids[0] != pages[-1].slide_id:
+        errors.append("Ending must be the final page")
     agenda_ids = [page.slide_id for page, page_type in zip(pages, page_types) if page_type == "agenda"]
     if len(agenda_ids) > 1:
         errors.append("Confirmed Storyline may contain at most one Agenda: " + ", ".join(agenda_ids))

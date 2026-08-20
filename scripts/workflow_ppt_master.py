@@ -68,12 +68,60 @@ def template_path(page: PageEntry) -> Path:
     return path
 
 
-def materialize_template(prototype: Path, destination: Path) -> Path:
+def deferred_template_text(
+    framework_text: str,
+    page: PageEntry,
+) -> dict[str, str]:
+    """Return exact text for editable deferred-template slots."""
+    if normalize_page_type(page.fields.get("Page type", "")) != "cover":
+        return {}
+    context = line_fields(h2_section(framework_text, "Project context"))
+    return {
+        "cover-project-type": context.get("Deliverable type", "").strip(),
+        "cover-title": page.title.strip(),
+        "cover-subtitle": page.fields.get("Content scope", "").strip(),
+    }
+
+
+def _bind_template_text(root: ET.Element, bindings: dict[str, str]) -> None:
+    elements_by_id = {
+        element.attrib["id"]: element
+        for element in root.iter()
+        if element.attrib.get("id")
+    }
+    for element_id, value in bindings.items():
+        if not value:
+            raise ValueError(f"deferred template text is empty: {element_id}")
+        container = elements_by_id.get(element_id)
+        if container is None:
+            raise ValueError(f"deferred template text slot not found: {element_id}")
+        carrier = next(
+            (
+                element
+                for element in container.iter()
+                if element.tag.rsplit("}", 1)[-1] == "text"
+            ),
+            None,
+        )
+        if carrier is None:
+            raise ValueError(f"deferred template text carrier not found: {element_id}")
+        for child in list(carrier):
+            carrier.remove(child)
+        carrier.text = value
+
+
+def materialize_template(
+    prototype: Path,
+    destination: Path,
+    *,
+    text_bindings: dict[str, str] | None = None,
+) -> Path:
     """Write a request-local template whose image resources are embedded."""
     try:
         root = ET.parse(prototype).getroot()
     except (OSError, ET.ParseError) as exc:
         raise ValueError(f"invalid EY template prototype: {prototype}: {exc}") from exc
+    _bind_template_text(root, text_bindings or {})
     template_root = TEMPLATE_ROOT.resolve()
     href_keys = ("href", "{http://www.w3.org/1999/xlink}href")
     for element in root.iter():

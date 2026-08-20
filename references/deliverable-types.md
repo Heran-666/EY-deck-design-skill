@@ -53,6 +53,7 @@ the objective changes.
 Apply this shared structural shell before the selected type policy:
 
 - place exactly one `Cover` at S01 for every deliverable type;
+- place exactly one `Ending` as the final page;
 - when there are at least six substantive pages, place one `Agenda` at S02 and
   at least one `Section divider` before the relevant major chapter;
 - allow Agenda or divider pages in shorter decks when they materially improve

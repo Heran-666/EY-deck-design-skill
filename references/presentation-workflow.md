@@ -31,7 +31,7 @@ frameworks.
 
 ## Content recovery
 
-- Missing or invalid provisional content returns to `PRESENT_PAGE_REVIEW`.
+- Missing or invalid provisional content returns to `AUTHOR_PAGE_CONTENT`.
 - Editing provisional content invalidates its review binding; present it
   again before approval.
 - For any change to approved meaning, wording, data, sources, page order, or

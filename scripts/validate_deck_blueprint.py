@@ -429,13 +429,12 @@ def validate_collection(
     return errors
 
 
-def validate(
-    content_path: Path,
+def validate_text(
+    content: str,
     only_page: str | None = None,
     *,
     expected_page_type: str = "",
 ) -> list[str]:
-    content = content_path.read_text(encoding="utf-8")
     errors = validate_header(content)
 
     slides = SLIDE_RE.findall(content)
@@ -468,6 +467,19 @@ def validate(
 
     errors.extend(_emphasis_errors(content))
     return errors
+
+
+def validate(
+    content_path: Path,
+    only_page: str | None = None,
+    *,
+    expected_page_type: str = "",
+) -> list[str]:
+    return validate_text(
+        content_path.read_text(encoding="utf-8"),
+        only_page,
+        expected_page_type=expected_page_type,
+    )
 
 
 def main() -> int:

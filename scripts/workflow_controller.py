@@ -284,6 +284,9 @@ def decision_directive(
         "slide_id": slide_id,
         "displayed_versions": versions,
         "decision_rules": "Confirm the displayed SVG, or write one concrete optimization request for that SVG.",
+        "required_environment": {
+            SVG_RUNTIME_ENV: "Absolute Python executable returned by load_workspace_dependencies",
+        },
         "commands": {
             "confirm": command_line(controller, "confirm-svg", paths.root, "--page", slide_id, "--version", "<DISPLAYED_VERSION>"),
             "revise": command_line(
@@ -419,7 +422,7 @@ def directive_payload(project_dir: Path, text: str, controller: Path) -> dict[st
                 },
             }
         return {
-            "action": "PRESENT_PAGE_REVIEW",
+            "action": "AUTHOR_PAGE_CONTENT",
             "slide_id": page.slide_id,
             "provisional_content": {"path": str(paths.provisional), "expected_pages": [page.slide_id]},
             "review_context": review_context(text, page),
@@ -460,7 +463,12 @@ def handle_present_review(project_dir: Path, text: str, controller: Path) -> int
     if page is None or page.fields.get("Status") not in {"Not started", "Content reviewing"}:
         raise ValueError("no page is waiting for content review")
     paths = ProjectPaths(project_dir)
-    errors = provisional_content_errors(paths.provisional, [page])
+    canonical_content = (
+        paths.content.read_text(encoding="utf-8")
+        if paths.content.is_file()
+        else ""
+    )
+    errors = provisional_content_errors(paths.provisional, [page], canonical_content)
     if errors:
         raise ValueError(" | ".join(errors))
     write_json(
@@ -622,9 +630,14 @@ def handle_request_revision(project_dir: Path, text: str, page_id: str, base: st
     feedback = feedback.strip()
     if not feedback:
         raise ValueError("revision feedback must be non-empty")
+    _svg_runtime_python()
     version = next_revision(paths, page_id)
-    write_packet(paths, page, version, base_version=base, feedback=feedback)
-    print_next(project_dir, text, controller)
+    packet = write_packet(paths, page, version, base_version=base, feedback=feedback)
+    try:
+        print_next(project_dir, text, controller)
+    except Exception:
+        packet.unlink(missing_ok=True)
+        raise
     return 0
 
 

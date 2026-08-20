@@ -17,7 +17,11 @@ from xml.etree import ElementTree as ET
 from framework_lib import h2_section, line_fields, page_entries
 from workflow_io import now, read_json, sha256, write_json
 from workflow_paths import ProjectPaths
-from workflow_ppt_master import materialize_template, template_path
+from workflow_ppt_master import (
+    deferred_template_text,
+    materialize_template,
+    template_path,
+)
 from workflow_svg import confirmation_valid
 
 
@@ -83,6 +87,7 @@ def _slide_roster(paths: ProjectPaths, text: str) -> list[dict[str, str]]:
             svg_path = paths.pptx_template(page.slide_id).resolve()
             if not svg_path.is_file():
                 raise ValueError(f"deferred template snapshot is missing for {page.slide_id}")
+            text_bindings = deferred_template_text(text, page)
             roster.append(
                 {
                     "slide_id": page.slide_id,
@@ -90,6 +95,14 @@ def _slide_roster(paths: ProjectPaths, text: str) -> list[dict[str, str]]:
                     "page_type": page.fields.get("Page type", ""),
                     "path": str(svg_path),
                     "sha256": sha256(svg_path),
+                    "binding_sha256": hashlib.sha256(
+                        json.dumps(
+                            text_bindings,
+                            ensure_ascii=False,
+                            sort_keys=True,
+                            separators=(",", ":"),
+                        ).encode("utf-8")
+                    ).hexdigest(),
                 }
             )
             continue
@@ -114,7 +127,51 @@ def _slide_roster(paths: ProjectPaths, text: str) -> list[dict[str, str]]:
 def _materialize_deferred_templates(paths: ProjectPaths, text: str) -> None:
     for page in page_entries(text):
         if page.fields.get("Status") == "Deferred template":
-            materialize_template(template_path(page), paths.pptx_template(page.slide_id))
+            materialize_template(
+                template_path(page),
+                paths.pptx_template(page.slide_id),
+                text_bindings=deferred_template_text(text, page),
+            )
+
+
+def _atomic_copy(source: Path, destination: Path) -> None:
+    """Replace one evidence file without exposing a partial write."""
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.NamedTemporaryFile(dir=destination.parent, delete=False) as handle:
+        temporary = Path(handle.name)
+    try:
+        shutil.copy2(source, temporary)
+        temporary.replace(destination)
+    finally:
+        temporary.unlink(missing_ok=True)
+
+
+def _validate_current_postflight(
+    postflight: dict,
+    quality: dict,
+    output_path: Path,
+    slide_count: int,
+) -> None:
+    """Reject a postflight report that does not describe this export run."""
+    output = postflight.get("output")
+    source = postflight.get("source")
+    report_fingerprint = (
+        source.get("fingerprint", {}).get("digest")
+        if isinstance(source, dict)
+        else None
+    )
+    quality_fingerprint = quality.get("source_fingerprint", {}).get("digest")
+    if (
+        not isinstance(output, dict)
+        or Path(str(output.get("path", ""))).resolve() != output_path.resolve()
+    ):
+        raise ValueError("PPTX postflight output path does not match this export")
+    if output.get("bytes") != output_path.stat().st_size:
+        raise ValueError("PPTX postflight output size does not match this export")
+    if not isinstance(source, dict) or source.get("svg_slide_count") != slide_count:
+        raise ValueError("PPTX postflight slide count does not match this export")
+    if not report_fingerprint or report_fingerprint != quality_fingerprint:
+        raise ValueError("PPTX postflight source fingerprint does not match this export")
 
 
 def request_payload(paths: ProjectPaths, text: str) -> dict[str, object]:
@@ -577,14 +634,20 @@ def _export_from_request_impl(paths: ProjectPaths, text: str) -> Path:
             "PPT Master editable PPTX export",
         )
         _annotate_trace_sources(trace_path, slides, projections)
-        paths.svg_quality_report.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(staged_quality, paths.svg_quality_report)
         staged_postflight = (
             staging_root / "validation" / f"{output_path.stem}.report.json"
         )
-        if not postflight_path.is_file() and staged_postflight.is_file():
-            postflight_path.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(staged_postflight, postflight_path)
+        if not staged_postflight.is_file():
+            raise ValueError("PPT Master did not produce a postflight report")
+        staged_postflight_payload = read_json(staged_postflight)
+        _validate_current_postflight(
+            staged_postflight_payload,
+            quality,
+            output_path,
+            len(slides),
+        )
+        _atomic_copy(staged_quality, paths.svg_quality_report)
+        _atomic_copy(staged_postflight, postflight_path)
 
     postflight = read_json(postflight_path)
     if postflight.get("status") not in {"passed", "passed-with-warnings"}:

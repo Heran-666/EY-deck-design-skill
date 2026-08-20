@@ -33,6 +33,8 @@ from svg_finalize.flatten_tspan import (  # noqa: E402
 )
 from validate_deck_blueprint import _emphasis_errors, validate_page_logic  # noqa: E402
 from validate_framework import validate as validate_framework  # noqa: E402
+from framework_lib import page_entries  # noqa: E402
+from workflow_content import provisional_content_errors  # noqa: E402
 from workflow_io import sha256 as request_sha256  # noqa: E402
 from workflow_ppt_master import (  # noqa: E402
     DESIGN_QUALITY_PROFILE,
@@ -54,7 +56,7 @@ SERVICE = ROOT / "ppt-master" / "scripts" / "page_svg_service.py"
 SVG_RUNTIME = os.environ.get("EY_DECK_SVG_PYTHON", sys.executable)
 
 
-FRAMEWORK = """# Presentation Framework
+FRAMEWORK_WITHOUT_ENDING = """# Presentation Framework
 
 ## Current position
 
@@ -125,24 +127,9 @@ SECOND_PAGE = """
 """
 
 
-DEFERRED_FRAMEWORK = FRAMEWORK.replace(
-    "- Status: Not started",
-    "- Status: Deferred template",
-    1,
-) + """
-### S02｜Content page
-
-- Chapter: Main
-- Page type: Standard content
-- Narrative role: Explain the recommendation
-- Page rhythm: dense
-- Content scope: Recommendation detail
-- Next connection: None
-- Status: Not started
-- Confirmed decisions: None
-- Open items: None
-
-### S03｜Closing
+def ending_page(slide_id: str) -> str:
+    return f"""
+### {slide_id}｜Closing
 
 - Chapter: Closing
 - Page type: Ending
@@ -154,6 +141,26 @@ DEFERRED_FRAMEWORK = FRAMEWORK.replace(
 - Confirmed decisions: None
 - Open items: None
 """
+
+
+FRAMEWORK = FRAMEWORK_WITHOUT_ENDING.rstrip() + "\n\n" + ending_page("S02").lstrip()
+
+
+def framework_with_second_page(second_page: str = SECOND_PAGE) -> str:
+    return (
+        FRAMEWORK_WITHOUT_ENDING.rstrip()
+        + "\n\n"
+        + second_page.lstrip()
+        + "\n"
+        + ending_page("S03").lstrip()
+    )
+
+
+DEFERRED_FRAMEWORK = framework_with_second_page().replace(
+    "- Status: Not started",
+    "- Status: Deferred template",
+    1,
+).replace("### S02｜Second page", "### S02｜Content page")
 
 
 CONTENT_S02 = """# Presentation Build Specification
@@ -342,9 +349,10 @@ class WorkflowTests(unittest.TestCase):
     def test_phase_one_workflow_migrates_without_changing_page_state(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             project = Path(tmp)
-            legacy = FRAMEWORK.replace("- Framework version: 3.2", "- Framework version: 3.1")
+            legacy = framework_with_second_page().replace(
+                "- Framework version: 3.2", "- Framework version: 3.1"
+            )
             legacy = legacy.replace("- Workflow version: 8.1", "- Workflow version: 8.0")
-            legacy = legacy.rstrip() + "\n\n" + SECOND_PAGE.lstrip()
             legacy = legacy.replace("- Reading mode: balanced\n", "")
             legacy = legacy.replace("- Page rhythm: anchor\n", "")
             legacy = legacy.replace("- Page rhythm: dense\n", "")
@@ -360,7 +368,7 @@ class WorkflowTests(unittest.TestCase):
             self.assertIn("- Page rhythm: anchor", text)
             self.assertIn("- Page rhythm: dense", text)
             self.assertIn("- Status: Not started", text)
-            self.assertIn('"action": "PRESENT_PAGE_REVIEW"', upgraded.stdout)
+            self.assertIn('"action": "AUTHOR_PAGE_CONTENT"', upgraded.stdout)
 
     def test_phase_one_migration_does_not_mutate_an_invalid_framework(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -413,7 +421,7 @@ class WorkflowTests(unittest.TestCase):
 
             first = next_payload(project)
 
-            self.assertEqual(first["action"], "PRESENT_PAGE_REVIEW")
+            self.assertEqual(first["action"], "AUTHOR_PAGE_CONTENT")
             self.assertEqual(first["slide_id"], "S02")
             self.assertFalse((project / "svg_working" / "S01").exists())
             self.assertFalse((project / "svg_working" / "S03").exists())
@@ -429,6 +437,28 @@ class WorkflowTests(unittest.TestCase):
             errors = validate_framework(framework, project)
 
             self.assertTrue(any("Deferred template status requires" in item for item in errors))
+
+    def test_framework_requires_one_final_ending(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project = Path(tmp)
+            framework = project / "framework.md"
+            framework.write_text(FRAMEWORK_WITHOUT_ENDING, encoding="utf-8")
+
+            errors = validate_framework(framework, project)
+
+            self.assertIn("Confirmed Storyline must contain exactly one Ending: None", errors)
+
+            content_after_ending = SECOND_PAGE.replace("S02", "S03")
+            framework.write_text(
+                FRAMEWORK_WITHOUT_ENDING.rstrip()
+                + "\n\n"
+                + ending_page("S02").lstrip()
+                + "\n"
+                + content_after_ending.lstrip(),
+                encoding="utf-8",
+            )
+
+            self.assertIn("Ending must be the final page", validate_framework(framework, project))
 
     def test_fixed_ending_cannot_be_reopened_for_content_or_svg(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -484,6 +514,62 @@ class WorkflowTests(unittest.TestCase):
             self.assertIn("- Status: Content locked", (project / "framework.md").read_text())
             self.assertFalse((project / "svg_working" / "S01").exists())
 
+    def test_svg_runtime_is_required_before_revision_allocation(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project = Path(tmp)
+            lock_content(project)
+            prepare_candidates(project)
+            complete_candidate(project, "A", "Option A")
+            self.assertEqual(
+                run(project, "present-svg", "--page", "S01", "--versions", "A").returncode,
+                0,
+            )
+            env = dict(os.environ)
+            env.pop("EY_DECK_SVG_PYTHON", None)
+
+            revised = subprocess.run(
+                [
+                    sys.executable,
+                    str(CONTROLLER),
+                    "request-svg-revision",
+                    "--page",
+                    "S01",
+                    "--base",
+                    "A",
+                    "--feedback",
+                    "Increase contrast.",
+                    "--project-dir",
+                    str(project),
+                ],
+                text=True,
+                capture_output=True,
+                check=False,
+                env=env,
+            )
+
+            self.assertNotEqual(revised.returncode, 0)
+            self.assertIn("EY_DECK_SVG_PYTHON", revised.stdout)
+            self.assertFalse((project / "working" / "packets" / "S01" / "R1.json").exists())
+
+    def test_later_provisional_content_reuses_canonical_header(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            project = Path(tmp)
+            provisional = project / "working" / "provisional-content.md"
+            provisional.parent.mkdir(parents=True)
+            provisional.write_text(
+                CONTENT_S02[CONTENT_S02.index("## S02"):],
+                encoding="utf-8",
+            )
+            page = page_entries(framework_with_second_page())[1]
+
+            errors = provisional_content_errors(
+                provisional,
+                [page],
+                CONTENT,
+            )
+
+            self.assertEqual(errors, [])
+
     def test_framework_enforces_navigation_shell_and_connections(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             project = Path(tmp)
@@ -505,7 +591,10 @@ class WorkflowTests(unittest.TestCase):
 """
                 )
             framework = project / "framework.md"
-            framework.write_text(FRAMEWORK + "".join(pages), encoding="utf-8")
+            framework.write_text(
+                FRAMEWORK_WITHOUT_ENDING + "".join(pages) + ending_page("S08"),
+                encoding="utf-8",
+            )
 
             errors = validate_framework(framework, project)
 
@@ -555,7 +644,7 @@ class WorkflowTests(unittest.TestCase):
             self.assertIn("Project context is missing Reading mode", errors)
             self.assertIn("S01 is missing Page rhythm", errors)
 
-            substantive_anchor = (FRAMEWORK.rstrip() + "\n\n" + SECOND_PAGE.lstrip()).replace(
+            substantive_anchor = framework_with_second_page().replace(
                 "- Page rhythm: dense",
                 "- Page rhythm: anchor",
                 1,
@@ -1156,6 +1245,42 @@ class WorkflowTests(unittest.TestCase):
                 self.assertTrue(hrefs)
                 self.assertTrue(all(href.startswith("data:image/") for href in hrefs))
                 self.assertFalse((project / "svg_working" / slide_id).exists())
+            cover_root = ET.parse(
+                project / "working" / "packets" / "pptx" / "templates" / "S01.svg"
+            ).getroot()
+            cover_text = {}
+            for element in cover_root.iter():
+                element_id = element.attrib.get("id")
+                if element_id in {"cover-project-type", "cover-title", "cover-subtitle"}:
+                    carrier = next(
+                        child
+                        for child in element.iter()
+                        if child.tag.rsplit("}", 1)[-1] == "text"
+                    )
+                    cover_text[element_id] = carrier.text
+            self.assertEqual(
+                cover_text,
+                {
+                    "cover-project-type": "Sharing deck",
+                    "cover-title": "Sample title",
+                    "cover-subtitle": "Title and subtitle",
+                },
+            )
+            self.assertFalse((project / "svg_output" / "S01.svg").exists())
+            framework_path = project / "framework.md"
+            framework_path.write_text(
+                framework_path.read_text(encoding="utf-8").replace(
+                    "### S01｜Sample title",
+                    "### S01｜Updated title",
+                ),
+                encoding="utf-8",
+            )
+            self.assertFalse(
+                pptx_request_valid(
+                    ProjectPaths(project),
+                    framework_path.read_text(encoding="utf-8"),
+                )
+            )
 
     def test_embedded_ppt_master_exports_editable_text_with_frame_parity(self) -> None:
         runtime = os.environ.get("EY_DECK_PPTX_PYTHON")
@@ -1244,6 +1369,12 @@ class WorkflowTests(unittest.TestCase):
                 run(project, "confirm-svg", "--page", "S02", "--version", "A").returncode,
                 0,
             )
+            stale_postflight = project / "validation" / "sample.report.json"
+            stale_postflight.parent.mkdir(parents=True, exist_ok=True)
+            stale_postflight.write_text(
+                json.dumps({"status": "passed", "stale": True}),
+                encoding="utf-8",
+            )
             exported = run(project, "export-pptx")
 
             self.assertEqual(exported.returncode, 0, exported.stdout + exported.stderr)
@@ -1283,6 +1414,9 @@ class WorkflowTests(unittest.TestCase):
                     f"fixed Ending pixels changed: size={exported_ending.size}, mean={ending_diff.mean}",
                 )
             self.assertEqual(len(slide_xml), 3)
+            current_postflight = json.loads(stale_postflight.read_text(encoding="utf-8"))
+            self.assertNotIn("stale", current_postflight)
+            self.assertEqual(current_postflight["source"]["svg_slide_count"], 3)
             audit = json.loads(
                 (project / "working" / "receipts" / "pptx" / "text-frames.json").read_text()
             )
@@ -1385,7 +1519,9 @@ class WorkflowTests(unittest.TestCase):
     def test_later_page_content_does_not_stale_a_confirmed_page(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             project = Path(tmp)
-            (project / "framework.md").write_text(FRAMEWORK.rstrip() + "\n\n" + SECOND_PAGE.lstrip(), encoding="utf-8")
+            (project / "framework.md").write_text(
+                framework_with_second_page(), encoding="utf-8"
+            )
             provisional = project / "working" / "provisional-content.md"
             provisional.parent.mkdir(parents=True)
             provisional.write_text(CONTENT, encoding="utf-8")
@@ -1451,7 +1587,7 @@ class WorkflowTests(unittest.TestCase):
                 "- Confirmed decisions: Provide two design options",
             )
             (project / "framework.md").write_text(
-                FRAMEWORK.rstrip() + "\n\n" + second_page.lstrip(),
+                framework_with_second_page(second_page),
                 encoding="utf-8",
             )
             provisional = project / "working" / "provisional-content.md"

@@ -45,7 +45,9 @@ Confirm the type separately only when it is ambiguous; otherwise include it in
 the Storyline approval. Follow the router and selected type policy.
 Unless the user requests custom design, keep Cover, Agenda, Section divider,
 and Ending in their ordered positions with `Deferred template` status and no
-authored copy. Preserve the bundled Ending unchanged.
+authored copy. Always place exactly one Ending last and preserve it unchanged.
+At export, the deferred Cover fills its template label, title, and subtitle
+from the approved framework; it never enters an SVG candidate cycle.
 
 Create framework 3.2 / workflow 8.1 with the approved deck-level Reading mode,
 each page's Page rhythm, and one plain `.pptx` output filename, then
@@ -66,13 +68,14 @@ the controller requests migration from workflow 6.0.
 ## Content gate
 
 Do not create `content.md` sections for `Deferred template` pages. At
-`PRESENT_PAGE_REVIEW`, replace `working/provisional-content.md` with exactly the
-active page. Include build-only Page logic, preferred wording, complete facts
-and data, emphasis intent, and sources; exclude visual or layout direction.
-Structural pages omit Page logic. Run `present-review`, reproduce the complete
-marked review, and show the full page—including Page logic—without summaries or
-file-link substitutions. Run `approve-content` only after explicit semantic
-approval.
+`AUTHOR_PAGE_CONTENT`, replace `working/provisional-content.md` with exactly the
+active page. Include the build-profile header only for the first approved page;
+later pages reuse the canonical header. Include build-only Page logic, preferred
+wording, complete facts and data, emphasis intent, and sources; exclude visual
+or layout direction. Structural pages omit Page logic. Run `present-review`,
+reproduce the complete marked review, and show the full page—including Page
+logic—without summaries or file-link substitutions. Run `approve-content` only
+after explicit semantic approval.
 
 Never invent client or EY facts, sources, credentials, cases, people, capacity,
 fees, schedules, tools, approvals, learning, or business outcomes.

@@ -69,8 +69,10 @@ explicit legacy upgrade, use `balanced`; use `anchor` for structural pages and
 
 Apply the structural shell from `deliverable-types.md`. Give Cover, Agenda,
 Section divider, and Ending their normal Page type and `Deferred template`
-status by default. Preserve their Slide IDs and positions without final copy;
-the user fills editable template fields after export. Keep Ending unchanged.
+status by default. Place exactly one Ending last and keep it unchanged. A
+deferred Cover uses the project `Deliverable type` as its template label, its
+Storyline heading as title, and `Content scope` as subtitle. The controller
+fills those fields during export without creating an SVG candidate cycle.
 Use `reopen-content` only when the user requests custom design for an editable
 structural page.
 

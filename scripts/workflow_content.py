@@ -7,7 +7,7 @@ import re
 from pathlib import Path
 
 from framework_lib import PageEntry, page_entries
-from validate_deck_blueprint import validate as validate_blueprint
+from validate_deck_blueprint import validate_text as validate_blueprint_text
 
 
 PAGE_LOGIC_FIELDS = {
@@ -55,7 +55,11 @@ def page_logic(section: str) -> dict[str, str] | None:
     }
 
 
-def provisional_content_errors(path: Path, expected_pages: list[PageEntry]) -> list[str]:
+def provisional_content_errors(
+    path: Path,
+    expected_pages: list[PageEntry],
+    canonical_content: str = "",
+) -> list[str]:
     if not path.is_file():
         return [f"provisional content not found: {path}"]
     text = path.read_text(encoding="utf-8")
@@ -70,10 +74,12 @@ def provisional_content_errors(path: Path, expected_pages: list[PageEntry]) -> l
             + (",".join(actual_ids) or "None")
             + "; replace the entire file instead of appending"
         )
+    validation_text = text
+    if canonical_content.strip() and re.match(r"\A\s*## S\d{2}(?:｜[^\n]*)?", text):
+        validation_text = content_header(canonical_content) + text.lstrip()
     for page in expected_pages:
-        section = content_section(text, page.slide_id)
-        for error in validate_blueprint(
-            path,
+        for error in validate_blueprint_text(
+            validation_text,
             page.slide_id,
             expected_page_type=page.fields.get("Page type", ""),
         ):

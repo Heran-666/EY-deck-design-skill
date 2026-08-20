@@ -67,8 +67,7 @@ evidence. Keep internal design decisions inside PPT Master.
 
 ## Initial SVG and revisions
 
-Build one complete A solution and do not invent B or another initial option. EY
-supplies no separate wording policy, candidate design role, or layout.
+Build one complete A solution. EY supplies no separate wording policy, candidate design role, or layout.
 
 For Rn, bind the one displayed base and non-empty user feedback. Preserve the
 base except for requested changes and necessary reflow. Repeat the same quality
