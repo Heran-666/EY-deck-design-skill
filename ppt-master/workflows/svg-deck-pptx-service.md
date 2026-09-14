@@ -14,6 +14,9 @@ postflight, and conversion trace production.
 
 1. Read only the request's ordered, hash-bound mixed slide roster. Accept
    confirmed authored SVGs and export-time structural template snapshots.
+   Require inline icon geometry and embedded, recursively closed picture data.
+   Reject unresolved resources upstream before staging; never inline materials
+   or acquire external files during export.
 2. Run the lockless final SVG quality gate in Quick Generate mode.
 3. Reject high-confidence fragmented-paragraph warnings. Do not repair a
    source during export; return upstream to reopen an authored page or repair a

@@ -35,7 +35,8 @@ change EY state, export PPTX, or question the user here.
    or uncertain bindings instead of reloading every reference for each page.
 4. For A, follow Full design loop; for Rn, follow Initial SVG and revisions.
    Write only `artifact_path`.
-5. After the applicable source review and bounded repair/validation gate passes,
+5. Apply Resource inlining before the applicable source review. After the
+   bounded repair/validation gate passes,
    run `record` once. It
    binds the exact request and artifact accepted by final `complete` validation.
 
@@ -70,6 +71,57 @@ Do not author these markers or activate native Chart/Table replacement at export
 charts/tables continue through their visible editable shape/text representation.
 The supporting compiler may remain bundled as a converter dependency.
 
+## Resource inlining
+
+This EY-local rule replaces shared Executor's project-pool-only lookup and
+missing-resource return for material preparation. It does not activate the
+generic project's resource workflow. Select suitable icons from the bundled
+`templates/icons/` library or an exact user-provided icon root, and use exact
+existing picture files supplied for the current request. Preserve mandatory
+assets and approved meaning; optional assets may yield to another expression.
+Do not search/download remote pictures, generate new assets, invent evidence,
+copy resource pools, or introduce another user gate here.
+
+**EY icon expression** — the shared icon README's single stylistic-library
+selection rule does not bind this service. Choose by semantic fit; cross-library
+selection is allowed. Maintain coherence through contour language, fill/outline
+treatment, stroke weight, palette, and visual weight rather than library
+membership. Preserve authentic brand identity and use brand marks only for the
+brands they identify. The external-asset generation restriction above does not
+prohibit hand-authoring original icon geometry directly in the current page SVG;
+it follows the same supported-SVG, approved-meaning, and template contracts.
+
+Before reviewing a draft that contains material references, run:
+
+```bash
+<bundled-python> <embedded-root>/scripts/page_svg_service.py inline-resources <absolute-request-path>
+```
+
+Use the same executable, script root, and request as `validate_request`.
+The default icon root is the bundled library. For an exact existing custom
+library root, pass `--icons-dir <absolute-icon-root>`; identifiers remain
+`library/name`. Picture hrefs may identify exact local files by absolute path or
+relative to the candidate, only during drafting.
+
+The helper expands icon and static same-document `<use>` instances, then embeds
+picture bytes as data URIs without compression, cropping, or resampling. It
+changes only the requested draft, atomically, and leaves it unchanged on failure.
+The controller-issued `candidate_receipt_path` must be present and not yet
+recorded; recorded versions are rejected even if already closed. Already closed
+unrecorded drafts need no rewrite. It never authors composition or changes
+fixed template atoms; do not use it on an ordinary recorded/confirmed version.
+Legacy requests without that field remain readable but cannot run this helper;
+inline their unrecorded draft through ordinary page edits, or use a new
+controller-issued Rn for a recorded version. Never invent a receipt path.
+
+At review and COMPLETE, icons are ordinary inline SVG geometry and pictures are
+embedded data, including recursively closed SVG pictures. No `<use>` or external
+material reference remains. Supported local paint/clip/filter references stay
+legal. Resource inlining is not a visual or technical completion gate: perform
+the existing source review and final `record` on the resulting exact draft.
+If existing confirmed resources need closure, author the requested Rn and
+reconfirm; export never performs this transformation.
+
 ## Full design loop
 
 1. **Strategist / information design** — apply
@@ -89,7 +141,9 @@ The supporting compiler may remain bundled as a converter dependency.
    use the full 1280×720 canvas.
 4. **Specialist choice** — use chart, table, qualitative structure, imagery,
    icons, typography, semantic SVG, and effects when they improve
-   communication. Keep one coherent icon language and omit decorative icons.
+   communication. Icons may serve recognition, navigation, grouping, visual
+   rhythm, or emphasis; avoid icon clutter with no communication purpose.
+   Apply the EY icon expression rule above.
 5. **Executor** — hand-author a complete editable SVG as an internal draft.
 6. **Art-direction refinement** — assess hierarchy, rhythm, optical balance,
    connectors, emphasis, and chosen treatments against the

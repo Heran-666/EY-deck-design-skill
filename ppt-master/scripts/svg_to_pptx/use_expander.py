@@ -203,8 +203,9 @@ def _symbol_viewport_transform(symbol: ET.Element, use_elem: ET.Element) -> str:
 class _LocalUseExpander:
     """Materialize static same-document SVG use references."""
 
-    def __init__(self, root: ET.Element):
+    def __init__(self, root: ET.Element, *, include_definitions: bool = False):
         self.root = root
+        self.include_definitions = include_definitions
         self.targets: dict[str, ET.Element] = {}
         self.duplicate_ids: set[str] = set()
         self.used_ids: set[str] = set()
@@ -228,7 +229,7 @@ class _LocalUseExpander:
 
     def _expand_children(self, parent: ET.Element, stack: tuple[str, ...]) -> None:
         for index, child in enumerate(list(parent)):
-            if _local_tag(child) == 'defs':
+            if _local_tag(child) == 'defs' and not self.include_definitions:
                 continue
             if (
                 _local_tag(child) == 'use'
@@ -450,9 +451,9 @@ class _LocalUseExpander:
         return wrapper
 
 
-def expand_local_use_references(root: ET.Element) -> int:
-    """Expand static same-document ``<use href="#id">`` references."""
-    return _LocalUseExpander(root).expand()
+def expand_local_use_references(root: ET.Element, *, include_definitions: bool = False) -> int:
+    """Expand local uses; EY may include definitions for a use-free candidate."""
+    return _LocalUseExpander(root, include_definitions=include_definitions).expand()
 
 
 def validate_local_use_references(root: ET.Element) -> list[str]:
@@ -488,6 +489,8 @@ def _build_replacement_g(
     use_elem: ET.Element,
     icons_dir: Path,
     embed_icons_mod,
+    *,
+    full_viewbox: bool = False,
 ) -> ET.Element:
     """Resolve a single ``<use data-icon="...">`` into an expanded ``<g>``.
 
@@ -513,7 +516,7 @@ def _build_replacement_g(
 
     color = attrs.get('fill', '#000000')
     elements, style, base_size = embed_icons_mod.extract_paths_from_icon(
-        icon_path, color,
+        icon_path, color, full_viewbox=full_viewbox,
     )
     if not elements:
         raise UseExpansionError(
@@ -544,6 +547,8 @@ def _build_replacement_g(
 def expand_use_data_icons(
     root: ET.Element,
     icons_dir: Path,
+    *,
+    full_viewbox: bool = False,
 ) -> int:
     """Replace every ``<use data-icon="...">`` in *root* with its expansion.
 
@@ -552,6 +557,7 @@ def expand_use_data_icons(
     swaps it into the parent element at the same position.
 
     Returns the number of placeholders successfully expanded.
+    EY opts into full_viewbox to retain custom icon dimensions and origin.
     """
     embed_icons_mod = _import_embed_icons()
 
@@ -576,7 +582,7 @@ def expand_use_data_icons(
         parent = parent_of.get(use_elem)
         if parent is None:
             continue
-        replacement = _build_replacement_g(use_elem, icons_dir, embed_icons_mod)
+        replacement = _build_replacement_g(use_elem, icons_dir, embed_icons_mod, full_viewbox=full_viewbox)
         idx = list(parent).index(use_elem)
         parent.remove(use_elem)
         parent.insert(idx, replacement)

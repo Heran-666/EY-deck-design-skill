@@ -30,6 +30,14 @@ Follow the bound `service_contract`. Preserve approved meaning and page logic;
 PPT Master may optimize expression. Use consistency references for coherence,
 not composition copying. Keep build-only fields invisible.
 
+Use one candidate representation: inline icon geometry and embedded picture
+data. Follow the service's pre-review resource inlining; never present or confirm
+an unresolved material reference. Gradients, clips, and other supported
+same-document paint references remain legal. Complete/record and controller
+validation enforce closure; export checks it without repairing confirmed SVGs.
+For an older confirmed page with external resources, request a new SVG revision,
+inline its resources, and reconfirm it; do not rewrite the prior version.
+
 Before presentation, complete information design, composition, art-direction
 refinement, and direct source-SVG review. Consolidate identified repairs and
 verify once; after passing, repeat only for new changes, failed checks, or a

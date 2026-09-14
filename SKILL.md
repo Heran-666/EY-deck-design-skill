@@ -108,6 +108,10 @@ Read the request and hash-bound `authoring_context`, then execute the bound
 `service_contract` once, including its request validation and final `record`.
 Preserve approved meaning and `page_logic`; write only `artifact_path`.
 
+Before source review and `record`, resolve material references under the service
+contract: icons become inline geometry and pictures become embedded data. A
+candidate must not depend on external material files at review or export.
+
 Present the emitted SVG at review scale. Follow `decision_policy.mode`: wait for
 confirmation when `manual`; when `delegated`, review and confirm within the
 recorded scope without another user wait. Publish only that exact version.

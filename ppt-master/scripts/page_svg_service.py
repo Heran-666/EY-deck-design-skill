@@ -13,6 +13,7 @@ from pathlib import Path
 
 from svg_quality_checker import SVGQualityChecker
 from svg_finalize.flatten_tspan import text_carrier_integrity_errors
+from ey_svg_resources import inline_resources, resource_errors
 
 
 REQUEST_SCHEMA = "ppt-master.page-svg-request.v4"
@@ -265,6 +266,7 @@ def artifact_errors(path: Path) -> list[str]:
         href = element.attrib.get("href") or element.attrib.get("{http://www.w3.org/1999/xlink}href")
         if href and re.match(r"(?i)^(?:https?:)?//", href):
             errors.append(f"artifact contains remote URL: {href}")
+    errors.extend(resource_errors(root, path.read_bytes()))
     errors.extend(
         f"artifact violates PPTX text-frame integrity: {message}"
         for message in text_carrier_integrity_errors(root)
@@ -285,8 +287,9 @@ def artifact_errors(path: Path) -> list[str]:
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("command", choices=("validate-request", "complete"))
+    parser.add_argument("command", choices=("validate-request", "inline-resources", "complete"))
     parser.add_argument("request", type=Path)
+    parser.add_argument("--icons-dir", type=Path, default=Path(__file__).resolve().parents[1] / "templates" / "icons")
     args = parser.parse_args()
     try:
         request = load_request(args.request.resolve())
@@ -297,6 +300,15 @@ def main() -> int:
             print(json.dumps({"status": "VALID", "schema": REQUEST_SCHEMA}, ensure_ascii=False))
             return 0
         artifact = Path(request["artifact_path"])
+        if args.command == "inline-resources":
+            receipt = Path(str(request.get("candidate_receipt_path", "")))
+            if not receipt.is_absolute():
+                raise ValueError("Resource inlining needs a controller-issued candidate_receipt_path")
+            if receipt.exists():
+                raise ValueError("Resource inlining cannot modify a recorded version; request a new Rn")
+            counts = inline_resources(artifact, args.icons_dir.resolve())
+            print(json.dumps({"status": "RESOURCES_INLINED", "counts": counts}, ensure_ascii=False))
+            return 0
         errors = artifact_errors(artifact)
         if errors:
             raise ValueError(" | ".join(errors))
@@ -315,7 +327,7 @@ def main() -> int:
             )
         )
         return 0
-    except ValueError as exc:
+    except (ValueError, OSError, ET.ParseError) as exc:
         print(json.dumps({"schema": RESULT_SCHEMA, "status": "BLOCKED", "reason": str(exc)}, ensure_ascii=False))
         return 1
 

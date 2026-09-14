@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import re
 import shutil
+import sys
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
@@ -12,6 +13,11 @@ from workflow_content import content_section
 from workflow_io import now, read_json, sha256, text_sha256, write_json
 from workflow_paths import ProjectPaths
 from workflow_spec import is_substantive_page_type
+
+PPT_MASTER_SCRIPTS = Path(__file__).resolve().parents[1] / "ppt-master" / "scripts"
+if str(PPT_MASTER_SCRIPTS) not in sys.path:
+    sys.path.insert(0, str(PPT_MASTER_SCRIPTS))
+from ey_svg_resources import resource_errors  # noqa: E402
 
 
 INITIAL_VERSIONS = ("A",)
@@ -61,6 +67,7 @@ def svg_errors(path: Path) -> list[str]:
         href = element.attrib.get("href") or element.attrib.get("{http://www.w3.org/1999/xlink}href")
         if href and re.match(r"(?i)^(?:https?:)?//", href):
             errors.append(f"candidate contains external URL: {href}")
+    errors.extend(resource_errors(root, path.read_bytes()))
     return list(dict.fromkeys(errors))
 
 

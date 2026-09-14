@@ -304,6 +304,7 @@ def request_payload(
         "version": version,
         "mode": "revision" if base_version else "independent",
         "artifact_path": str(paths.candidate(page.slide_id, version).resolve()),
+        "candidate_receipt_path": str(paths.candidate_receipt(page.slide_id, version).resolve()),
         "authoring_context": {
             "path": str(context_path.resolve()),
             "sha256": sha256(context_path),

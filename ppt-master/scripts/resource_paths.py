@@ -130,7 +130,7 @@ def _decode_svg_data_uri(raw: str) -> tuple[bytes | None, str | None]:
     return decoded, None
 
 
-def _svg_reference_error(raw: str, depth: int) -> str | None:
+def _svg_reference_error(raw: str, depth: int, allow_use: bool = True) -> str | None:
     """Return an external or recursively embedded SVG resource error."""
     value = raw.strip().strip('\'"')
     if not value:
@@ -147,13 +147,13 @@ def _svg_reference_error(raw: str, depth: int) -> str | None:
         return None
     if depth >= _SVG_DATA_URI_DEPTH_LIMIT:
         return 'embedded SVG resource nesting exceeds the safety limit'
-    nested_error = _svg_image_payload_error(nested_svg, depth + 1)
+    nested_error = _svg_image_payload_error(nested_svg, depth + 1, allow_use)
     if nested_error is None:
         return None
     return f'embedded SVG resource is not closed: {nested_error}'
 
 
-def _xml_stylesheet_error(raw_bytes: bytes, depth: int) -> str | None:
+def _xml_stylesheet_error(raw_bytes: bytes, depth: int, allow_use: bool = True) -> str | None:
     """Return an external XML stylesheet processing-instruction error."""
     parser = ET.XMLPullParser(events=('pi',))
     try:
@@ -168,13 +168,13 @@ def _xml_stylesheet_error(raw_bytes: bytes, depth: int) -> str | None:
         match = _XML_STYLESHEET_HREF_RE.search(text)
         if match is None:
             return 'XML stylesheet processing instruction lacks href'
-        reference_error = _svg_reference_error(match.group(2), depth)
+        reference_error = _svg_reference_error(match.group(2), depth, allow_use)
         if reference_error is not None:
             return f'XML stylesheet is not closed: {reference_error}'
     return None
 
 
-def _svg_image_payload_error(raw_bytes: bytes, depth: int) -> str | None:
+def _svg_image_payload_error(raw_bytes: bytes, depth: int, allow_use: bool = True) -> str | None:
     """Return why one SVG image payload is not a closed packaged resource."""
     if _SVG_EXTERNAL_DOCTYPE_RE.search(raw_bytes):
         return 'unpackaged external XML doctype'
@@ -185,23 +185,25 @@ def _svg_image_payload_error(raw_bytes: bytes, depth: int) -> str | None:
     if root.tag != f'{{{_SVG_NAMESPACE}}}svg':
         return 'root must use the SVG namespace'
 
-    stylesheet_error = _xml_stylesheet_error(raw_bytes, depth)
+    stylesheet_error = _xml_stylesheet_error(raw_bytes, depth, allow_use)
     if stylesheet_error is not None:
         return stylesheet_error
     for elem in root.iter():
         tag = str(elem.tag).rsplit('}', 1)[-1]
+        if tag == 'use' and not allow_use:
+            return 'resource <use> must be expanded to geometry before review'
         for raw_name, raw_value in elem.attrib.items():
             name = raw_name.rsplit('}', 1)[-1]
             if name == 'href' and tag != 'a':
-                reference_error = _svg_reference_error(raw_value, depth)
+                reference_error = _svg_reference_error(raw_value, depth, allow_use)
                 if reference_error is not None:
                     return reference_error
             elif name in _SVG_DIRECT_RESOURCE_ATTRIBUTES:
-                reference_error = _svg_reference_error(raw_value, depth)
+                reference_error = _svg_reference_error(raw_value, depth, allow_use)
                 if reference_error is not None:
                     return reference_error
             elif name == 'data' and tag == 'object':
-                reference_error = _svg_reference_error(raw_value, depth)
+                reference_error = _svg_reference_error(raw_value, depth, allow_use)
                 if reference_error is not None:
                     return reference_error
             elif name == 'srcset' and raw_value.strip():
@@ -210,7 +212,7 @@ def _svg_image_payload_error(raw_bytes: bytes, depth: int) -> str | None:
             if name not in _SVG_CSS_URL_ATTRIBUTES:
                 continue
             for match in _SVG_URL_REFERENCE_RE.finditer(raw_value):
-                reference_error = _svg_reference_error(match.group(1), depth)
+                reference_error = _svg_reference_error(match.group(1), depth, allow_use)
                 if reference_error is not None:
                     return f'url() resource is not closed: {reference_error}'
 
@@ -220,15 +222,15 @@ def _svg_image_payload_error(raw_bytes: bytes, depth: int) -> str | None:
         if re.search(r'@import\b', style_text, flags=re.IGNORECASE):
             return 'unpackaged CSS import'
         for match in _SVG_URL_REFERENCE_RE.finditer(style_text):
-            reference_error = _svg_reference_error(match.group(1), depth)
+            reference_error = _svg_reference_error(match.group(1), depth, allow_use)
             if reference_error is not None:
                 return f'url() resource is not closed: {reference_error}'
     return None
 
 
-def svg_image_payload_error(raw_bytes: bytes) -> str | None:
-    """Return why a nested SVG image is not a closed packaged resource."""
-    return _svg_image_payload_error(raw_bytes, 0)
+def svg_image_payload_error(raw_bytes: bytes, *, allow_use: bool = True) -> str | None:
+    """Check resource closure; EY may additionally require fully inline geometry."""
+    return _svg_image_payload_error(raw_bytes, 0, allow_use)
 
 
 def svg_data_uri_payload_error(raw: str) -> str | None:

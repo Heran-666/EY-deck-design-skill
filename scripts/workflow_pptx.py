@@ -31,6 +31,7 @@ PPT_MASTER_SCRIPTS = PPT_MASTER_ROOT / "scripts"
 if str(PPT_MASTER_SCRIPTS) not in sys.path:
     sys.path.insert(0, str(PPT_MASTER_SCRIPTS))
 from svg_finalize.flatten_tspan import text_carrier_integrity_errors  # noqa: E402
+from ey_svg_resources import resource_errors  # noqa: E402
 SERVICE_CONTRACT = PPT_MASTER_ROOT / "workflows" / "svg-deck-pptx-service.md"
 SVG_QUALITY_CHECKER = PPT_MASTER_ROOT / "scripts" / "svg_quality_checker.py"
 PPTX_EXPORTER = PPT_MASTER_ROOT / "scripts" / "svg_to_pptx.py"
@@ -286,6 +287,9 @@ def _write_flat_projection(
 ) -> dict[str, object]:
     """Write and attest a visual-equivalent flat SVG projection."""
     root = ET.parse(source).getroot()
+    errors = resource_errors(root, source.read_bytes())
+    if errors:
+        raise ValueError(f"{slide_id} has unresolved SVG resources; revise and reconfirm upstream: " + " | ".join(errors))
     text_errors = text_carrier_integrity_errors(root)
     if text_errors:
         raise TextCarrierIntegrityError(

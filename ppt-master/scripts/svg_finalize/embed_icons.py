@@ -297,6 +297,7 @@ def extract_paths_from_icon(
     target_color: str = '#000000',
     *,
     target_dir: Path | None = None,
+    full_viewbox: bool = False,
 ) -> tuple[list[str], str, BaseGeometry]:
     """
     Extract drawable elements from an icon SVG file.
@@ -304,7 +305,7 @@ def extract_paths_from_icon(
     Returns:
         (elements, style, base_size)
         style: 'fill', 'stroke', or 'preserve'
-        base_size: square icon size, or full viewBox geometry for preserve assets
+        base_size: square icon size, or full viewBox for preserve/full_viewbox
     """
     if not icon_path.exists():
         return [], 'fill', 16
@@ -325,7 +326,7 @@ def extract_paths_from_icon(
         return elements, 'preserve', geometry
 
     style = _detect_icon_style(content)
-    base_size = _get_viewbox_size(content) or 16
+    base_size = (_get_viewbox_geometry(content) if full_viewbox else None) or _get_viewbox_size(content) or 16
     elements = _extract_shape_elements(content, target_color)
     return elements, style, base_size
 
@@ -457,10 +458,10 @@ def generate_icon_group(attrs: dict[str, str | float], elements: list[str], styl
 
     elements_str = '\n    '.join(elements)
 
+    if min_x or min_y:
+        inner_transform = f'translate({_format_number(-min_x)}, {_format_number(-min_y)})'
+        elements_str = f'<g transform="{_xml_attr(inner_transform)}">\n    {elements_str}\n    </g>'
     if style == 'preserve':
-        if min_x or min_y:
-            inner_transform = f'translate({_format_number(-min_x)}, {_format_number(-min_y)})'
-            elements_str = f'<g transform="{_xml_attr(inner_transform)}">\n    {elements_str}\n    </g>'
         return f'''<!-- icon: {_xml_attr(icon_name)} -->
   <g transform="{_xml_attr(transform)}">
     {elements_str}
