@@ -40,6 +40,11 @@ of `framework.md`.
 
 ## Storyline and framework
 
+Show all Storyline and content confirmation material in chat in Chinese,
+regardless of whether the requested deck language is Chinese or English. Use
+the complete, faithful Chinese review translation defined in
+`references/storyline-and-content.md`; keep the deck's requested output language.
+
 Classify the deliverable and complete Storyline before creating `framework.md`.
 Confirm the type separately only when it is ambiguous; otherwise include it in
 the Storyline approval. Follow the router and selected type policy.
@@ -73,9 +78,11 @@ active page. Include the build-profile header only for the first approved page;
 later pages reuse the canonical header. Include build-only Page logic, preferred
 wording, complete facts and data, emphasis intent, and sources; exclude visual
 or layout direction. Structural pages omit Page logic. Run `present-review`,
-reproduce the complete marked review, and show the full page—including Page
-logic—without summaries or file-link substitutions. Run `approve-content` only
-after explicit semantic approval.
+use the complete marked review as the source, and show its full Chinese review
+translation—including Page logic—without summaries or file-link substitutions.
+Keep the provisional and canonical content in the requested deck language;
+Chinese chat review does not change `Language`. Run `approve-content` only
+after explicit semantic approval of the source represented by that translation.
 
 Never invent client or EY facts, sources, credentials, cases, people, capacity,
 fees, schedules, tools, approvals, learning, or business outcomes.

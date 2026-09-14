@@ -23,6 +23,12 @@ Begin the first provisional file and the canonical file with:
 - Language: <Chinese | English>
 ```
 
+`Language` specifies the final deck language. Write audience-facing content in
+that language, and preserve it when content is promoted. Storyline and content
+confirmation in chat use a complete Chinese review translation as defined in
+`storyline-and-content.md`; that review view does not replace the source files
+or change the build profile.
+
 Exclude template identity, visual decisions, Storyline tables, analysis
 registers, review logs, open questions, and assumptions.
 

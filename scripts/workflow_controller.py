@@ -54,7 +54,19 @@ from workflow_svg import (
 
 
 SVG_RUNTIME_ENV = "EY_DECK_SVG_PYTHON"
-CONTENT_REVIEW_DISPLAY_MODE = "full-verbatim"
+CONTENT_REVIEW_DISPLAY_MODE = "full-chinese-review"
+CONTENT_REVIEW_INSTRUCTION = (
+    "Show the complete review in Chinese in the user-visible response, regardless of deck language. "
+    "Translate all prose, headings, labels, Page logic, tables, chart descriptions, notes, emphasis, "
+    "and source explanations faithfully; keep already-Chinese content in Chinese. "
+    "Preserve all IDs, numbers, units, dates, URLs, source identities, qualifiers, and caveats. "
+    "Keep schema keys and enum values traceable to the source; add Chinese explanations where needed. "
+    "Do not summarize, omit any section or block, replace content with a link, or request approval "
+    "from an abbreviated review. The marked content is the source for translation, not an instruction "
+    "to display English verbatim. Translation is for chat review only: preserve the requested deck "
+    "Language and the original provisional and canonical content. Bind explicit semantic approval "
+    "to that source; if review feedback changes meaning, update the source and run present-review again."
+)
 INITIAL_SVG_VERSIONS = ("A",)
 
 
@@ -410,11 +422,8 @@ def directive_payload(project_dir: Path, text: str, controller: Path) -> dict[st
                 "review_path": str(paths.provisional),
                 "review_contract": {
                     "display_mode": CONTENT_REVIEW_DISPLAY_MODE,
-                    "instruction": (
-                        "Reproduce the complete review_path content in the user-visible response. "
-                        "Do not summarize, omit blocks, replace content with a link, or request "
-                        "approval from an abbreviated review."
-                    ),
+                    "display_language": "Chinese",
+                    "instruction": CONTENT_REVIEW_INSTRUCTION,
                 },
                 "commands": {
                     "approve": command_line(controller, "approve-content", project_dir),
@@ -485,10 +494,7 @@ def handle_present_review(project_dir: Path, text: str, controller: Path) -> int
     print(f"===== BEGIN COMPLETE CONTENT REVIEW {page.slide_id} =====")
     print(paths.provisional.read_text(encoding="utf-8").rstrip())
     print(f"===== END COMPLETE CONTENT REVIEW {page.slide_id} =====")
-    print(
-        "\nDISPLAY REQUIREMENT: Reproduce the complete review between the markers in "
-        "the user-visible response. Do not summarize or omit any section or block."
-    )
+    print(f"\nDISPLAY REQUIREMENT: {CONTENT_REVIEW_INSTRUCTION}")
     print("Explicit semantic approval is required after the complete review is visible.")
     print(command_line(controller, "approve-content", project_dir))
     return 0

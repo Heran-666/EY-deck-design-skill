@@ -324,12 +324,35 @@ class WorkflowTests(unittest.TestCase):
             end = "===== END COMPLETE CONTENT REVIEW S01 ====="
             review = presented.stdout.split(begin, 1)[1].split(end, 1)[0].strip()
             self.assertEqual(review, CONTENT.strip())
-            self.assertIn("Do not summarize or omit any section or block", presented.stdout)
+            self.assertIn("omit any section or block", presented.stdout)
             self.assertIn("approve-content", presented.stdout)
             payload = next_payload(project)
             self.assertEqual(payload["action"], "COLLECT_CONTENT_DECISION")
-            self.assertEqual(payload["review_contract"]["display_mode"], "full-verbatim")
+            self.assertEqual(payload["review_contract"]["display_mode"], "full-chinese-review")
+            self.assertEqual(payload["review_contract"]["display_language"], "Chinese")
             self.assertIn("Do not summarize", payload["review_contract"]["instruction"])
+
+    def test_chinese_review_preserves_requested_deck_language_and_source_content(self) -> None:
+        for language in ("English", "Chinese"):
+            with self.subTest(language=language), tempfile.TemporaryDirectory() as tmp:
+                project = Path(tmp)
+                content = CONTENT.replace("Language: English", f"Language: {language}")
+                (project / "framework.md").write_text(FRAMEWORK, encoding="utf-8")
+                provisional = project / "working" / "provisional-content.md"
+                provisional.parent.mkdir(parents=True)
+                provisional.write_text(content, encoding="utf-8")
+
+                presented = run(project, "present-review")
+                self.assertEqual(presented.returncode, 0, presented.stdout + presented.stderr)
+                contract = next_payload(project)["review_contract"]
+                self.assertEqual(contract["display_language"], "Chinese")
+                self.assertIn(contract["instruction"], presented.stdout)
+                self.assertIn("Translate", contract["instruction"])
+                self.assertEqual(provisional.read_text(encoding="utf-8"), content)
+
+                approved = run(project, "approve-content")
+                self.assertEqual(approved.returncode, 0, approved.stdout + approved.stderr)
+                self.assertEqual((project / "content.md").read_text(encoding="utf-8"), content)
 
     def test_missing_pillow_is_dependency_failure_not_invalid_raster(self) -> None:
         original_import = __import__
