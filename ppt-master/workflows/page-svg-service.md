@@ -19,19 +19,56 @@ change EY state, export PPTX, or question the user here.
 ## Entry
 
 1. Run the embedded-root attribution guard.
-2. Load workspace dependencies; set command-scoped `EY_DECK_SVG_PYTHON` to the
-   returned Python executable; run the request's `validate_request` command.
+2. Reuse the current session's valid bundled Python path, or load workspace
+   dependencies if unknown or unavailable. Set command-scoped
+   `EY_DECK_SVG_PYTHON` to that executable and run the request's `validate_request`.
 3. Read the bound authoring context, including `communication.consumption_mode`,
    `page_rhythm`, `page_logic`, `design_quality_profile`, approved content,
-   project/page context, and
-   `template.design_spec.path`. Then read `references/strategist.md`,
-   `references/strategist-template.md`, `references/executor-base.md`, and
-   `references/executor-structured.md`; load specialist references only when
-   useful.
-4. Run the full design loop and write only `artifact_path`.
-5. Complete information design, composition, art-direction refinement,
-   full-slide source review, repair, and recheck; then run `record` once. It
+   project/page context, the bound `template.design_spec.path`, and exact
+   prototype. Load the applicable core construction rules in
+   `references/executor-base.md` and template rules in
+   `references/executor-structured.md`. Use relevant sections of
+   `references/plan-core.md` or `references/strategist-template.md` only for an
+   unresolved page-level design choice; `references/strategist.md` is not an
+   entry requirement. Load specialist references only for objects being drawn.
+   Reuse unchanged reference sections already in valid context; reread changed
+   or uncertain bindings instead of reloading every reference for each page.
+4. For A, follow Full design loop; for Rn, follow Initial SVG and revisions.
+   Write only `artifact_path`.
+5. After the applicable source review and bounded repair/validation gate passes,
+   run `record` once. It
    binds the exact request and artifact accepted by final `complete` validation.
+
+## Upstream 6.4 integration boundary
+
+The shared references are design/construction authorities inside this service.
+Generic Default/Quick routing, confirmation stages, three-direction planning,
+whole-deck roster sweeps, project initialization, preview launch, spec/lock
+creation, notes, motion, narration, and export commands never execute here.
+Evaluate capability triggers over the current request only; load an unforeseen
+module before drawing the affected object.
+
+Use these bindings wherever a shared reference expects a plan or lock:
+
+| Generic reference input | EY service authority |
+|---|---|
+| Page brief / §IX semantic content | `approved_content` and `page_logic` |
+| Core message / Audience move / Relationships | `page_logic`'s approved claim, audience move, argument chain, and relationship constraints; structural pages use the bound page context |
+| Reading mode / page rhythm | `communication.consumption_mode` and `page_rhythm` |
+| Identity, typography, spacing, template mapping | Bound `template.design_spec` and exact `template.prototype` |
+| Roster / consistency / revision | Current Slide ID, `consistency_references`, and the request's exact base/feedback |
+
+Composition sketches are References; EY identity, fixed atoms, literal
+requirements, and approved meaning remain binding. Use the new text-measurement,
+contour vocabulary, topology, gradients, inline emphasis, and technical checks
+without creating another user gate or changing the candidate cycle.
+
+Native Office Math markers (`data-pptx-inline-formula` and
+`data-pptx-replace-with="formula"`) are not enabled in this integration: EY's
+text audit currently compares ordinary DrawingML runs and semantic paragraphs.
+Do not author these markers or activate native Chart/Table replacement at export;
+charts/tables continue through their visible editable shape/text representation.
+The supporting compiler may remain bundled as a converter dependency.
 
 ## Full design loop
 
@@ -54,12 +91,15 @@ change EY state, export PPTX, or question the user here.
    icons, typography, semantic SVG, and effects when they improve
    communication. Keep one coherent icon language and omit decorative icons.
 5. **Executor** — hand-author a complete editable SVG as an internal draft.
-6. **Art-direction refinement** — refine hierarchy, rhythm, optical balance,
-   connectors, emphasis, and chosen treatments until all
-   the `ey-executive-editorial-v3` quality profile passes.
+6. **Art-direction refinement** — assess hierarchy, rhythm, optical balance,
+   connectors, emphasis, and chosen treatments against the
+   `ey-executive-editorial-v3` quality profile; repair specific unmet criteria.
 7. **Review and repair** — inspect the complete source SVG at full-slide scale
    for composition, craft, clipping, overlap, legibility, and template fidelity;
-   repair and reinspect before returning COMPLETE.
+   combine identified repairs in one pass and verify once before returning
+   COMPLETE. Once the source review and deterministic checks pass, stop.
+   Repeat only for new changes, failed checks, or a specific unresolved defect;
+   do not keep polishing a passing page for hypothetical improvements.
 
 Do not use Chromium, Playwright, or another browser renderer for candidate QA.
 Direct source-SVG review and deterministic validation are the completion
@@ -70,9 +110,11 @@ evidence. Keep internal design decisions inside PPT Master.
 Build one complete A solution. EY supplies no separate wording policy, candidate design role, or layout.
 
 For Rn, bind the one displayed base and non-empty user feedback. Preserve the
-base except for requested changes and necessary reflow. Repeat the same quality
-gate; do not broaden a targeted revision into an unrelated redesign. Return one
-revised SVG for the next review round.
+base except for requested changes and necessary reflow. Review the affected
+elements and their page-level consequences, then run the required deterministic
+validation once on the final artifact. Apply the same bounded repair discipline;
+do not restart unrelated planning or broaden a targeted revision into a redesign.
+Return one revised SVG for the next review round.
 
 ## Invariants
 

@@ -134,9 +134,12 @@ Use this page block unless a compact table can preserve the bullet hierarchy and
 - Next connection: <specific content-to-content bridge | Not applicable>
 ```
 
-Obtain explicit approval before creating `framework.md` or `content.md`, unless
-the user waives this gate. This approval may confirm both an unambiguous type and
-the Storyline. After approval, use the shared controller workflow.
+Obtain explicit Storyline approval before creating `framework.md` or `content.md`,
+unless the user explicitly waives this gate. Record the actual waiver under
+[framework-contract.md](framework-contract.md); a waiver does not remove the
+complete Storyline or imply approval of later content/SVGs. Storyline approval
+may also confirm an unambiguous type. After approval or a recorded waiver, use
+the shared controller workflow and its effective [review policy](review-policy.md).
 In `framework.md`, default Cover, Agenda, Section divider, and Ending to
 `Deferred template` unless custom design is requested; never modify the fixed
 Ending. Export only after every authored page has a confirmed SVG and every

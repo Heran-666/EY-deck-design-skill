@@ -8,7 +8,8 @@ Content locked -> author A -> present -> confirm or revise -> SVG confirmed
 
 The controller owns requests, hashes, decisions, state, and publication. PPT
 Master owns design and technical completion. The user owns feedback and
-confirmation.
+confirmation, including explicit scope-bound delegation under
+[review-policy.md](review-policy.md).
 
 ## Candidate rules
 
@@ -30,13 +31,19 @@ PPT Master may optimize expression. Use consistency references for coherence,
 not composition copying. Keep build-only fields invisible.
 
 Before presentation, complete information design, composition, art-direction
-refinement, direct source-SVG review, repair, and recheck. Do not use a browser
-renderer for candidate QA.
+refinement, and direct source-SVG review. Consolidate identified repairs and
+verify once; after passing, repeat only for new changes, failed checks, or a
+specific unresolved defect. Do not use a browser renderer for candidate QA.
 
 ## Recovery
 
 - Invalid request: regenerate it through the owning controller command.
 - Invalid candidate: repair the requested artifact and run `record` again.
 - On re-entry before a decision, present the current version again.
-- Content change: use `reopen-content`.
-- Visual restart without content change: use `reopen-svg`.
+- Meaning, facts, data, sources, Page logic, or canonical content change: use
+  `reopen-content`.
+- Meaning-preserving wording or cosmetic feedback: use `request-svg-revision`
+  on the exact current displayed SVG, even after confirmation. Preserve
+  canonical content and prior versions; reconfirm the resulting Rn.
+- Explicit complete visual restart or controller-directed recovery: use
+  `reopen-svg`; it deletes the old cycle and is not the normal feedback route.

@@ -4,7 +4,7 @@
 
 Use this policy when the primary goal is to build knowledge or capability through explicit learning objectives, explanation, examples, practice, checks, or application support.
 
-Define observable learning outcomes before drafting. State what participants should be able to explain, distinguish, decide, perform, or apply after the session. Confirm the audience's starting level, delivery setting, available time, and any required practice or assessment format.
+Propose observable learning objectives before drafting. State what participants should be able to explain, distinguish, decide, perform, or apply after the session, without claiming those outcomes have already occurred. Use supplied audience and delivery context; clarify missing starting level, time, or assessment requirements only when they materially change the learning design.
 
 ## 2. Storyline logic
 
@@ -16,7 +16,7 @@ Sequence concepts by learning dependency, not merely by source order. Introduce 
 
 ## 3. Safeguards
 
-- Do not invent audience proficiency, learning outcomes, exercises, answer keys, policies, or required procedures.
+- Propose learning objectives, exercises, and answer keys for review, clearly distinguishing authored teaching material from verified facts. Do not invent audience proficiency, achieved learning outcomes, organization policies, or required procedures.
 - Distinguish instruction, illustration, practice, assessment, and reference material.
 - Do not turn the deck into a proposal or claim business outcomes that training alone cannot ensure.
 - Keep checks proportionate to the delivery setting and provide sufficient information for the expected response.

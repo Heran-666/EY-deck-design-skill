@@ -43,14 +43,18 @@ RUNTIME_PYTHON_ENV = "EY_DECK_PPTX_PYTHON"
 PRESENTATION_NS = "http://schemas.openxmlformats.org/presentationml/2006/main"
 DRAWINGML_NS = "http://schemas.openxmlformats.org/drawingml/2006/main"
 SVG_NS = "http://www.w3.org/2000/svg"
+# Upstream 6.4 also treats editable/layout-kind markers as structure hints.
+# They carry no visual content and must not leak into EY's flat staging roster.
 FLAT_PROJECTION_ATTRS = frozenset(
     {
         "data-pptx-binding",
         "data-pptx-carrier",
+        "data-pptx-editable",
         "data-pptx-idx",
         "data-pptx-layer",
         "data-pptx-layout",
         "data-pptx-layout-name",
+        "data-pptx-layout-kind",
         "data-pptx-master",
         "data-pptx-master-name",
         "data-pptx-placeholder",
@@ -305,13 +309,14 @@ def _write_flat_projection(
     projection_visual_fingerprint = _visual_fingerprint(projected_root)
     if projection_visual_fingerprint != source_visual_fingerprint:
         raise ValueError("flat projection changed visual SVG content")
+    source_hash = sha256(source)
     return {
         "transform": "strip-structure-metadata/v1",
         "source_kind": source_kind,
         "source_path": str(source.resolve()),
-        "source_sha256": sha256(source),
+        "source_sha256": source_hash,
         "confirmed_svg": str(source.resolve()),
-        "confirmed_sha256": sha256(source),
+        "confirmed_sha256": source_hash,
         "conversion_svg": str(destination.resolve()),
         "conversion_sha256": sha256(destination),
         "visual_fingerprint": source_visual_fingerprint,

@@ -34,15 +34,19 @@ frameworks.
 - Missing or invalid provisional content returns to `AUTHOR_PAGE_CONTENT`.
 - Editing provisional content invalidates its review binding; present it
   again before approval.
-- For any change to approved meaning, wording, data, sources, page order, or
+- For a change to approved meaning (including meaning-changing wording), data,
+  sources, Page logic, canonical source content, page order, or
   page count, run `reopen-content --page <Slide ID>`. It deletes the affected
   page's SVG requests, candidates, receipts, and confirmed output, then returns
   the page to content review.
+- For meaning-preserving wording or cosmetic feedback, keep canonical content
+  unchanged and use `request-svg-revision` on the displayed current SVG.
 
 ## SVG recovery
 
-- Before `prepare-svg-candidates`, load workspace dependencies and set
-  command-scoped `EY_DECK_SVG_PYTHON` to the returned absolute Python path. If
+- Before `prepare-svg-candidates`, reuse the session's valid bundled Python path
+  or load workspace dependencies if needed; set command-scoped
+  `EY_DECK_SVG_PYTHON` to that absolute path. If
   the runtime is unavailable, fail before changing state or candidate files;
   do not install another environment.
 - Deferred template pages skip SVG preparation. Substantive pages and Cover,
@@ -56,9 +60,14 @@ frameworks.
 - After an environment failure, rerun the same Rn request; do not allocate a
   new version. Keep it bound to the displayed base and exact user feedback.
   The controller deletes the transient feedback file after embedding it.
-- To restart visual work without changing approved content, run
+- For feedback on a valid current SVG, including an already-confirmed version,
+  use `request-svg-revision` with that exact displayed base and actual user
+  feedback. It preserves candidate history and returns a confirmed page to
+  `Content locked` until the revision is reconfirmed.
+- Only for an explicit complete visual restart or controller-directed recovery, run
   `reopen-svg --page <Slide ID>`. It deletes A/Rn artifacts, receipts, and the
   confirmed output, then starts again from A without archiving the old cycle.
+  Do not use it for ordinary cosmetic feedback.
 
 ## Confirmation recovery
 

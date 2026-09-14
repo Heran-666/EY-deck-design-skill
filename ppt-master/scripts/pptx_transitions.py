@@ -3,8 +3,8 @@
 PPT Master - PPTX Transition Core
 
 Provide one strict PowerPoint-native transition registry, a compatibility input
-map, and shared OOXML read/write helpers for generated slides, template-filled
-PPTX files, and native PPTX enhancement.
+map, and shared OOXML read/write helpers for generated and source-preserving
+round-trip PPTX files.
 See references/animations.md for the public workflow and
 scripts/docs/pptx-transitions.md for the OOXML contract.
 
@@ -525,7 +525,11 @@ _TRANSITION_EFFECT_OPTIONS: dict[str, dict[str, dict[str, Any]]] = {
         ),
     },
     "push": {
-        "direction": _attribute_enum("right", "dir", _CARDINAL_DIRECTIONS),
+        "direction": _attribute_enum(
+            "right",
+            "dir",
+            {**_CARDINAL_DIRECTIONS, "left": "l"},
+        ),
     },
     "wipe": {
         "direction": _attribute_enum("right", "dir", _CARDINAL_DIRECTIONS),
@@ -2431,8 +2435,11 @@ def validate_generated_transition_xml(
                     for child in (list(primary) if primary is not None else [])
                     if child.tag != _qn(PML_NS, "sndAc")
                 ]
-                if not effect_children:
-                    errors.append("generated transition has no visual effect child")
+                if len(effect_children) != 1:
+                    errors.append(
+                        "generated transition must contain exactly one visual "
+                        f"effect child; found {len(effect_children)}"
+                    )
                 else:
                     for name, value in expected_attrs.items():
                         if effect_children[0].get(name) != str(value):

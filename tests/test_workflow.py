@@ -1520,6 +1520,26 @@ class WorkflowTests(unittest.TestCase):
         self.assertTrue(any("positional dx" in item for item in errors))
         self.assertTrue(any("absolute-y rows" in item for item in errors))
 
+    def test_page_service_rejects_native_math_outside_text_audit_contract(self) -> None:
+        bodies = (
+            '<text x="60" y="100" font-size="24">Ratio '
+            '<tspan data-pptx-inline-formula="a/b">a/b</tspan></text>',
+            '<g data-pptx-replace-with="formula"><text x="60" y="100">a/b</text></g>',
+        )
+        with tempfile.TemporaryDirectory() as temporary:
+            svg = Path(temporary) / "formula.svg"
+            for body in bodies:
+                with self.subTest(body=body):
+                    svg.write_text(
+                        '<svg xmlns="http://www.w3.org/2000/svg" '
+                        'viewBox="0 0 1280 720">' + body + '</svg>',
+                        encoding="utf-8",
+                    )
+                    self.assertTrue(any(
+                        "native Office Math outside the EY text-audit contract" in message
+                        for message in artifact_errors(svg)
+                    ))
+
     def test_service_rejects_remote_svg_dependencies(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             project = Path(tmp)
@@ -1732,7 +1752,19 @@ class WorkflowTests(unittest.TestCase):
         self.assertIn("normally three to five planned content blocks", storyline)
         self.assertIn("Reading mode × Page rhythm", storyline)
         self.assertIn("Visual design direction", routing)
-        self.assertIn("preserve the three to five\ndistinct planned units", framework)
+        # Counts guide Storyline design; the controller must retain the exact
+        # approved scope, including a deliberate two-unit impact page.
+        for count in (2, 3, 5):
+            with self.subTest(units=count), tempfile.TemporaryDirectory() as tmp:
+                project = Path(tmp)
+                scope = "; ".join(f"Approved unit {index}" for index in range(1, count + 1))
+                source = DEFERRED_FRAMEWORK.replace("Recommendation detail", scope)
+                (project / "framework.md").write_text(source, encoding="utf-8")
+                initialized = run(project, "bootstrap")
+                self.assertEqual(initialized.returncode, 0, initialized.stdout + initialized.stderr)
+                payload = json.loads(initialized.stdout)
+                self.assertEqual(payload["review_context"]["active_page"]["Content scope"], scope)
+                self.assertEqual((project / "framework.md").read_text(encoding="utf-8"), source)
         self.assertIn("execution anchors", framework)
         self.assertIn("Keep structural pages role-appropriate and concise", framework)
 

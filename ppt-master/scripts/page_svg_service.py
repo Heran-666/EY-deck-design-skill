@@ -257,6 +257,11 @@ def artifact_errors(path: Path) -> list[str]:
         tag = element.tag.rsplit("}", 1)[-1]
         if tag in {"style", "script", "foreignObject"}:
             errors.append(f"artifact contains forbidden <{tag}>")
+        if (
+            element.get("data-pptx-inline-formula") is not None
+            or element.get("data-pptx-replace-with") == "formula"
+        ):
+            errors.append("artifact uses native Office Math outside the EY text-audit contract")
         href = element.attrib.get("href") or element.attrib.get("{http://www.w3.org/1999/xlink}href")
         if href and re.match(r"(?i)^(?:https?:)?//", href):
             errors.append(f"artifact contains remote URL: {href}")

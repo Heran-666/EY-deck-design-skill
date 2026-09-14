@@ -8,13 +8,22 @@ and transform authoring contracts.
 from __future__ import annotations
 
 import colorsys
+import json
 import math
 import re
 import unicodedata
 from collections import Counter
 from collections.abc import Iterator
 from decimal import Decimal, ROUND_HALF_UP
+from pathlib import Path
 from xml.etree import ElementTree as ET
+
+from pptx_gradients import (
+    NATIVE_GRADIENT_ATTR,
+    NATIVE_GRADIENT_PREVIEW_SHA256_ATTR,
+    NATIVE_GRADIENT_SHA256_ATTR,
+    preserved_native_gradient_xml,
+)
 
 from pptx_shapes import (
     OOXML_COORDINATE_MAX,
@@ -22,7 +31,7 @@ from pptx_shapes import (
     svg_preset_preview_fingerprint,
     validate_ooxml_xfrm,
 )
-from language_tags import language_base, language_uses_rtl
+from language_tags import language_base, language_uses_rtl, normalize_language_tag
 
 from .context import AffineMatrix, ConvertContext, IDENTITY_MATRIX
 
@@ -57,7 +66,7 @@ EA_FONTS = {
     'Hiragino Kaku Gothic ProN', 'Hiragino Kaku Gothic Pro',
     'Hiragino Mincho Pro',
     'Noto Sans SC', 'Noto Sans TC', 'Noto Serif SC', 'Noto Serif TC',
-    'Noto Sans CJK SC',
+    'Noto Sans CJK SC', 'Noto Serif CJK SC',
     'Noto Sans JP', 'Noto Serif JP', 'Noto Sans CJK JP',
     'Source Han Sans SC', 'Source Han Sans TC',
     'Source Han Serif SC', 'Source Han Serif TC',
@@ -106,6 +115,7 @@ FONT_FALLBACK_WIN = {
     'Noto Sans CJK SC': 'Microsoft YaHei',
     'Noto Sans TC': 'Microsoft JhengHei',
     'Noto Serif SC': 'SimSun',
+    'Noto Serif CJK SC': 'SimSun',
     'Noto Serif TC': 'PMingLiU',
     # Japanese: keep as-is if user specified (PowerPoint will fallback if uninstalled)
     # 'Noto Sans JP': → keep as 'Noto Sans JP' (do not map)
@@ -165,9 +175,12 @@ PPT_SAFE_FONTS = frozenset({
     'meiryo', 'meiryo ui',
     'ms gothic', 'ms mincho', 'ms pgothic', 'ms pmincho', 'ms ui gothic',
     'malgun gothic', 'gulim', 'dotum', 'batang',
+    'nirmala ui', 'mangal', 'kokila', 'aparajita', 'utsaah',
+    'leelawadee ui', 'leelawadee', 'cordia new', 'angsana new', 'browallia new',
+    'david', 'miriam', 'frank ruehl', 'gisha', 'levenim mt', 'narkisim', 'aharoni',
     'arial', 'arial black', 'calibri', 'segoe ui', 'verdana',
     'helvetica', 'helvetica neue', 'tahoma', 'trebuchet ms',
-    'times new roman', 'times', 'georgia', 'cambria', 'palatino',
+    'times new roman', 'times', 'georgia', 'cambria', 'cambria math', 'palatino',
     'garamond', 'book antiqua',
     'consolas', 'courier new', 'menlo', 'monaco',
     'impact',
@@ -253,6 +266,7 @@ PROJECT_FILTER_PUBLIC_TARGETS = frozenset({
     'circle',
     'image',
     'path',
+    'polygon',
     'text',
 })
 _PROJECT_MARKER_NUMBER_TOKEN = (
@@ -1026,7 +1040,7 @@ def _contains_native_marker(elem: ET.Element) -> bool:
     from ..native_objects.marker_attributes import native_replacement_kind
 
     return any(
-        native_replacement_kind(descendant) in {'table', 'chart'}
+        native_replacement_kind(descendant) in {'table', 'chart', 'formula'}
         for descendant in _iter_visual_transform_tree(elem)
     )
 
@@ -1177,7 +1191,7 @@ def _transform_semantic_error(
             if all(name in {'translate', 'scale'} for name in names):
                 return None
             return (
-                f'{label} native table/chart marker transforms support only '
+                f'{label} native replacement marker transforms support only '
                 'translate and scale'
             )
         if _contains_thick_circle(elem, thick_circle_ids):
@@ -1460,6 +1474,36 @@ def parse_inline_style(style_str: str | None) -> dict[str, str]:
         if name and value:
             styles[name] = value
     return styles
+
+
+def svg_hidden_reason(
+    element: ET.Element,
+    parent_by_id: dict[int, ET.Element],
+    *,
+    preserve_native_carriers: bool = False,
+) -> str | None:
+    """Resolve display suppression and inherited visibility, including overrides."""
+    visibility = None
+    current: ET.Element | None = element
+    while current is not None:
+        styles = parse_inline_style(current.get('style'))
+        display = styles.get('display', current.get('display', '')).strip().lower()
+        if display == 'none':
+            return 'display:none'
+        native_carrier = (
+            preserve_native_carriers
+            and current is element
+            and current.get('data-pptx-part') == 'geometry'
+            and current.get('data-pptx-object') in {'shape', 'connector'}
+        )
+        if visibility is None and not native_carrier:
+            value = styles.get('visibility', current.get('visibility', '')).strip().lower()
+            if value and value not in {'inherit', 'unset'}:
+                visibility = value
+        current = parent_by_id.get(id(current))
+    if visibility in {'hidden', 'collapse'}:
+        return f'visibility:{visibility}'
+    return None
 
 
 def iter_project_geometry_lengths(
@@ -2142,6 +2186,17 @@ def project_marker_errors(root: ET.Element) -> list[str]:
             else:
                 marker_channel = 'fill'
                 marker_paint = marker_fill
+            gradient_id = resolve_url_id(stroke_value)
+            gradient = definitions.get(gradient_id) if gradient_id else None
+            if gradient is not None:
+                try:
+                    native_gradient = preserved_native_gradient_xml(gradient)
+                except ValueError:
+                    native_gradient = None
+                if native_gradient is not None:
+                    # The original DrawingML line owns both gradient stroke
+                    # and arrowhead paint; the solid SVG marker is its preview.
+                    continue
             stroke_color, _stroke_alpha = parse_svg_color(stroke_value or '')
             marker_color, _marker_alpha = parse_svg_color(marker_paint)
             if stroke_color is None or marker_color is None:
@@ -2407,6 +2462,21 @@ def project_gradient_errors(root: ET.Element) -> list[str]:
             continue
         gradient_id = gradient.get('id')
         label = f'<{tag} id="{gradient_id}">' if gradient_id else f'<{tag}>'
+        if any(
+            gradient.get(name) is not None
+            for name in (
+                NATIVE_GRADIENT_ATTR,
+                NATIVE_GRADIENT_SHA256_ATTR,
+                NATIVE_GRADIENT_PREVIEW_SHA256_ATTR,
+            )
+        ):
+            try:
+                native = preserved_native_gradient_xml(gradient)
+            except ValueError as exc:
+                errors.add(f'{label} has invalid imported gradient payload: {exc}')
+                continue
+            if native is not None:
+                continue
         attribute_names = {
             name.rsplit('}', 1)[-1]
             for name in gradient.attrib
@@ -2749,13 +2819,14 @@ def project_filter_errors(root: ET.Element) -> list[str]:
             continue
         if (
             tag not in PROJECT_FILTER_PUBLIC_TARGETS
+            and not _is_compact_authored_preset_filter_target(elem)
             and not _is_imported_preset_preview_filter_target(elem, parents)
             and not is_picture_effect_carrier(elem)
         ):
             errors.add(
                 f'{label} cannot use filter; supported native targets are '
-                'rect, circle, image, path, text, and an exact single clipped-'
-                'image carrier group'
+                'rect, circle, image, path, polygon, text, a validated compact authored-'
+                'preset shape, and an exact registered carrier group'
             )
         if tag == 'image' and elem.get('clip-path') is not None:
             errors.add(
@@ -2905,6 +2976,26 @@ def project_filter_errors(root: ET.Element) -> list[str]:
     return sorted(errors)
 
 
+def _is_compact_authored_preset_filter_target(elem: ET.Element) -> bool:
+    """Recognize one validated project-authored preset shape filter target."""
+    if (
+        _svg_element_tag(elem) != 'g'
+        or elem.get('data-pptx-authoring') != 'preset'
+        or elem.get('data-pptx-object') != 'shape'
+        or elem.get('data-pptx-part') is not None
+    ):
+        return False
+    from pptx_to_svg.preset_authoring import (  # Local to avoid layer coupling.
+        authored_preset_encoding,
+        validate_authored_preset_group,
+    )
+
+    return (
+        authored_preset_encoding(elem) == 'compact'
+        and not validate_authored_preset_group(elem)
+    )
+
+
 def _is_imported_preset_preview_filter_target(
     elem: ET.Element,
     parents: dict[ET.Element, ET.Element],
@@ -2915,8 +3006,8 @@ def _is_imported_preset_preview_filter_target(
     shape-level effect.  The lossless importer therefore keeps the native
     filter on the hidden geometry carrier and mirrors the same reference onto
     its hash-locked preview group.  The preview group is never exported as a
-    separate PowerPoint object; ordinary authored ``<g filter>`` remains
-    outside the project contract.
+    separate PowerPoint object; other ordinary or authored ``<g filter>``
+    forms remain outside the project contract.
     """
     if (
         _svg_element_tag(elem) != 'g'
@@ -3103,14 +3194,55 @@ def get_effective_filter_id(elem: ET.Element, ctx: ConvertContext) -> str | None
 # Font parsing
 # ---------------------------------------------------------------------------
 
-def parse_font_family(font_family_str: str) -> dict[str, str]:
+# Windows EA faces for decks whose primary language is not Simplified Chinese:
+# (sans, serif) by BCP-47 language/script prefix.
+_EA_DEFAULTS_BY_LANGUAGE = (
+    (('ja',), ('Yu Gothic', 'Yu Mincho')),
+    (('ko',), ('Malgun Gothic', 'Batang')),
+    (('zh-hant', 'zh-tw', 'zh-hk', 'zh-mo'), ('Microsoft JhengHei', 'PMingLiU')),
+)
+# macOS Japanese faces map to Japanese Windows faces, not to Chinese ones.
+_JA_FONT_FALLBACK_WIN = {
+    'Hiragino Sans': 'Yu Gothic',
+    'Hiragino Kaku Gothic ProN': 'Yu Gothic',
+    'Hiragino Kaku Gothic Pro': 'Yu Gothic',
+    'Hiragino Mincho ProN': 'Yu Mincho',
+    'Hiragino Mincho Pro': 'Yu Mincho',
+}
+
+
+def _language_is(language: str | None, prefix: str) -> bool:
+    """Return whether a BCP-47 tag equals or starts with one subtag prefix."""
+    tag = (language or '').lower()
+    return tag == prefix or tag.startswith(prefix + '-')
+
+
+def _ea_default(language: str | None, serif: bool) -> str:
+    """Return the Windows EA fallback face for one deck language."""
+    for prefixes, faces in _EA_DEFAULTS_BY_LANGUAGE:
+        if any(_language_is(language, prefix) for prefix in prefixes):
+            return faces[1] if serif else faces[0]
+    return 'SimSun' if serif else 'Microsoft YaHei'
+
+
+def parse_font_family(
+    font_family_str: str,
+    language: str | None = None,
+) -> dict[str, str]:
     """Parse CSS font-family into latin/ea typeface names.
 
     Prioritizes Windows-available fonts since PPTX is primarily opened on
-    Windows. macOS/Linux-only fonts are mapped via FONT_FALLBACK_WIN.
+    Windows. macOS/Linux-only fonts are mapped via FONT_FALLBACK_WIN. The
+    first named Latin face fills ``latin`` and the first named CJK face fills
+    ``ea``; a CJK face also serves ``latin`` when no named Latin face exists,
+    and a generic family fills ``latin`` only when it precedes every named face.
+    ``language`` (the deck's BCP-47 primary language) picks the EA fallback
+    when the stack names no CJK face, so Japanese text never lands on a
+    Chinese face.
     """
+    is_japanese = _language_is(language, 'ja')
     if not font_family_str:
-        return {'latin': 'Segoe UI', 'ea': 'Microsoft YaHei'}
+        return {'latin': 'Segoe UI', 'ea': _ea_default(language, False)}
 
     fonts = [f.strip().strip("'\"") for f in font_family_str.split(',')]
     latin_font = None
@@ -3120,11 +3252,16 @@ def parse_font_family(font_family_str: str) -> dict[str, str]:
         if font in SYSTEM_FONTS:
             continue
         if font in GENERIC_FONT_MAP:
-            resolved = GENERIC_FONT_MAP[font]
-            latin_font = latin_font or resolved
+            # A generic family only fills the Latin slot when it precedes
+            # every named face: a trailing ``sans-serif`` after a named CJK
+            # face must not pull that run's Latin glyphs onto another face.
+            if latin_font is None and ea_font is None:
+                latin_font = GENERIC_FONT_MAP[font]
             continue
 
-        win_font = FONT_FALLBACK_WIN.get(font, font)
+        win_font = (
+            _JA_FONT_FALLBACK_WIN.get(font) if is_japanese else None
+        ) or FONT_FALLBACK_WIN.get(font, font)
         if font in EA_FONTS:
             ea_font = ea_font or win_font
         else:
@@ -3138,7 +3275,7 @@ def parse_font_family(font_family_str: str) -> dict[str, str]:
 
     # EA must always be a CJK-capable font
     if not ea_font:
-        ea_font = 'SimSun' if final_latin in _SERIF_LATIN else 'Microsoft YaHei'
+        ea_font = _ea_default(language, final_latin in _SERIF_LATIN)
 
     return {'latin': final_latin, 'ea': ea_font}
 
@@ -3223,6 +3360,18 @@ def _contains_codepoint_range(
         for ch in text
         for start, end in ranges
     )
+
+
+def _explicit_language_script(language: str) -> str | None:
+    """Return the explicit script before any region, variant, or extension."""
+    parts = normalize_language_tag(language).split('-')
+    index = 1
+    if len(parts[0]) <= 3:
+        while index < len(parts) and len(parts[index]) == 3 and parts[index].isalpha():
+            index += 1
+    if index < len(parts) and len(parts[index]) == 4 and parts[index].isalpha():
+        return parts[index]
+    return None
 
 
 def _default_language_for_script(
@@ -3343,7 +3492,30 @@ def detect_text_lang(
             frozenset({'el'}),
             'el-GR',
         )
+    if (
+        default_language
+        and language_base(default_language) in _NON_LATIN_SCRIPT_BASES
+        and _explicit_language_script(default_language) != 'Latn'
+        and any(ch.isalpha() for ch in text)
+    ):
+        # A run of Latin letters inside a CJK/Arabic/... deck (an English
+        # subtitle, a source line) proofs and reads as English, not as the
+        # deck language; digits and punctuation alone keep the deck tag.
+        return 'en-US'
     return default_language or 'en-US'
+
+
+# Language bases whose script the detector recognises above; a Latin-letter
+# run under one of these deck languages is not written in that language.
+_NON_LATIN_SCRIPT_BASES = frozenset({
+    'zh', 'ja', 'ko',
+    'ar', 'fa', 'ps', 'sd', 'ug', 'ur',
+    'he', 'yi',
+    'hi', 'mr', 'ne', 'sa',
+    'th',
+    'be', 'bg', 'kk', 'ky', 'mk', 'mn', 'ru', 'sr', 'uk',
+    'el',
+})
 
 
 def _is_grapheme_extend(ch: str) -> bool:
@@ -3474,6 +3646,11 @@ def resolve_text_run_fonts(text: str, fonts: dict[str, str]) -> dict[str, str]:
 
 
 def _estimate_character_width(ch: str, font_size: float) -> float:
+    if (
+        0xFF00 <= ord(ch) <= 0xFFEF
+        and unicodedata.east_asian_width(ch) == 'H'
+    ):
+        return font_size * 0.5
     if is_cjk_char(ch):
         return font_size
     if ch == ' ':
@@ -3502,21 +3679,69 @@ def _estimate_grapheme_width(cluster: str, font_size: float) -> float:
         and all(_is_regional_indicator(ch) for ch in bases)
     ) or '\u20e3' in cluster or any(_is_emoji_base(ch) for ch in bases):
         return font_size
-    return max(_estimate_character_width(ch, font_size) for ch in bases)
+    # Spacing combining marks (Indic vowel signs such as Devanagari aa/ii/o)
+    # sit beside the base and advance the pen; non-spacing marks do not.
+    spacing_marks = sum(1 for ch in cluster if unicodedata.category(ch) == 'Mc')
+    return (
+        max(_estimate_character_width(ch, font_size) for ch in bases)
+        + font_size * 0.3 * spacing_marks
+    )
+
+
+_FONT_ADVANCES_CACHE = None
+
+
+def primary_font_family(font_family: str | None) -> str:
+    """Normalize the first family in a font stack."""
+    return str(font_family or '').split(',')[0].strip().strip('\'"').lower()
+
+
+def get_font_advances(
+    font_family: str | None,
+    font_weight: str = '400',
+    font_style: str = 'normal',
+) -> dict[str, float] | None:
+    """Return bundled glyph advances for the primary family and style."""
+    family = primary_font_family(font_family)
+    if not family:
+        return None
+
+    global _FONT_ADVANCES_CACHE
+    if _FONT_ADVANCES_CACHE is None:
+        with Path(__file__).with_name('font_advances.json').open(encoding='utf-8') as handle:
+            _FONT_ADVANCES_CACHE = json.load(handle)['families']
+
+    bold = font_weight in ('bold', '600', '700', '800', '900')
+    italic = font_style in ('italic', 'oblique')
+    style = 'bold' if bold else 'regular'
+    if italic:
+        style = 'bold-italic' if bold else 'italic'
+    entry = _FONT_ADVANCES_CACHE.get(family, {}).get(style)
+    return entry['advances'] if entry is not None else None
 
 
 def estimate_text_cluster_widths(
     text: str,
     font_size: float,
     font_weight: str = '400',
+    *,
+    font_family: str | None = None,
+    font_style: str = 'normal',
 ) -> list[float]:
     """Estimate each project text cluster without inserting tracking."""
-    widths = [
-        _estimate_grapheme_width(cluster, font_size)
-        for cluster in split_project_text_clusters(text)
-    ]
-    if font_weight in ('bold', '600', '700', '800', '900'):
-        widths = [width * 1.05 for width in widths]
+    advances = get_font_advances(font_family, font_weight, font_style)
+    bold = font_weight in ('bold', '600', '700', '800', '900')
+    widths = []
+    for cluster in split_project_text_clusters(text):
+        cjk = any(is_cjk_char(ch) for ch in cluster)
+        if advances is not None and not cjk and all(
+            ch in advances and not _is_emoji_base(ch) and not _is_grapheme_extend(ch)
+            for ch in cluster
+        ):
+            widths.append(sum(advances[ch] for ch in cluster) * font_size)
+            continue
+        width = _estimate_grapheme_width(cluster, font_size)
+        widths.append(width * 1.05 if bold and not cjk else width)
     return widths
 
 

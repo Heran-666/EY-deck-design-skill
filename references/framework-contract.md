@@ -2,14 +2,20 @@
 
 ## Boundary
 
-Create `framework.md` only after the complete Storyline is explicitly approved.
+Create `framework.md` after the complete Storyline is explicitly approved or the
+user explicitly waives Storyline approval.
 It stores compact project context, page order, narrative intent, the approved
 reading-mode and page-rhythm execution anchors, durable page state, decisions,
 and unresolved items. Exclude approved copy or data, detailed design and layout
 choices, visual style, SVG/PPTX details, receipts, and PPT Master internal state.
 
-Before approval, use optional `working/intake-summary.md`. After approval, move
-only durable information into `framework.md`.
+Before approval or waiver, use optional `working/intake-summary.md`. Afterwards,
+move only durable information into `framework.md`. For a waiver, record its
+scope and the actual user instruction in S01's `Confirmed decisions`. If the
+instruction exceeds that field's limit, keep a concise scope and reference there
+and preserve the exact instruction in `working/intake-summary.md`. Never record
+a waiver that the user did not give. Later review preferences and delegated
+decisions use the controller-owned [review policy](review-policy.md).
 
 ## Required structure
 
@@ -54,8 +60,8 @@ Use one sequential Slide ID system. After content approval, the controller
 synchronizes the Storyline heading to the approved audience-facing title. Do
 not duplicate approved copy in `Content scope` or `Confirmed decisions`.
 
-For each substantive page, preserve the three to five
-distinct planned units from the approved `Content Summary` in `Content scope`.
+For each substantive page, preserve every approved `Content Summary` unit in
+`Content scope`.
 Compress them with semicolons, but retain the main claim and its approved
 explanation, evidence, example, boundary, implication, or action. Do not reduce
 the scope to a topic label or write final on-slide copy. Keep structural pages role-appropriate and concise.
@@ -101,6 +107,8 @@ Use only:
 The controller selects the first page not in `SVG confirmed`, `Deferred
 template`, or `Protected placeholder`. Content approval sets `Content locked`;
 candidate preparation does not change it; publication sets `SVG confirmed`.
+A feedback revision of the current confirmed SVG returns it to `Content locked`
+until reconfirmed, retaining the prior candidate and decision history.
 Only Cover, Agenda, Section divider, and Ending may use `Deferred template`.
 `Open items` must be `None` before content lock or template deferral.
 
@@ -112,8 +120,9 @@ to finish or reopen a pre-8.0 cycle.
 
 Keep candidate versions and revision history under `working/`, with their
 immutable request, artifact, and decision receipts. Reopening
-content returns the page to `Not started`; reopening SVG returns it to `Content
-locked` and removes transient SVG evidence.
+content returns the page to `Not started`; an explicit full SVG restart returns
+it to `Content locked` and removes transient SVG evidence. Ordinary cosmetic or
+expression feedback uses `request-svg-revision`, not a full restart.
 
 Limit `Narrative role`, `Next connection`, `Confirmed decisions`, and `Open
 items` to 500 characters each; limit `Content scope` to 700. Use a substantive

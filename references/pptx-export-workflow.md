@@ -8,8 +8,8 @@ DrawingML conversion, trace production, text parity, and package postflight.
 
 ## Export
 
-1. Load workspace dependencies and set command-scoped
-   `EY_DECK_PPTX_PYTHON` to the returned Python executable.
+1. Reuse the session's valid bundled Python path, or load workspace dependencies
+   if needed. Set command-scoped `EY_DECK_PPTX_PYTHON` to that executable.
 2. Run the emitted `export-pptx` command. It materializes deferred structural
    snapshots, binds deferred Cover text from `framework.md`, and writes a
    hash-bound roster only when the current request is missing or stale, then

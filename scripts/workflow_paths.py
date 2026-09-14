@@ -34,6 +34,13 @@ class ProjectPaths:
         return self.working / "receipts" / "content-review.json"
 
     @property
+    def review_policy(self) -> Path:
+        return self.working / "review-policy.json"
+
+    def content_decision(self, slide_id: str) -> Path:
+        return self.working / "receipts" / "content" / f"{slide_id}.json"
+
+    @property
     def svg_output(self) -> Path:
         return self.root / "svg_output"
 

@@ -166,9 +166,17 @@ def latest_revision(paths: ProjectPaths, slide_id: str) -> str | None:
     return versions[-1] if versions else None
 
 
-def confirm_candidate(paths: ProjectPaths, slide_id: str, version: str) -> Path:
+def confirm_candidate(paths: ProjectPaths, slide_id: str, version: str, *, decision: dict | None = None) -> Path:
     if not candidate_valid(paths, slide_id, version):
         raise ValueError(f"{version} is not a valid current SVG candidate")
+    if paths.decision_receipt(slide_id).is_file():
+        previous = read_json(paths.decision_receipt(slide_id))
+        previous_version = require_version(str(previous.get("confirmed_version", "")))
+        history = paths.decision_receipt(slide_id).parent / "decisions" / f"{previous_version}.json"
+        if history.is_file() and read_json(history) != previous:
+            raise ValueError("prior SVG confirmation history does not match the current receipt")
+        if not history.is_file():
+            write_json(history, previous)
     source = paths.candidate(slide_id, version)
     target = paths.svg_output / f"{slide_id}.svg"
     target.parent.mkdir(parents=True, exist_ok=True)
@@ -182,6 +190,7 @@ def confirm_candidate(paths: ProjectPaths, slide_id: str, version: str) -> Path:
             "artifact_sha256": sha256(source),
             "confirmed_path": str(target.resolve()),
             "confirmed_at": now(),
+            "decision_policy": decision or {"mode": "manual"},
         },
     )
     return target

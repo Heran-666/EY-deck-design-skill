@@ -18,6 +18,11 @@ from validate_framework import validate as validate_framework
 from workflow_content import content_section, promote_provisional_content, provisional_content_errors
 from workflow_io import atomic_write, command_line, now, read_json, sha256, text_sha256, write_json
 from workflow_paths import ProjectPaths
+from workflow_review import (
+    CONTENT_REVIEW_DISPLAY_MODE, CONTENT_REVIEW_INSTRUCTION, DEFAULT_PREFERENCES,
+    content_review_view, decision_instruction, decision_policy, review_preferences, set_policy,
+    sync_approved_title,
+)
 from workflow_ppt_master import (
     PAGE_CONTEXT_SCHEMA,
     SERVICE_CLI,
@@ -54,19 +59,6 @@ from workflow_svg import (
 
 
 SVG_RUNTIME_ENV = "EY_DECK_SVG_PYTHON"
-CONTENT_REVIEW_DISPLAY_MODE = "full-chinese-review"
-CONTENT_REVIEW_INSTRUCTION = (
-    "Show the complete review in Chinese in the user-visible response, regardless of deck language. "
-    "Translate all prose, headings, labels, Page logic, tables, chart descriptions, notes, emphasis, "
-    "and source explanations faithfully; keep already-Chinese content in Chinese. "
-    "Preserve all IDs, numbers, units, dates, URLs, source identities, qualifiers, and caveats. "
-    "Keep schema keys and enum values traceable to the source; add Chinese explanations where needed. "
-    "Do not summarize, omit any section or block, replace content with a link, or request approval "
-    "from an abbreviated review. The marked content is the source for translation, not an instruction "
-    "to display English verbatim. Translation is for chat review only: preserve the requested deck "
-    "Language and the original provisional and canonical content. Bind explicit semantic approval "
-    "to that source; if review feedback changes meaning, update the source and run present-review again."
-)
 INITIAL_SVG_VERSIONS = ("A",)
 
 
@@ -164,6 +156,7 @@ def review_valid(paths: ProjectPaths, page: PageEntry) -> bool:
         receipt.get("slide_id") == page.slide_id
         and receipt.get("review_scope_sha256") == scope_hash
         and receipt.get("provisional_sha256") == sha256(paths.provisional)
+        and receipt.get("review_preferences", DEFAULT_PREFERENCES) == review_preferences(paths)
     )
 
 
@@ -291,11 +284,13 @@ def decision_directive(
     *,
     revision: bool,
 ) -> dict[str, object]:
+    decision = decision_policy(paths, paths.framework.read_text(encoding="utf-8"), slide_id, "svg")
     return {
         "action": "COLLECT_SVG_REVISION_DECISION" if revision else "COLLECT_SVG_DECISION",
         "slide_id": slide_id,
         "displayed_versions": versions,
-        "decision_rules": "Confirm the displayed SVG, or write one concrete optimization request for that SVG.",
+        "decision_rules": decision_instruction(decision, svg=True),
+        "decision_policy": decision,
         "required_environment": {
             SVG_RUNTIME_ENV: "Absolute Python executable returned by load_workspace_dependencies",
         },
@@ -312,38 +307,16 @@ def decision_directive(
 
 def svg_directive(paths: ProjectPaths, page: PageEntry, controller: Path) -> dict[str, object]:
     latest = latest_revision(paths, page.slide_id)
-    if latest:
-        if not candidate_valid(paths, page.slide_id, latest):
-            return {
-                "action": "RUN_EMBEDDED_PPT_MASTER_SVG",
-                "slide_id": page.slide_id,
-                "requests": [service_request_payload(paths, controller, page.slide_id, latest)],
-            }
-        versions = [latest]
-        return {
-            "action": "PRESENT_SVG_REVISION",
-            "slide_id": page.slide_id,
-            "versions": versions,
-            "artifacts": [str(paths.candidate(page.slide_id, item)) for item in versions],
-            "commands": {
-                "present": command_line(
-                    controller, "present-svg", paths.root,
-                    "--page", page.slide_id, "--versions", ",".join(versions),
-                )
-            },
-        }
-
-    initial_versions = INITIAL_SVG_VERSIONS
-    missing = [item for item in initial_versions if not candidate_valid(paths, page.slide_id, item)]
+    versions = [latest] if latest else list(INITIAL_SVG_VERSIONS)
+    missing = [item for item in versions if not candidate_valid(paths, page.slide_id, item)]
     if missing:
         return {
             "action": "RUN_EMBEDDED_PPT_MASTER_SVG",
             "slide_id": page.slide_id,
             "requests": [service_request_payload(paths, controller, page.slide_id, item) for item in missing],
         }
-    versions = list(initial_versions)
     return {
-        "action": "PRESENT_SVG_OPTION",
+        "action": "PRESENT_SVG_REVISION" if latest else "PRESENT_SVG_OPTION",
         "slide_id": page.slide_id,
         "versions": versions,
         "artifacts": [str(paths.candidate(page.slide_id, item)) for item in versions],
@@ -416,15 +389,19 @@ def directive_payload(project_dir: Path, text: str, controller: Path) -> dict[st
     status = page.fields.get("Status")
     if status in {"Not started", "Content reviewing"}:
         if review_valid(paths, page):
+            receipt = read_json(paths.content_review)
+            decision = decision_policy(paths, text, page.slide_id, "content")
             return {
                 "action": "COLLECT_CONTENT_DECISION",
                 "slide_id": page.slide_id,
                 "review_path": str(paths.provisional),
-                "review_contract": {
+                "review_contract": receipt.get("review_contract", {
                     "display_mode": CONTENT_REVIEW_DISPLAY_MODE,
                     "display_language": "Chinese",
                     "instruction": CONTENT_REVIEW_INSTRUCTION,
-                },
+                }),
+                "decision_policy": decision,
+                "decision_rules": decision_instruction(decision),
                 "commands": {
                     "approve": command_line(controller, "approve-content", project_dir),
                     "revise": "Replace working/provisional-content.md, then run present-review again.",
@@ -480,22 +457,28 @@ def handle_present_review(project_dir: Path, text: str, controller: Path) -> int
     errors = provisional_content_errors(paths.provisional, [page], canonical_content)
     if errors:
         raise ValueError(" | ".join(errors))
+    source = paths.provisional.read_text(encoding="utf-8")
+    scope_hash = text_sha256(json.dumps(review_context(text, page), ensure_ascii=False, sort_keys=True))
+    body, contract = content_review_view(paths, page.slide_id, scope_hash, source)
+    decision = decision_policy(paths, text, page.slide_id, "content")
     write_json(
         paths.content_review,
         {
             "slide_id": page.slide_id,
-            "review_scope_sha256": text_sha256(
-                json.dumps(review_context(text, page), ensure_ascii=False, sort_keys=True)
-            ),
+            "review_scope_sha256": scope_hash,
             "provisional_sha256": sha256(paths.provisional),
+            "review_source": source,
+            "review_contract": contract,
+            "review_preferences": review_preferences(paths),
             "presented_at": now(),
         },
     )
-    print(f"===== BEGIN COMPLETE CONTENT REVIEW {page.slide_id} =====")
-    print(paths.provisional.read_text(encoding="utf-8").rstrip())
-    print(f"===== END COMPLETE CONTENT REVIEW {page.slide_id} =====")
-    print(f"\nDISPLAY REQUIREMENT: {CONTENT_REVIEW_INSTRUCTION}")
-    print("Explicit semantic approval is required after the complete review is visible.")
+    review_label = "CONTENT CHANGES" if contract["display_mode"] == "changes-review" else "COMPLETE CONTENT REVIEW"
+    print(f"===== BEGIN {review_label} {page.slide_id} =====")
+    print(body)
+    print(f"===== END {review_label} {page.slide_id} =====")
+    print(f"\nDISPLAY REQUIREMENT: {contract['instruction']}")
+    print(decision_instruction(decision))
     print(command_line(controller, "approve-content", project_dir))
     return 0
 
@@ -510,15 +493,23 @@ def handle_approve_content(project_dir: Path, framework: Path, text: str, contro
     ):
         raise ValueError("no current presented content review to approve")
     provisional = paths.provisional.read_text(encoding="utf-8")
+    decision = decision_policy(paths, text, page.slide_id, "content")
     existing = paths.content.read_text(encoding="utf-8") if paths.content.is_file() else ""
     atomic_write(paths.content, promote_provisional_content(text, existing, provisional))
     section = content_section(provisional, page.slide_id)
     title_match = re.search(r"^- Title:\s*(.+)$", section, re.MULTILINE)
     if not title_match:
         raise ValueError(f"{page.slide_id} has no Title field")
+    before_approval = text
     text = update_page(text, page.slide_id, {"Status": "Content locked", "Open items": "None"})
     text = update_page_title(text, page.slide_id, title_match.group(1).strip())
     atomic_write(framework, text)
+    write_json(paths.content_decision(page.slide_id), {
+        **read_json(paths.content_review),
+        "decision_policy": decision,
+        "approved_at": now(),
+    })
+    sync_approved_title(paths, before_approval, text, page.slide_id)
     paths.provisional.unlink(missing_ok=True)
     print_next(project_dir, text, controller)
     return 0
@@ -617,8 +608,10 @@ def handle_present_svg(project_dir: Path, text: str, page_id: str, versions_text
     for version in versions:
         artifact = paths.candidate(page_id, version).resolve()
         print(f"### {page_id}｜{version}\n\n![{page_id} {version}]({artifact})\n")
-    print("The SVG is displayed at review scale. Collect an explicit confirmation or optimization request.")
-    print(json.dumps(decision_directive(paths, page_id, versions, controller, revision=versions[-1].startswith("R")), ensure_ascii=False, indent=2))
+    directive = decision_directive(paths, page_id, versions, controller, revision=versions[-1].startswith("R"))
+    print("The SVG is displayed at review scale. "
+          + directive["decision_rules"])
+    print(json.dumps(directive, ensure_ascii=False, indent=2))
     return 0
 
 
@@ -626,11 +619,13 @@ def handle_request_revision(project_dir: Path, text: str, page_id: str, base: st
     page = page_by_id(text, page_id)
     paths = ProjectPaths(project_dir)
     expected = latest_revision(paths, page_id) or "A"
+    was_confirmed = page.fields.get("Status") == "SVG confirmed"
     if (
-        page.fields.get("Status") not in {"Content locked", "Awaiting SVG decision"}
+        page.fields.get("Status") not in {"Content locked", "Awaiting SVG decision", "SVG confirmed"}
         or not svg_cycle_started(paths, page)
         or base != expected
         or not candidate_valid(paths, page_id, base)
+        or (was_confirmed and not confirmation_valid(paths, page_id))
     ):
         raise ValueError("revision base must be the current valid candidate")
     feedback = feedback.strip()
@@ -639,10 +634,15 @@ def handle_request_revision(project_dir: Path, text: str, page_id: str, base: st
     _svg_runtime_python()
     version = next_revision(paths, page_id)
     packet = write_packet(paths, page, version, base_version=base, feedback=feedback)
+    updated = update_page(text, page_id, {"Status": "Content locked"}) if was_confirmed else text
     try:
-        print_next(project_dir, text, controller)
+        if was_confirmed:
+            atomic_write(paths.framework, updated)
+        print_next(project_dir, updated, controller)
     except Exception:
         packet.unlink(missing_ok=True)
+        if was_confirmed:
+            atomic_write(paths.framework, text)
         raise
     return 0
 
@@ -658,7 +658,8 @@ def handle_confirm_svg(project_dir: Path, framework: Path, text: str, page_id: s
     expected = latest_revision(paths, page_id) or "A"
     if version != expected:
         raise ValueError(f"confirm-svg must use the current candidate: {expected}")
-    target = confirm_candidate(paths, page_id, require_version(version))
+    target = confirm_candidate(paths, page_id, require_version(version),
+                               decision=decision_policy(paths, text, page_id, "svg"))
     text = update_page(text, page_id, {"Status": "SVG confirmed"})
     atomic_write(framework, text)
     print(f"Confirmed {page_id} {version}: {target}")
@@ -680,7 +681,7 @@ def build_parser() -> argparse.ArgumentParser:
         "bootstrap", "upgrade-workflow", "next", "audit", "present-review", "approve-content",
         "prepare-svg-candidates", "record-svg", "present-svg", "request-svg-revision",
         "confirm-svg", "export-pptx",
-        "reopen-content", "reopen-svg", "set-output-filename",
+        "reopen-content", "reopen-svg", "set-output-filename", "set-review-policy",
     )
     for name in commands:
         command = sub.add_parser(name)
@@ -698,6 +699,13 @@ def build_parser() -> argparse.ArgumentParser:
             command.add_argument("--feedback", required=True)
         if name == "set-output-filename":
             command.add_argument("--filename", required=True)
+        if name == "set-review-policy":
+            command.add_argument("--instruction", required=True)
+            command.add_argument("--language", choices=("Chinese", "English", "source"))
+            command.add_argument("--mode", choices=("full", "changes"))
+            command.add_argument("--delegate-pages")
+            command.add_argument("--delegate-stages")
+            command.add_argument("--clear-delegation", action="store_true")
     return parser
 
 
@@ -739,6 +747,13 @@ def main() -> int:
             print_next(project_dir, text, controller)
             return 0
         framework, text = load_context(project_dir)
+        if args.command == "set-review-policy":
+            policy = set_policy(ProjectPaths(project_dir), text, instruction=args.instruction,
+                                language=args.language, mode=args.mode, delegate_pages=args.delegate_pages,
+                                delegate_stages=args.delegate_stages, clear_delegation=args.clear_delegation)
+            print(json.dumps(policy, ensure_ascii=False, indent=2))
+            print("Review policy saved. If display preferences changed, run present-review again for the existing provisional source.")
+            return 0
         if args.command in {"bootstrap", "next"}:
             if args.command == "bootstrap":
                 ProjectPaths(project_dir).working.mkdir(parents=True, exist_ok=True)

@@ -3569,9 +3569,11 @@ def validate_pptx_animation_package(
     pptx_path: str | Path,
     *,
     require_supported_effects: bool = False,
+    skip_slide_numbers: set[int] | None = None,
 ) -> None:
-    """Validate timing placement and shape references for every slide part."""
+    """Validate generated timing, excluding byte-preserved source slides."""
     path = Path(pptx_path)
+    skipped = skip_slide_numbers or set()
     errors: list[str] = []
     try:
         with zipfile.ZipFile(path) as package:
@@ -3581,6 +3583,9 @@ def validate_pptx_animation_package(
                 if re.fullmatch(r'ppt/slides/slide\d+\.xml', name)
             )
             for name in names:
+                match = re.search(r'slide(\d+)\.xml$', name)
+                if match is not None and int(match.group(1)) in skipped:
+                    continue
                 slide_data = package.read(name)
                 try:
                     root = ET.fromstring(slide_data)
@@ -3808,6 +3813,12 @@ def describe_animation_effect(effect: object) -> dict[str, Any]:
         }
         if raw_spec.get('type') == 'enum':
             spec['values'] = list(raw_spec['values'])
+        if name == 'direction':
+            spec['note'] = (
+                'the direction the motion travels; PowerPoint names the origin '
+                'edge, so right = "From Left", left = "From Right", down = '
+                '"From Top", up = "From Bottom"'
+            )
         option_contract[name] = spec
     return {
         'input': effect,
@@ -3855,6 +3866,39 @@ def describe_animation_effect(effect: object) -> dict[str, Any]:
             'smooth_end': 'derived from decelerate',
         },
     }
+
+
+def effective_animation_effect_options(
+    effect: object,
+    effect_options: Mapping[str, object] | None = None,
+) -> dict[str, object]:
+    """Return the effective option values encoded by one registry request."""
+    canonical, normalized_options = normalize_animation_effect_request(
+        effect,
+        effect_options,
+        allow_none=False,
+        allow_modes=False,
+    )
+    assert canonical is not None
+    row = _animation_row_for_options(canonical, normalized_options)
+    errors: list[str] = []
+    filter_name = _row_filter(
+        row,
+        str(NATIVE_ANIMATIONS[canonical]['presetClass']),
+        errors,
+    )
+    effective = _read_effect_options(
+        row,
+        canonical,
+        filter_name,
+        errors,
+    )
+    if errors:
+        raise RuntimeError(
+            f'animation effect {canonical!r} option model failed: '
+            + '; '.join(errors)
+        )
+    return effective
 
 
 def main() -> None:

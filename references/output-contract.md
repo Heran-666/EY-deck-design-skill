@@ -25,9 +25,10 @@ Begin the first provisional file and the canonical file with:
 
 `Language` specifies the final deck language. Write audience-facing content in
 that language, and preserve it when content is promoted. Storyline and content
-confirmation in chat use a complete Chinese review translation as defined in
-`storyline-and-content.md`; that review view does not replace the source files
-or change the build profile.
+confirmation in chat default to a complete Chinese review translation as defined
+in `storyline-and-content.md`. Explicit display preferences follow
+`review-policy.md`; the review view never replaces the source files or changes
+the build profile.
 
 Exclude template identity, visual decisions, Storyline tables, analysis
 registers, review logs, open questions, and assumptions.
@@ -126,6 +127,9 @@ derive visible numbering from block order.
 
 - Apply PPT Master's `content vs expression` rule: wording is preferred, not
   verbatim, and concise connective copy may add no new claim.
+- Make meaning-preserving expression edits in an SVG revision without changing
+  canonical `content.md`. Changes to approved meaning or canonical source
+  require the content review path.
 - Keep build-only fields invisible; use them as guidance, never on-slide text.
 - Use `Emphasis` only for semantic priority: `关键重点`, `次级重点`, `对比重点`, or
   `普通加粗`. Reserve `对比重点` for an approved contrast. PPT Master may apply

@@ -3,37 +3,38 @@
 This file defines the shared reasoning standard. Use the confirmed
 `storyline-type-*.md` policy for type-specific sequence and safeguards.
 
-## Chat review language
+## Chat review language and fidelity
 
-At Storyline confirmation and content confirmation, present all review material
-in Chinese in chat, whether the deck is requested in Chinese or English.
-Translate English material before displaying it; keep Chinese material in
-Chinese. This applies to the initial review, revised reviews, and resumed
-confirmation stages.
+Default to complete Chinese Storyline and content reviews in chat, including
+revised and resumed reviews, whether the deck is Chinese or English. Explicit
+language or difference-review preferences follow [review-policy.md](review-policy.md).
+Translate only when needed for the effective review language.
 
-For Storyline, translate the context, thesis, chapter and page titles, claims,
-Content Summary units, Next connection, and Reading mode × Page rhythm design
-directions. For content, use the complete `present-review` marked source and
-translate the full page, including Page logic, headings, block details, Child
-logic, emphasis intent, tables and chart descriptions, notes, and source
+For a full Storyline review, include the context, thesis, chapter and page
+titles, claims, Content Summary units, Next connection, and Reading mode × Page
+rhythm design directions. For a full content review, use the complete
+`present-review` marked source, including Page logic, headings, block details,
+Child logic, emphasis intent, tables and chart descriptions, notes, and source
 explanations. Translate field labels for readability; retain schema keys and
-enum values alongside Chinese explanations when needed for traceability.
+enum values alongside explanations when needed for traceability.
 
 Preserve page/block IDs, all numbers, units, dates, URLs, source identities,
 relationships, qualifiers, conditions, and caveats. Keep proper names and
-technical identifiers traceable; add Chinese explanations where useful. Review
-translation must neither summarize nor omit content, add claims, strengthen
-certainty, or substitute a file link. An English original alone does not satisfy
-this gate. For example, `The pilot may reduce rework by 15% if controls are met`
-becomes `在满足控制要求的情况下，试点可能将返工减少 15%。`
+technical identifiers traceable. Never add claims, strengthen certainty, or
+substitute a file link. Full review must neither summarize nor omit content;
+authorized difference review must faithfully show all emitted changes. Under
+the default Chinese policy, an English original alone is insufficient. For
+example, `The pilot may reduce rework by 15% if controls are met` becomes
+`在满足控制要求的情况下，试点可能将返工减少 15%。`.
 
-The Chinese text is a chat review view of the source. Keep the requested deck
-language in `Language`, audience-facing Storyline fields used for deck output
-(including deferred Cover text), and provisional/canonical on-slide content.
-Do not overwrite them with the review translation. Explicit approval of the
-faithful Chinese review approves the corresponding source meaning. If feedback
-changes that meaning, update the source and present its complete Chinese review
-again; use `present-review` again for content so the binding is current.
+The review text is a view of the source. Keep the requested deck language in
+`Language`, audience-facing Storyline fields used for deck output (including
+deferred Cover text), and provisional/canonical on-slide content. Do not replace
+them with review translations. Approval of a faithful review approves the
+corresponding source meaning. If feedback changes that meaning, update the
+source and review again under the effective policy; rerun `present-review` for
+content so the source binding is current. Meaning-preserving SVG wording edits
+leave canonical content unchanged and follow the SVG revision workflow.
 
 ## Storyline
 
